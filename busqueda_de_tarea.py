@@ -24,7 +24,7 @@ usuario_input.send_keys('jotoapanta')  # Reemplaza 'tu_usuario' por tu nombre de
 
 # Encuentra el campo de contraseña por su atributo 'name' y completa el campo con la contraseña
 password_input = driver.find_element(By.NAME, 'josso_password')
-password_input.send_keys('Sebas3413620j7.')  # Reemplaza 'tu_contraseña' por tu contraseña
+password_input.send_keys('contraseña')  # Reemplaza 'tu_contraseña' por tu contraseña
 
 # Enviar el formulario presionando la tecla Enter
 password_input.send_keys(Keys.RETURN)
