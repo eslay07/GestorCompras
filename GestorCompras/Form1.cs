@@ -1,4 +1,5 @@
-﻿using GestorCompras;
+﻿//using Cotizador;
+using GestorCompras;
 using System;
 using System.Windows.Forms;
 
@@ -17,6 +18,15 @@ namespace ProyectoCotizador
             proveedoresForm.Show();
             this.Hide();
         }
+
+        private void btnProductos_Click(object sender, EventArgs e)
+        {
+            ProductosForm productosForm = new ProductosForm();
+            productosForm.Show();
+            this.Hide();
+        }
+
+
 
         private void btnCotizador_Click(object sender, EventArgs e)
         {

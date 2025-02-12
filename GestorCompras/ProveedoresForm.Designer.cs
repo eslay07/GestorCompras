@@ -246,7 +246,9 @@ namespace ProyectoCotizador
 
         private void btnCerrar_Click(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
+            Form1 form1 = new Form1();
+            form1.Show();
+            this.Close();  // Cierra Form2
         }
 
         private System.Windows.Forms.TextBox txtRuc;

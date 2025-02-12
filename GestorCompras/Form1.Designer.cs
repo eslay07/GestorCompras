@@ -1,4 +1,6 @@
-﻿namespace ProyectoCotizador
+﻿using System.Windows.Forms;
+
+namespace ProyectoCotizador
 {
     partial class Form1
     {
@@ -17,6 +19,7 @@
         private void InitializeComponent()
         {
             this.btnProveedores = new System.Windows.Forms.Button();
+            this.btnProductos = new System.Windows.Forms.Button();
             this.btnCotizador = new System.Windows.Forms.Button();
             this.btnTareas = new System.Windows.Forms.Button();
             this.btnSalir = new System.Windows.Forms.Button();
@@ -28,7 +31,7 @@
             this.btnProveedores.BackColor = System.Drawing.Color.SteelBlue;
             this.btnProveedores.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnProveedores.ForeColor = System.Drawing.Color.White;
-            this.btnProveedores.Location = new System.Drawing.Point(99, 145);
+            this.btnProveedores.Location = new System.Drawing.Point(99, 99);
             this.btnProveedores.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnProveedores.Name = "btnProveedores";
             this.btnProveedores.Size = new System.Drawing.Size(225, 75);
@@ -37,12 +40,26 @@
             this.btnProveedores.UseVisualStyleBackColor = false;
             this.btnProveedores.Click += new System.EventHandler(this.btnProveedores_Click);
             // 
+            // btnProductos
+            // 
+            this.btnProductos.BackColor = System.Drawing.Color.SteelBlue;
+            this.btnProductos.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
+            this.btnProductos.ForeColor = System.Drawing.Color.White;
+            this.btnProductos.Location = new System.Drawing.Point(99, 182);
+            this.btnProductos.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
+            this.btnProductos.Name = "btnProductos";
+            this.btnProductos.Size = new System.Drawing.Size(225, 75);
+            this.btnProductos.TabIndex = 0;
+            this.btnProductos.Text = "Productos";
+            this.btnProductos.UseVisualStyleBackColor = false;
+            this.btnProductos.Click += new System.EventHandler(this.btnProductos_Click);
+            // 
             // btnCotizador
             // 
             this.btnCotizador.BackColor = System.Drawing.Color.SteelBlue;
             this.btnCotizador.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnCotizador.ForeColor = System.Drawing.Color.White;
-            this.btnCotizador.Location = new System.Drawing.Point(99, 228);
+            this.btnCotizador.Location = new System.Drawing.Point(99, 265);
             this.btnCotizador.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnCotizador.Name = "btnCotizador";
             this.btnCotizador.Size = new System.Drawing.Size(225, 75);
@@ -56,7 +73,7 @@
             this.btnTareas.BackColor = System.Drawing.Color.SteelBlue;
             this.btnTareas.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnTareas.ForeColor = System.Drawing.Color.White;
-            this.btnTareas.Location = new System.Drawing.Point(99, 311);
+            this.btnTareas.Location = new System.Drawing.Point(99, 348);
             this.btnTareas.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnTareas.Name = "btnTareas";
             this.btnTareas.Size = new System.Drawing.Size(225, 75);
@@ -84,7 +101,7 @@
             this.label1.AutoSize = true;
             this.label1.BackColor = System.Drawing.SystemColors.Window;
             this.label1.ForeColor = System.Drawing.Color.DarkTurquoise;
-            this.label1.Location = new System.Drawing.Point(136, 67);
+            this.label1.Location = new System.Drawing.Point(135, 37);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(148, 20);
             this.label1.TabIndex = 4;
@@ -96,9 +113,10 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.ClientSize = new System.Drawing.Size(430, 625);
+            this.ClientSize = new System.Drawing.Size(500, 625);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.btnProveedores);
+            this.Controls.Add(this.btnProductos);
             this.Controls.Add(this.btnCotizador);
             this.Controls.Add(this.btnTareas);
             this.Controls.Add(this.btnSalir);
@@ -114,6 +132,7 @@
         #endregion
 
         private System.Windows.Forms.Button btnProveedores;
+        private System.Windows.Forms.Button btnProductos;
         private System.Windows.Forms.Button btnCotizador;
         private System.Windows.Forms.Button btnTareas;
         private System.Windows.Forms.Button btnSalir;
