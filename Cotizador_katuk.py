@@ -73,7 +73,7 @@ except:
 # 3. Ingresar contraseña
 try:
     password_input = driver.find_element(By.ID, "password")
-    password_input.send_keys("3413620Heidan")
+    password_input.send_keys("contraseña")
     password_input.send_keys(Keys.RETURN)  # Dar Enter para iniciar sesión
     time.sleep(3)
 except:
