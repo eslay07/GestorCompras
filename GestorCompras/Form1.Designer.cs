@@ -31,7 +31,7 @@ namespace ProyectoCotizador
             this.btnProveedores.BackColor = System.Drawing.Color.SteelBlue;
             this.btnProveedores.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnProveedores.ForeColor = System.Drawing.Color.White;
-            this.btnProveedores.Location = new System.Drawing.Point(99, 99);
+            this.btnProveedores.Location = new System.Drawing.Point(138, 102);
             this.btnProveedores.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnProveedores.Name = "btnProveedores";
             this.btnProveedores.Size = new System.Drawing.Size(225, 75);
@@ -45,7 +45,7 @@ namespace ProyectoCotizador
             this.btnProductos.BackColor = System.Drawing.Color.SteelBlue;
             this.btnProductos.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnProductos.ForeColor = System.Drawing.Color.White;
-            this.btnProductos.Location = new System.Drawing.Point(99, 182);
+            this.btnProductos.Location = new System.Drawing.Point(138, 185);
             this.btnProductos.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnProductos.Name = "btnProductos";
             this.btnProductos.Size = new System.Drawing.Size(225, 75);
@@ -59,7 +59,7 @@ namespace ProyectoCotizador
             this.btnCotizador.BackColor = System.Drawing.Color.SteelBlue;
             this.btnCotizador.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnCotizador.ForeColor = System.Drawing.Color.White;
-            this.btnCotizador.Location = new System.Drawing.Point(99, 265);
+            this.btnCotizador.Location = new System.Drawing.Point(138, 268);
             this.btnCotizador.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnCotizador.Name = "btnCotizador";
             this.btnCotizador.Size = new System.Drawing.Size(225, 75);
@@ -73,7 +73,7 @@ namespace ProyectoCotizador
             this.btnTareas.BackColor = System.Drawing.Color.SteelBlue;
             this.btnTareas.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnTareas.ForeColor = System.Drawing.Color.White;
-            this.btnTareas.Location = new System.Drawing.Point(99, 348);
+            this.btnTareas.Location = new System.Drawing.Point(138, 351);
             this.btnTareas.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnTareas.Name = "btnTareas";
             this.btnTareas.Size = new System.Drawing.Size(225, 75);
@@ -87,7 +87,7 @@ namespace ProyectoCotizador
             this.btnSalir.BackColor = System.Drawing.Color.Firebrick;
             this.btnSalir.Font = new System.Drawing.Font("Arial", 12F, System.Drawing.FontStyle.Bold);
             this.btnSalir.ForeColor = System.Drawing.Color.White;
-            this.btnSalir.Location = new System.Drawing.Point(99, 431);
+            this.btnSalir.Location = new System.Drawing.Point(138, 434);
             this.btnSalir.Margin = new System.Windows.Forms.Padding(3, 4, 3, 4);
             this.btnSalir.Name = "btnSalir";
             this.btnSalir.Size = new System.Drawing.Size(225, 75);
@@ -98,12 +98,12 @@ namespace ProyectoCotizador
             // 
             // label1
             // 
-            this.label1.AutoSize = true;
-            this.label1.BackColor = System.Drawing.SystemColors.Window;
+            this.label1.BackColor = System.Drawing.Color.Thistle;
+            this.label1.Font = new System.Drawing.Font("Arial", 14F, System.Drawing.FontStyle.Bold);
             this.label1.ForeColor = System.Drawing.Color.DarkTurquoise;
-            this.label1.Location = new System.Drawing.Point(135, 37);
+            this.label1.Location = new System.Drawing.Point(104, 30);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(148, 20);
+            this.label1.Size = new System.Drawing.Size(311, 49);
             this.label1.TabIndex = 4;
             this.label1.Text = "Gestor de Compras";
             this.label1.Click += new System.EventHandler(this.label1_Click);
@@ -112,7 +112,7 @@ namespace ProyectoCotizador
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.WhiteSmoke;
+            this.BackColor = System.Drawing.SystemColors.ActiveCaption;
             this.ClientSize = new System.Drawing.Size(500, 625);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.btnProveedores);
@@ -126,7 +126,6 @@ namespace ProyectoCotizador
             this.Name = "Form1";
             this.Text = "Menú Principal";
             this.ResumeLayout(false);
-            this.PerformLayout();
 
         }
         #endregion
