@@ -8,7 +8,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json.Serialization;
 using System.Windows.Forms;
 
 namespace ProyectoCotizador
@@ -20,16 +19,18 @@ namespace ProyectoCotizador
         public CotizadorForm()
         {
             InitializeComponent();
-            //estilizador de botones
-            // Botones en panelBottom
-            EstilizarBoton(this.BtnGuardar_Click, "Guardar", 50);
-            EstilizarBoton(this.btnCotcorreo_Click, "Cot. Correo", 220);
+
+            // Estilizar botones
+       
+            EstilizarBoton(this.btnCotcorreo, "Cot. Correo", 220);
             EstilizarBoton(this.btnCotKatuk, "Cotizar Katuk", 390);
-            EstilizarBoton(this.btnPegarExcel, "Pegar Excel", 560);
             EstilizarBoton(this.btnRegresar, "Regresar", 730);
-            //conexiones y teclaas de la tabla
+
+            // Configuración del DataGridView
             conn = DatabaseHelper.GetConnection();
-           dgvProductos.KeyDown += dgvProductos_KeyDown;
+            dgvProductos.KeyDown += dgvProductos_KeyDown;
+            dgvProductos.EditingControlShowing += dgvProductos_EditingControlShowing;
+            dgvProductos.RowsAdded += dgvProductos_RowsAdded;
             ConfigurarDataGridView();
             LoadCategorias();
         }
@@ -37,6 +38,10 @@ namespace ProyectoCotizador
         private void LoadCategorias()
         {
             cmbCategoria.Items.Clear();
+            if (conn.State != ConnectionState.Open)
+            {
+                conn.Open();
+            }
             using (var cmd = new NpgsqlCommand("SELECT DISTINCT categoria FROM proveedores", conn))
             {
                 using (var reader = cmd.ExecuteReader())
@@ -52,72 +57,93 @@ namespace ProyectoCotizador
         private void ConfigurarDataGridView()
         {
             dgvProductos.Columns.Clear();
-
             dgvProductos.Columns.Add("Codigo", "Código");
             dgvProductos.Columns.Add("Producto", "Producto");
+            dgvProductos.Columns.Add("Cantidad", "Cantidad"); // Editable por el usuario
             dgvProductos.Columns.Add("Precio", "Precio");
 
-            // 🔹 Ajustar el tamaño de las columnas al contenido
             dgvProductos.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
 
-            // 🔹 Ajustar el ancho total del DataGridView según sus columnas
-            dgvProductos.Width = dgvProductos.Columns.Cast<DataGridViewColumn>().Sum(c => c.Width) + dgvProductos.RowHeadersWidth + 5;
-
-            // 🔹 Ajustar la altura total del DataGridView
-            dgvProductos.Height = Math.Min(600, dgvProductos.RowTemplate.Height * 50 + dgvProductos.ColumnHeadersHeight + 5);
-
-            // 🔹 Centrar el DataGridView en el formulario
-            dgvProductos.Left = (this.ClientSize.Width - dgvProductos.Width) / 2;
-            dgvProductos.Top = (this.ClientSize.Height - dgvProductos.Height) / 2;
-
-            // 🔹 Agregar 50 filas en blanco al inicio
-            for (int i = 0; i < 55; i++)
-            {
-                dgvProductos.Rows.Add();
-            }
-
-            dgvProductos.EditingControlShowing += dgvProductos_EditingControlShowing;
-            dgvProductos.KeyDown += dgvProductos_KeyDown;
+            // Agregar una fila inicial + 2 filas en blanco
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
+            dgvProductos.Rows.Add();
         }
 
-        // Manejar eventos cuando el usuario empieza a editar una celda
         private void dgvProductos_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
         {
-            if (dgvProductos.CurrentCell.ColumnIndex == 0) // Solo en la columna "Código"
+            if (dgvProductos.CurrentCell.ColumnIndex == 0) // Columna "Código"
             {
                 TextBox txt = e.Control as TextBox;
                 if (txt != null)
                 {
-                    txt.KeyDown -= Codigo_KeyDown;  // Evita múltiples suscripciones
+                    txt.KeyDown -= Codigo_KeyDown;
                     txt.KeyDown += Codigo_KeyDown;
-
-                    txt.Leave -= Codigo_Leave;  // Evento al salir de la celda
-                    txt.Leave += Codigo_Leave;
                 }
             }
         }
-        // Detectar cambios en la celda "Código" y limpiar si es necesario
-        private void dgvProductos_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        private void dgvProductos_RowsAdded(object sender, DataGridViewRowsAddedEventArgs e)
         {
-            if (e.ColumnIndex == 0 && e.RowIndex >= 0) // Solo afecta a la columna "Código"
+            // Si el usuario agrega una nueva fila manualmente, añadimos dos filas más en blanco.
+            if (e.RowIndex == dgvProductos.Rows.Count - 1)
             {
-                string codigo = dgvProductos.Rows[e.RowIndex].Cells["Codigo"].Value?.ToString()?.Trim();
-
-                if (string.IsNullOrEmpty(codigo))
-                {
-                    // Si el código está vacío, limpiar "Producto" y "Precio"
-                    dgvProductos.Rows[e.RowIndex].Cells["Producto"].Value = "";
-                    dgvProductos.Rows[e.RowIndex].Cells["Precio"].Value = "";
-                }
-                else
-                {
-                    // Si se escribió un código, intentar completar datos
-                    CompletarDatosDesdeBD(codigo, e.RowIndex);
-                }
+                dgvProductos.Rows.Add();
+                dgvProductos.Rows.Add();
             }
         }
 
-        // Cuando el usuario presiona "Enter" en la celda "Código"
+        private void BorrarSeleccion()
+        {
+            foreach (DataGridViewCell cell in dgvProductos.SelectedCells)
+            {
+                cell.Value = DBNull.Value; // Elimina el contenido sin dejar espacios invisibles
+            }
+        }
+
+        private void dgvProductos_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Control && e.KeyCode == Keys.C)
+            {
+                CopiarSeleccion();
+                e.Handled = true;
+            }
+            else if (e.Control && e.KeyCode == Keys.V)
+            {
+                PegarDesdePortapapeles();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Delete || e.KeyCode == Keys.Back)
+            {
+                BorrarSeleccion();
+                e.Handled = true;
+            }
+        }
+
+
         private void Codigo_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
@@ -127,35 +153,27 @@ namespace ProyectoCotizador
 
                 if (!string.IsNullOrEmpty(codigo))
                 {
-                    CompletarDatosDesdeBD(codigo, rowIndex);
+                    bool encontrado = CompletarDatosDesdeBD(codigo, rowIndex);
+
+                    // Si el código no existe, dejar la fila editable
+                    if (!encontrado)
+                    {
+                        dgvProductos.Rows[rowIndex].Cells["Producto"].ReadOnly = false;
+                        dgvProductos.Rows[rowIndex].Cells["Cantidad"].ReadOnly = false;
+                        dgvProductos.Rows[rowIndex].Cells["Precio"].ReadOnly = false;
+                    }
+
+                    // Asegurar que haya exactamente dos filas vacías al final
+                    AgregarFilasSiEsNecesario();
                 }
 
-                e.SuppressKeyPress = true; // Evita el sonido del "Enter"
-            }
-        }
-
-        // Cuando el usuario termina de editar una celda y cambia de foco
-        private void Codigo_Leave(object sender, EventArgs e)
-        {
-            int rowIndex = dgvProductos.CurrentCell.RowIndex;
-            string codigo = dgvProductos.Rows[rowIndex].Cells["Codigo"].EditedFormattedValue.ToString().Trim();
-
-            if (string.IsNullOrEmpty(codigo))
-            {
-                // Si el usuario borra el código, limpiar Producto y Precio
-                dgvProductos.Rows[rowIndex].Cells["Producto"].Value = "";
-                dgvProductos.Rows[rowIndex].Cells["Precio"].Value = "";
-            }
-            else
-            {
-                // Si hay un código ingresado, intentar completar datos
-                CompletarDatosDesdeBD(codigo, rowIndex);
+                e.SuppressKeyPress = true;
             }
         }
 
 
-        // Consultar PostgreSQL para obtener el producto y el precio según el código
-        private void CompletarDatosDesdeBD(string codigo, int rowIndex)
+
+        private bool CompletarDatosDesdeBD(string codigo, int rowIndex)
         {
             string query = "SELECT nombre, precio FROM productos WHERE codigo = @codigo";
 
@@ -176,62 +194,244 @@ namespace ProyectoCotizador
                         {
                             dgvProductos.Rows[rowIndex].Cells["Producto"].Value = reader["nombre"].ToString();
                             dgvProductos.Rows[rowIndex].Cells["Precio"].Value = reader["precio"].ToString();
-                        }
-                        else
-                        {
-                            // Si el código no existe, limpiar las columnas para evitar datos incorrectos
-                            dgvProductos.Rows[rowIndex].Cells["Producto"].Value = "";
-                            dgvProductos.Rows[rowIndex].Cells["Precio"].Value = "";
+
+                            dgvProductos.Rows[rowIndex].Cells["Producto"].ReadOnly = true;
+                            dgvProductos.Rows[rowIndex].Cells["Cantidad"].ReadOnly = false; // El usuario siempre debe ingresar cantidad
+                            dgvProductos.Rows[rowIndex].Cells["Precio"].ReadOnly = true;
+
+                            return true; // Código encontrado en BD
                         }
                     }
                 }
             }
+
+            return false; // Código no encontrado en BD
         }
 
-        // 🔹 Control de teclas (Copiar, Pegar, Borrar)
-        private void dgvProductos_KeyDown(object sender, KeyEventArgs e)
+        private bool EsFilaVacia(int rowIndex)
         {
-            if (e.Control && e.KeyCode == Keys.C)
+            if (rowIndex < 0 || rowIndex >= dgvProductos.Rows.Count) return false;
+
+            var codigo = dgvProductos.Rows[rowIndex].Cells["Codigo"].Value;
+            var producto = dgvProductos.Rows[rowIndex].Cells["Producto"].Value;
+            var cantidad = dgvProductos.Rows[rowIndex].Cells["Cantidad"].Value;
+            var precio = dgvProductos.Rows[rowIndex].Cells["Precio"].Value;
+
+            return (codigo == null || string.IsNullOrWhiteSpace(codigo.ToString())) &&
+                   (producto == null || string.IsNullOrWhiteSpace(producto.ToString())) &&
+                   (cantidad == null || string.IsNullOrWhiteSpace(cantidad.ToString())) &&
+                   (precio == null || string.IsNullOrWhiteSpace(precio.ToString()));
+        }
+        private void AgregarFilasSiEsNecesario()
+        {
+            int filasVacias = 0;
+            int totalFilas = dgvProductos.Rows.Count;
+
+            // Contamos cuántas filas vacías hay al final
+            for (int i = totalFilas - 1; i >= 0; i--)
             {
-                CopiarSeleccion();
-                e.Handled = true;
+                if (EsFilaVacia(i))
+                {
+                    filasVacias++;
+                }
+                else
+                {
+                    break; // Detenemos el conteo cuando encontramos una fila con datos
+                }
             }
-            else if (e.Control && e.KeyCode == Keys.V)
+
+            // Si hay menos de dos filas vacías, agregamos las que falten
+            while (filasVacias < 15)
             {
-                PegarDesdePortapapeles();
-                e.Handled = true;
-            }
-            else if (e.KeyCode == Keys.Delete || e.KeyCode == Keys.Back)
-            {
-                BorrarSeleccion();
-                e.Handled = true;
+                dgvProductos.Rows.Add();
+                filasVacias++;
             }
         }
 
-        // 🔹 Copiar selección al portapapeles
+
+        private void btnCotKatuk_Click(object sender, EventArgs e)
+        {
+            GuardarDatosEnJson("Cotizador_katuk.py");
+        }
+
+        private void btnCotcorreo_Click(object sender, EventArgs e)
+        {
+            GuardarDatosEnJson2("busqueda_de_tarea.py");
+        }
+        ////funcion  que ejecuta script para cotizacion por katuk
+        private void GuardarDatosEnJson(string scriptPython)
+        {
+            string numeroTarea = txtNumeroTarea.Text.Trim();
+            string categoria = cmbCategoria.SelectedItem?.ToString()?.Trim();
+
+            // 🔴 Validación de "Número de Tarea" y "Categoría"
+            if (string.IsNullOrEmpty(numeroTarea))
+            {
+                MessageBox.Show("El campo 'Número de Tarea' no puede estar vacío.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(categoria))
+            {
+                MessageBox.Show("El campo 'Categoría' no puede estar vacío.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var productos = new List<object>();
+
+            foreach (DataGridViewRow row in dgvProductos.Rows)
+            {
+                if (row.IsNewRow) continue; // Ignorar la última fila vacía por defecto
+
+                string codigo = row.Cells["Codigo"].Value?.ToString()?.Trim();
+                string producto = row.Cells["Producto"].Value?.ToString()?.Trim();
+                string cantidad = row.Cells["Cantidad"].Value?.ToString()?.Trim();
+                string precio = row.Cells["Precio"].Value?.ToString()?.Trim();
+
+                // 🔴 Validación de filas con código pero con campos vacíos
+                if (!string.IsNullOrEmpty(codigo) && (string.IsNullOrEmpty(producto) || string.IsNullOrEmpty(cantidad) || string.IsNullOrEmpty(precio)))
+                {
+                    MessageBox.Show($"Faltan campos por llenar en la fila del código: {codigo}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return; // No permite guardar el JSON
+                }
+
+                // 🔵 Si la fila está completamente vacía, se ignora
+                if (string.IsNullOrEmpty(codigo) && string.IsNullOrEmpty(producto) && string.IsNullOrEmpty(cantidad) && string.IsNullOrEmpty(precio))
+                {
+                    continue;
+                }
+
+                // 🔵 Si la fila está completa, agregarla a la lista
+                productos.Add(new
+                {
+                    Codigo = string.IsNullOrEmpty(codigo) ? "SIN CÓDIGO" : codigo,
+                    Producto = string.IsNullOrEmpty(producto) ? "SIN PRODUCTO" : producto,
+                    Cantidad = string.IsNullOrEmpty(cantidad) ? "0" : cantidad,
+                    Precio = string.IsNullOrEmpty(precio) ? "0.00" : precio
+                });
+            }
+
+            // 🔴 Validación de que haya al menos un producto en la lista
+            if (productos.Count == 0)
+            {
+                MessageBox.Show("No hay productos válidos para procesar.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var jsonData = new
+            {
+                NumeroTarea = numeroTarea,
+                Categoria = categoria,
+                Productos = productos
+            };
+
+            string jsonPath = Path.Combine(Application.StartupPath, "datos_automatizacion_temp.json");
+            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(jsonData, Formatting.Indented));
+
+            // COMENTADO PARA FUTURA ACTIVACIÓN
+            /*
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "C:\\Users\\jimmy\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                Arguments = $"\"E:/Proyecto compras/GestorCompras/{scriptPython}\" \"{jsonPath}\"",
+                UseShellExecute = false
+            })?.WaitForExit();
+
+            File.Delete(jsonPath);
+            */
+
+            MessageBox.Show("Datos listos para automatización. Ejecución de script desactivada.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        //funcion  que ejecuta script para cotizacion por correo
+        private void GuardarDatosEnJson2(string scriptPython)
+        {
+            string numeroTarea = txtNumeroTarea.Text.Trim();
+            string categoria = cmbCategoria.SelectedItem?.ToString()?.Trim();
+
+            // 🔴 Validación de "Número de Tarea" y "Categoría"
+            if (string.IsNullOrEmpty(numeroTarea))
+            {
+                MessageBox.Show("El campo 'Número de Tarea' no puede estar vacío.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(categoria))
+            {
+                MessageBox.Show("El campo 'Categoría' no puede estar vacío.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var productos = new List<object>();
+
+            foreach (DataGridViewRow row in dgvProductos.Rows)
+            {
+                if (row.IsNewRow) continue; // Ignorar la última fila vacía por defecto
+
+                string codigo = row.Cells["Codigo"].Value?.ToString()?.Trim();
+                string producto = row.Cells["Producto"].Value?.ToString()?.Trim();
+                string cantidad = row.Cells["Cantidad"].Value?.ToString()?.Trim();
+                string precio = row.Cells["Precio"].Value?.ToString()?.Trim();
+
+                // 🔴 Validación de filas con código pero con campos vacíos
+                if (!string.IsNullOrEmpty(codigo) && (string.IsNullOrEmpty(producto) || string.IsNullOrEmpty(cantidad) || string.IsNullOrEmpty(precio)))
+                {
+                    MessageBox.Show($"Faltan campos por llenar en la fila del código: {codigo}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return; // No permite guardar el JSON
+                }
+
+                // 🔵 Si la fila está completamente vacía, se ignora
+                if (string.IsNullOrEmpty(codigo) && string.IsNullOrEmpty(producto) && string.IsNullOrEmpty(cantidad) && string.IsNullOrEmpty(precio))
+                {
+                    continue;
+                }
+
+                // 🔵 Si la fila está completa, agregarla a la lista
+                productos.Add(new
+                {
+                    Codigo = string.IsNullOrEmpty(codigo) ? "SIN CÓDIGO" : codigo,
+                    Producto = string.IsNullOrEmpty(producto) ? "SIN PRODUCTO" : producto,
+                    Cantidad = string.IsNullOrEmpty(cantidad) ? "0" : cantidad,
+                    Precio = string.IsNullOrEmpty(precio) ? "0.00" : precio
+                });
+            }
+
+            // 🔴 Validación de que haya al menos un producto en la lista
+            if (productos.Count == 0)
+            {
+                MessageBox.Show("No hay productos válidos para procesar.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var jsonData = new
+            {
+                NumeroTarea = numeroTarea,
+                Categoria = categoria,
+                Productos = productos
+            };
+
+            string jsonPath = Path.Combine(Application.StartupPath, "datos_automatizacion_temp.json");
+            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(jsonData, Formatting.Indented));
+
+            // COMENTADO PARA FUTURA ACTIVACIÓN
+            /*
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "C:\\Users\\jimmy\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+                Arguments = $"\"E:/Proyecto compras/GestorCompras/{scriptPython}\" \"{jsonPath}\"",
+                UseShellExecute = false
+            })?.WaitForExit();
+
+            File.Delete(jsonPath);
+            */
+
+            MessageBox.Show("Datos listos para automatización. Ejecución de script desactivada.", "Información", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+
+
+
         private void CopiarSeleccion()
         {
-            if (dgvProductos.SelectedCells.Count > 0)
-            {
-                StringBuilder sb = new StringBuilder();
-                int currentRowIndex = -1;
-
-                foreach (DataGridViewCell cell in dgvProductos.SelectedCells)
-                {
-                    if (currentRowIndex != cell.RowIndex)
-                    {
-                        if (sb.Length > 0) sb.AppendLine();
-                        currentRowIndex = cell.RowIndex;
-                    }
-                    else
-                    {
-                        sb.Append("\t");
-                    }
-                    sb.Append(cell.Value?.ToString() ?? "");
-                }
-
-                Clipboard.SetText(sb.ToString());
-            }
+            Clipboard.SetText(dgvProductos.GetClipboardContent().GetText());
         }
 
         private void PegarDesdePortapapeles()
@@ -241,245 +441,61 @@ namespace ProyectoCotizador
             string clipboardText = Clipboard.GetText();
             string[] filas = clipboardText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
-            int rowIndex = dgvProductos.CurrentCell.RowIndex; // Fila actual donde se pega el primer dato
-            int colIndex = dgvProductos.CurrentCell.ColumnIndex;
+            int rowIndex = dgvProductos.CurrentCell.RowIndex; // Fila donde se pegarán los datos
+            int colIndex = dgvProductos.CurrentCell.ColumnIndex; // Columna seleccionada
 
             foreach (string fila in filas)
             {
                 string[] celdas = fila.Split('\t');
                 int tempColIndex = colIndex;
 
-                // Asegurar que haya suficientes filas en el DataGridView antes de asignar valores
+                // Asegurar que haya suficientes filas para pegar los datos
                 while (rowIndex >= dgvProductos.Rows.Count)
                 {
                     dgvProductos.Rows.Add();
                 }
 
+                // Pegado respetando la columna seleccionada
                 foreach (string celda in celdas)
                 {
-                    if (tempColIndex < dgvProductos.ColumnCount && rowIndex < dgvProductos.Rows.Count)
+                    if (tempColIndex < dgvProductos.ColumnCount) // Evitar que sobrepase las columnas
                     {
-                        dgvProductos[tempColIndex, rowIndex].Value = celda.Trim();
+                        dgvProductos.Rows[rowIndex].Cells[tempColIndex].Value = celda.Trim();
                         tempColIndex++;
                     }
                 }
 
-                // Si la primera columna (Código) tiene un valor, completar datos
+                // Si se pegó un código, intentar completar datos desde la BD
                 string codigo = dgvProductos.Rows[rowIndex].Cells["Codigo"].Value?.ToString();
                 if (!string.IsNullOrEmpty(codigo))
                 {
                     CompletarDatosDesdeBD(codigo, rowIndex);
                 }
 
-                rowIndex++; // Moverse a la siguiente fila
+                rowIndex++;
             }
 
-            // 🔹 Asegurar que la última fila siempre quede vacía para futuras inserciones
-            if (!EsFilaVacia(dgvProductos.Rows.Count - 1))
-            {
-                dgvProductos.Rows.Add();
-            }
-        }
-
-        private bool EsFilaVacia(int rowIndex)
-        {
-            if (rowIndex < 0 || rowIndex >= dgvProductos.Rows.Count) return false;
-
-            var codigo = dgvProductos.Rows[rowIndex].Cells["Codigo"].Value;
-            return codigo == null || string.IsNullOrWhiteSpace(codigo.ToString());
-        }
-
-        // 🔹 Borrar celdas seleccionadas con "Delete" o "Backspace"
-        private void BorrarSeleccion()
-        {
-            foreach (DataGridViewCell cell in dgvProductos.SelectedCells)
-            {
-                if (!cell.ReadOnly)
-                {
-                    cell.Value = null;
-                }
-            }
-        }
-
-        private void btnCotKatuk_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var productos = new System.Collections.Generic.List<object>();
-
-                foreach (DataGridViewRow row in dgvProductos.Rows)
-                {
-                    if (!row.IsNewRow)
-                    {
-                        string codigo = row.Cells["Codigo"].Value?.ToString()?.Trim();
-                        string producto = row.Cells["Producto"].Value?.ToString()?.Trim();
-                        string cantidad = row.Cells["Cantidad"].Value?.ToString()?.Trim();
-
-                        // Solo agregar filas donde todas las celdas tienen datos
-                        if (!string.IsNullOrEmpty(codigo) && !string.IsNullOrEmpty(producto) && !string.IsNullOrEmpty(cantidad))
-                        {
-                            productos.Add(new
-                            {
-                                Codigo = codigo,
-                                Producto = producto,
-                                Cantidad = cantidad
-                            });
-                        }
-                    }
-                }
-
-                // Verificar que hay datos para guardar
-                if (productos.Count == 0)
-                {
-                    MessageBox.Show("No hay productos válidos para procesar.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                var jsonData = new
-                {
-                    NumeroTarea = txtNumeroTarea.Text.Trim(),
-                    Categoria = cmbCategoria.SelectedItem?.ToString()?.Trim(),
-                    Productos = productos
-                };
-
-                string basePath = Application.StartupPath;
-                string jsonPath = Path.Combine(basePath, "datos_automatizacion_temp.json");
-
-                // 🔹 📌 Verificar permisos de escritura
-                if (!Directory.Exists(basePath))
-                {
-                    MessageBox.Show($"Error: La carpeta {basePath} no existe.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                // 🔹 📌 Guardar el JSON inicial
-                try
-                {
-                    File.WriteAllText(jsonPath, JsonConvert.SerializeObject(jsonData, Formatting.Indented));
-                    MessageBox.Show($"Archivo JSON creado exitosamente en:\n{jsonPath}", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error al escribir el archivo JSON:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                // 🔹 📌 Ejecutar el script de Python
-                ProcessStartInfo start = new ProcessStartInfo
-                {
-                    FileName = "C:\\Users\\jimmy\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
-                    Arguments = $"\"E:/Proyecto compras/GestorCompras/Cotizador_katuk.py\" \"{jsonPath}\"",
-                    UseShellExecute = false
-                };
-
-                using (Process proc = Process.Start(start))
-                {
-                    proc.WaitForExit(); // Esperar a que termine el script de Python
-
-                    // ********** 📌 LÓGICA PARA CREAR ARCHIVOS CONSECUTIVOS SI EL SCRIPT SIGUE EJECUTÁNDOSE **********
-                    /*
-                    int count = 1;
-                    string newJsonPath = jsonPath;
-
-                    while (Process.GetProcessesByName("python").Length > 0) // Verifica si hay instancias de Python corriendo
-                    {
-                        newJsonPath = Path.Combine(basePath, $"datos_automatizacion_temp_{count}.json");
-                        count++;
-                        File.WriteAllText(newJsonPath, JsonConvert.SerializeObject(jsonData, Formatting.Indented));
-                    }
-
-                    // Cuando termine el proceso, eliminar archivos temporales
-                    foreach (var file in Directory.GetFiles(basePath, "datos_automatizacion_temp_*.json"))
-                    {
-                        File.Delete(file);
-                    }
-                    */
-
-                    MessageBox.Show("Publicación creada exitosamente!");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error inesperado:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            // Asegurar que haya dos filas vacías al final después de pegar datos
+            AgregarFilasSiEsNecesario();
         }
 
 
-        private void btnCotcorreo(object sender, EventArgs e)
-        {
-            var productos = new System.Collections.Generic.List<object>();
-            foreach (DataGridViewRow row in dgvProductos.Rows)
-            {
-                if (!row.IsNewRow)
-                {
-                    productos.Add(new
-                    {
-                        Producto = row.Cells[0].Value?.ToString(),
-                        Cantidad = row.Cells[1].Value?.ToString()
-                    });
-                }
-            }
 
-            var jsonData = new
-            {
-                NumeroTarea = txtNumeroTarea.Text,
-                Categoria = cmbCategoria.SelectedItem?.ToString(),
-                Productos = productos
-            };
-
-            string jsonPath = Path.Combine(Application.StartupPath, "datos_automatizacion_temp.json");
-            File.WriteAllText(jsonPath, JsonConvert.SerializeObject(jsonData));
-
-            ProcessStartInfo start = new ProcessStartInfo
-            {
-                FileName = "C:\\Users\\jimmy\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
-                Arguments = $"\"E:/Proyecto compras/GestorCompras/busqueda_de_tarea.py\" \"{jsonPath}\"",
-                UseShellExecute = false
-            };
-
-            using (Process proc = Process.Start(start))
-            {
-                proc.WaitForExit(); // Esperar a que termine el script de Python
-
-                //  Eliminar el archivo JSON después de la ejecución
-                if (File.Exists(jsonPath))
-                {
-                    File.Delete(jsonPath);
-                    Console.WriteLine("Archivo JSON eliminado correctamente.");
-                }
-
-                MessageBox.Show("Publicación creada exitosamente!");
-            }
-        } 
-   
-        //prueba para commit
         private void btnRegresar_Click(object sender, EventArgs e)
         {
-            Form1 mainForm = new Form1();
-            mainForm.Show();
+            new Form1().Show();
             this.Close();
         }
 
-        private void dgvProductos_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        {
-
-        }
-
-        private void dgvProductos_CellContentClick_1(object sender, DataGridViewCellEventArgs e)
-        {
-
-        }
         private void EstilizarBoton(Button boton, string texto, int posicionX)
         {
             boton.Text = texto;
-            boton.Size = new System.Drawing.Size(140, 35);
+            boton.Size = new Size(140, 35);
             boton.Location = new Point(posicionX, 12);
-
             boton.ForeColor = Color.White;
             boton.BackColor = Color.SteelBlue;
             boton.FlatStyle = FlatStyle.Flat;
             boton.FlatAppearance.BorderSize = 0;
         }
-
     }
 }
