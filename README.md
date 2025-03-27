@@ -72,7 +72,7 @@ Las contribuciones son bienvenidas siempre que se mantenga el enfoque del proyec
 
 Contacto
 --------
-- Correo Electrónico: jotoapanta@telconet.ec
+- Correo Electrónico: omar777j@gmail.com
 - Teléfonos:
     - Personal: 0967629643
 
