@@ -1,95 +1,81 @@
-# 📌 Proyecto Cotizador - Fase Preliminar
+GestorCompras - Versión Preliminar
 
-## ⚠️ Estado del Proyecto
-Este proyecto se encuentra **en una fase de pruebas** y aún **no ha sido entregado oficialmente**.  
-El autor **Jimmy Toapanta** está realizando ajustes y optimizaciones antes de su versión final.  
+Descripción del Proyecto
+-------------------------
+GestorCompras es una herramienta de gestión automatizada de compras diseñada para facilitar la administración de proveedores, la asignación de tareas y el envío de solicitudes de despacho mediante una interfaz gráfica desarrollada en Python con Tkinter. Este software ha sido desarrollado de forma autónoma e independiente por Jimmy Toapanta, como iniciativa personal, y NO constituye un encargo realizado para ninguna empresa.
 
-⚠ **IMPORTANTE:** No utilizar esta versión en entornos de producción hasta que se confirme su estabilidad.  
+Estado del Proyecto
+-------------------
+ADVERTENCIA:
+Este proyecto se encuentra en fase de pruebas y desarrollo. La versión actual es preliminar y NO se recomienda su uso en entornos de producción hasta que se confirme su estabilidad y se complete la versión final.
 
+Características Principales
+----------------------------
+- Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Configuración de Asignaciones: Asignación única de personas a departamentos.
+- Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
+- Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
+- Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
+- Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
+
+Instalación y Configuración
+---------------------------
+Requisitos:
+  - Python 3.x
+  - Librerías de Python (entre otras): tkinter, sqlite3, pdfplumber, smtplib, jinja2, selenium, webdriver_manager
+  - Conexión a Internet para autenticación SMTP y servicios externos.
+
+Pasos de Instalación:
+  1. Clonar el repositorio:
+       git clone https://github.com/eslay07/GestorCompras.git
+  2. Instalar las dependencias:
+       pip install -r requirements.txt
+     (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
+  3. Configuración de la Base de Datos:
+     La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
+  4. Carga rápida de Proveedores:
+     Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
+       python import_proveedores.py
+  5. Ejecutar la Aplicación:
+       python main.py
+
+Uso
 ---
+Al iniciar la aplicación se presenta una pantalla de inicio de sesión. Una vez autenticado, el usuario accede a un menú principal que permite:
+  - Administrar proveedores.
+  - Configurar asignaciones de departamentos.
+  - Cargar y gestionar tareas temporales notificadas por correo.
+  - Enviar solicitudes de despacho a través de correos electrónicos predefinidos.
 
-## 🚀 Descripción del Proyecto
-El **Proyecto Cotizador** es una herramienta diseñada para la gestión automatizada de cotizaciones y publicaciones en plataformas de licitación. Su objetivo principal es **optimizar y agilizar la generación de cotizaciones** a través de dos procesos automatizados:
+Aclaraciones y Disclaimer Legal
+---------------------------------
+Propiedad Intelectual:
+  Todo el código, documentación y recursos incluidos en este repositorio son propiedad exclusiva de Jimmy Toapanta.
 
-### 📌 **Modos de Cotización**
-1️⃣ **Cotizar en Katuk (Automatización con Selenium)**
-   - 📤 **Genera un archivo JSON con los datos de la cotización.**
-   - 🤖 **Ejecuta un script en Python** con Selenium, el cual:
-     - **Inicia sesión** en la plataforma **Katuk**.
-     - **Toma los datos del JSON** y los **ingresa automáticamente en Katuk**.
-     - **Crea y publica** la licitación sin intervención manual.
-   
-2️⃣ **Cotizar por Correo (Generación de Email a Proveedores)**
-   - 📤 **Genera un archivo JSON con los datos de la cotización.**
-   - 📧 **Ejecuta un script en Python**, que:
-     - **Selecciona proveedores** en base a la categoría del producto.
-     - **Genera un correo automático** con los datos de la cotización.
-     - **Envía el correo** a los proveedores correspondientes.
+Proyecto Autónomo:
+  Este proyecto ha sido desarrollado por iniciativa propia y NO representa ni ha sido solicitado por ninguna empresa. Su desarrollo se realiza de forma completamente independiente.
 
----
+Estado Preliminar:
+  La versión actual es preliminar y se encuentra en fase de pruebas. Se recomienda que cualquier usuario realice pruebas y validaciones antes de utilizar el software en un entorno real o productivo.
 
-## 🛠 Características del Módulo Cotizador
-✅ **Carga de datos desde PostgreSQL al ingresar un código**  
-✅ **Generación de JSON con la información estructurada**  
-✅ **Autocompletado de "Producto" y "Precio" si el código existe en la BD**  
-✅ **Permite ingresar productos sin código y completar manualmente**  
-✅ **Validaciones antes de generar JSON (no permite campos vacíos en filas con código)**  
-✅ **Automatización con Selenium para Katuk** *(desactivada temporalmente, lista para pruebas)*  
-✅ **Generación automática de correos a proveedores** *(desactivada temporalmente, lista para pruebas)*  
-✅ **Compatibilidad con selección múltiple y eliminación de datos con "Delete"**  
-✅ **Copiar y pegar datos desde el portapapeles (Ctrl+C, Ctrl+V)**  
-✅ **Siempre mantiene dos filas vacías al final para facilitar el ingreso de datos**  
+Deslinde de Responsabilidad:
+  El autor no asume responsabilidad alguna por el uso de este software. Cualquier riesgo o daño derivado de su implementación será responsabilidad exclusiva del usuario final. Este proyecto se ofrece "tal cual", sin garantías de ningún tipo, expresas o implícitas.
 
----
+Futuras Mejoras
+---------------
+- Se está diseñando un nuevo módulo para solicitar cotizaciones de manera automática, tanto mediante correo electrónico como a través de la plataforma Katuk, con el objetivo de optimizar aún más el proceso.
+- Se planea implementar la generación de un nuevo formato de usuario desde el módulo de configuraciones, permitiendo una mayor flexibilidad al no depender de un formato HTML preestablecido.
 
-## ⚙️ Requisitos Técnicos
-- **Lenguaje:** C# (.NET Framework)  
-- **Base de Datos:** PostgreSQL  
-- **Automatización:** Python 3.x con Selenium  
-- **Librerías utilizadas:**  
-  - `Newtonsoft.Json` (manejo de JSON en C#)  
-  - `Npgsql` (conexión con PostgreSQL)  
-  - `Selenium` (automatización en Python)  
+Contribuciones y Mejoras
+------------------------
+Las contribuciones son bienvenidas siempre que se mantenga el enfoque del proyecto y se respeten los derechos de autor. Para sugerencias, mejoras o reportar errores, por favor utilice los canales de contacto indicados a continuación.
 
----
+Contacto
+--------
+- Correo Electrónico: jotoapanta@telconet.ec
+- Teléfonos:
+    - Personal: 0967629643
 
-## 📂 Archivos Clave
-- `CotizadorForm.cs` → Módulo principal en C#.  
-- `Cotizador_katuk.py` → Script en Python para automatizar publicaciones en **Katuk**.  
-- `busqueda_de_tarea.py` → Script en Python para **generar y enviar correos** a proveedores.  
-- `datos_automatizacion_temp.json` → Archivo JSON con los datos de cada cotización.  
+Última actualización: 27/03/2025
 
----
-
-## 📌 Funcionamiento del Módulo
-1️⃣ **El usuario llena la tabla con los productos a cotizar.**  
-2️⃣ **Valida que todos los campos obligatorios estén llenos.**  
-3️⃣ **Genera un JSON con los datos de la cotización.**  
-4️⃣ **Ejecuta un script Python según el botón seleccionado:**  
-   - **Cotizar Katuk:** Automatización con Selenium para publicar en Katuk.  
-   - **Cotizar Correo:** Genera y envía un correo a proveedores.  
-
-🚨 **Actualmente, la ejecución de los scripts Python está desactivada por pruebas.**  
-
----
-
-## 🛠 Instalación y Configuración
-### 🔹 **1. Clonar el repositorio**
-```bash
-git clone https://github.com/usuario/proyecto-cotizador.git
-🔹 2. Configurar la conexión a PostgreSQL
-Editar DatabaseHelper.cs con los datos de conexión.
-
-🔹 3. Instalar dependencias en Python
-Si vas a probar la automatización con Selenium:
-
-bash
-Copiar
-Editar
-pip install selenium
-🔹 4. Ejecutar la aplicación
-Abrir en Visual Studio y ejecutar CotizadorForm.cs.
-
-⚠️ Nota Final
-Este es un proyecto preliminar en fase de pruebas. No se recomienda su uso en producción hasta su versión final.
-Última actualización: [25/02/2025]
+Este README ha sido actualizado para reflejar la versión actual del proyecto, garantizando claridad en sus funcionalidades, estado de desarrollo y un completo deslinde de responsabilidad legal.
