@@ -1,4 +1,0 @@
-pip install jinja2
-pip install pdfplumber
-pip install pandas openpyxl
-pip install selenium webdriver_manager
