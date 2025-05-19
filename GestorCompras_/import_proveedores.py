@@ -2,12 +2,6 @@ import os
 import pandas as pd
 from gestorcompras.services import db
 
-# ============================================================
-# SCRIPT PARA IMPORTAR PROVEEDORES DESDE UN ARCHIVO EXCEL
-# Propósito: Reiniciar la tabla de proveedores y cargar nuevos registros
-# desde un archivo Excel, preservando la integridad de los datos (como ceros en RUC).
-# ============================================================
-
 def reset_proveedores():
     """Elimina todos los registros de la tabla de proveedores."""
     try:
@@ -21,24 +15,18 @@ def reset_proveedores():
         print(f"Error al resetear la tabla: {e}")
 
 def import_proveedores_from_excel():
-    """
-    Importa proveedores desde un archivo Excel.
-    
-    Se asume que el Excel contiene las columnas "name", "ruc" y "email".
-    Se fuerza la lectura de la columna 'ruc' como cadena para preservar ceros iniciales.
-    """
-    # Obtiene la ruta absoluta del script y compone la ruta del archivo Excel
+    # Obtiene la ruta absoluta del script y se añade el nombre del archivo Excel
     script_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(script_dir, "correos.xlsx")
     
     try:
-        # Lee el Excel, forzando la columna "ruc" a tipo string
+        # Forzamos que la columna "ruc" se lea como string para preservar los ceros iniciales
         df = pd.read_excel(file_path, dtype={'ruc': str})
     except Exception as e:
         print(f"Error al leer el Excel: {e}")
         return
 
-    # Itera sobre cada fila del DataFrame para insertar el proveedor en la base de datos
+    # Se asume que el Excel tiene las columnas "name", "ruc" y "email".
     for index, row in df.iterrows():
         name = str(row.get("name", "")).strip()
         ruc = str(row.get("ruc", "")).strip()
@@ -54,9 +42,9 @@ def import_proveedores_from_excel():
     print("Importación de proveedores finalizada.")
 
 if __name__ == '__main__':
-    # Inicializa la base de datos si no existe
+    # Inicializamos la base de datos si no existe
     db.init_db()
-    # Reinicia la tabla de proveedores
+    # Primero, eliminamos todos los registros actuales de la tabla
     reset_proveedores()
-    # Importa los nuevos datos de proveedores desde el Excel
+    # Luego, importamos los nuevos datos
     import_proveedores_from_excel()

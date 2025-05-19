@@ -2,13 +2,7 @@ import sqlite3
 import os
 import json
 
-# ============================================================
-# MÓDULO DE ACCESO A BASE DE DATOS (SQLite)
-# Propósito: Gestiona la conexión, inicialización y operaciones CRUD
-# de la base de datos de proveedores, tareas temporales, asignaciones y configuración.
-# ============================================================
-
-# Determinación de rutas y creación de carpeta de datos
+# Definición de rutas y creación de carpeta de datos
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(BASE_DIR, "data")
 os.makedirs(DB_DIR, exist_ok=True)
@@ -26,7 +20,7 @@ def init_db():
     """
     conn = get_connection()
     cursor = conn.cursor()
-    # Tabla de proveedores: almacena información básica de cada proveedor
+    # Tabla de proveedores
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS suppliers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +29,7 @@ def init_db():
             email TEXT NOT NULL
         )
     """)
-    # Tabla para tareas temporales: almacena tareas en espera de procesamiento
+    # Tabla para tareas temporales
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tasks_temp (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +38,7 @@ def init_db():
             details TEXT NOT NULL
         )
     """)
-    # Configuración de asignación: asigna una única persona por departamento
+    # Configuración de asignación: solo 1 persona por departamento
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS config_assignment (
             department TEXT PRIMARY KEY,
@@ -86,7 +80,7 @@ def add_supplier(name, ruc, email):
 
 def update_supplier(supplier_id, name, ruc, email):
     """
-    Actualiza la información de un proveedor existente.
+    Actualiza la información de un proveedor.
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -142,8 +136,7 @@ def clear_tasks_temp():
 
 def insert_task_temp(task_number, reasignacion, details_dict):
     """
-    Inserta una tarea temporal.
-    Los detalles se guardan en formato JSON.
+    Inserta una tarea temporal. Los detalles se guardan en formato JSON.
     Evita duplicados (no inserta la misma task_number dos veces).
     Retorna True si se insertó la tarea, False si ya existía.
     """

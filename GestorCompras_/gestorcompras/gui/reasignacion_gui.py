@@ -18,23 +18,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 
-# ============================================================
-# INTERFAZ GRÁFICA Y LÓGICA PARA LA REASIGNACIÓN DE TAREAS
-# Propósito: Cargar tareas notificadas por correo, procesarlas y automatizar la reasignación a través de Selenium.
-# ============================================================
-
 def process_body(body):
-    """
-    Procesa el cuerpo del correo para extraer información de tareas.
-    
-    Utiliza expresiones regulares para buscar:
-        - Número de tarea.
-        - Departamento a la que se reasigna(asociado al departamento al que 		  pertenece la tarea).
-        - Detalles relacionados (OC, Proveedor, Factura, Ingreso).
-    
-    Retorna:
-        Una lista de diccionarios con la información extraída.
-    """
     task_pattern = r'Tarea:\s+(\d+)\s+Reasignación a:\s+(.*?)\s+Datos relacionados:(.*?)\n(?=Tarea:|\Z)'
     tasks = re.findall(task_pattern, body, re.DOTALL)
     tasks_data = []
@@ -53,15 +37,6 @@ def process_body(body):
     return tasks_data
 
 def cargar_tareas_correo(email_address, email_password, window):
-    """
-    Conecta al correo IMAP para buscar tareas notificadas desde una fecha dada.
-    
-    Solicita al usuario:
-        - Fecha de búsqueda.
-        - Filtro opcional por números de tarea.
-    
-    Luego, procesa cada correo y almacena las tareas en la base de datos temporal.
-    """
     date_input = simpledialog.askstring("Fecha", "Ingresa la fecha (DD/MM/YYYY):", parent=window)
     if not date_input:
         messagebox.showwarning("Advertencia", "No se ingresó fecha.", parent=window)
@@ -96,7 +71,6 @@ def cargar_tareas_correo(email_address, email_password, window):
         return
 
     loaded_count = 0
-    # Procesa cada correo encontrado
     for mail_id in messages:
         status, data = mail.fetch(mail_id, '(RFC822)')
         for response_part in data:
@@ -120,9 +94,6 @@ def cargar_tareas_correo(email_address, email_password, window):
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 
 def login_telcos(driver, username, password):
-    """
-    Automatiza el inicio de sesión en la plataforma Telcos utilizando Selenium.
-    """
     driver.get('https://telcos.telconet.ec/inicio/?josso_back_to=http://telcos.telconet.ec/check&josso_partnerapp_host=telcos.telconet.ec')
     user_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'josso_username')))
     user_input.send_keys(username)
@@ -132,19 +103,9 @@ def login_telcos(driver, username, password):
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
 
 def process_task(task, email_session):
-    """
-    Automatiza el proceso de reasignación de una tarea:
-        - Inicia el navegador.
-        - Realiza login en Telcos.
-        - Busca y procesa la tarea, añadiendo comentarios y seguimiento.
-    
-    Parámetros:
-        task: Diccionario con la información de la tarea.
-        email_session: Datos de sesión para acceder a la cuenta de Telcos.
-    """
     service = Service(ChromeDriverManager().install())
     chrome_options = Options()
-    #chrome_options.add_argument("--headless")  # Opcional: ejecutar en modo headless
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--no-sandbox")
@@ -153,7 +114,6 @@ def process_task(task, email_session):
     chrome_options.add_experimental_option("prefs", prefs)
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
-    # Extrae usuario y contraseña de la sesión de correo para login en Telcos
     telcos_username = email_session["address"].split("@")[0]
     telcos_password = email_session["password"]
     
@@ -181,6 +141,7 @@ def process_task(task, email_session):
         ).click()
     except Exception:
         driver.quit()
+        # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
         raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
     
     time.sleep(1)
@@ -213,10 +174,13 @@ def process_task(task, email_session):
     time.sleep(2)
     department_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'txtDepartment')))
     department_input.clear()
-    department_input.send_keys('Compras L')
-    #department_input.send_keys('Bodeg')
+    #department_input.send_keys('Compras L')
+    department_input.send_keys('Bodeg')
     time.sleep(1)
-    department_input.send_keys(Keys.UP, Keys.RETURN)
+    #elemento para pruebas compras
+    #department_input.send_keys(Keys.UP, Keys.RETURN)
+    #////////////elementopara produccion bodega
+    department_input.send_keys(Keys.DOWN, Keys.RETURN)
     time.sleep(2)
     department_input.send_keys(Keys.TAB)
     time.sleep(2)
@@ -232,6 +196,7 @@ def process_task(task, email_session):
     observation_textarea.send_keys('TRABAJO REALIZADO')
     WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "modalReasignarTarea")))
     boton = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "btnGrabarReasignaTarea")))
+    # Se mueve el ratón al botón antes de hacer clic
     from selenium.webdriver.common.action_chains import ActionChains
     ActionChains(driver).move_to_element(boton).perform()
     boton.click()
@@ -242,10 +207,6 @@ def process_task(task, email_session):
     driver.quit()
 
 def open_reasignacion(master, email_session):
-    """
-    Abre la ventana de reasignación de tareas.
-    Configura la interfaz y vincula las acciones para cargar y procesar las tareas.
-    """
     window = tk.Toplevel(master)
     window.title("Reasignación de Tareas")
     window.geometry("670x600")
@@ -253,7 +214,6 @@ def open_reasignacion(master, email_session):
     window.grab_set()
 
     def on_close():
-        # Al cerrar, limpia la tabla temporal de tareas
         db.clear_tasks_temp()
         window.destroy()
     window.protocol("WM_DELETE_WINDOW", on_close)
@@ -329,9 +289,6 @@ def open_reasignacion(master, email_session):
     status_label.pack(pady=2)
 
     def actualizar_tareas():
-        """
-        Actualiza la lista de tareas mostradas en la ventana consultando la base de datos temporal.
-        """
         all_tasks = db.get_tasks_temp()
         print("DEBUG - Tareas en DB:", all_tasks)
 
@@ -365,12 +322,6 @@ def open_reasignacion(master, email_session):
         canvas.yview_moveto(0.0)
 
     def process_tasks():
-        """
-        Procesa las tareas seleccionadas:
-            - Valida la selección.
-            - Ejecuta la reasignación de cada tarea.
-            - Elimina la tarea de la base de datos temporal si se procesa con éxito.
-        """
         if not any(var.get() for var, _ in task_vars.values()):
             messagebox.showwarning("Advertencia", "No se ha seleccionado ninguna tarea.", parent=window)
             return
@@ -406,3 +357,4 @@ def open_reasignacion(master, email_session):
 
     process_btn.configure(command=process_tasks)
     actualizar_tareas()
+
