@@ -21,14 +21,28 @@ class HtmlEditor(ttk.Frame):
 
         self.font_var = tk.StringVar(value="Helvetica")
         fonts = sorted(set(tkfont.families()))
-        ttk.Combobox(toolbar, textvariable=self.font_var, values=fonts, width=10,
-                     state="readonly").pack(side="left", padx=5)
+        font_box = ttk.Combobox(
+            toolbar,
+            textvariable=self.font_var,
+            values=fonts,
+            width=10,
+            state="readonly",
+        )
+        font_box.pack(side="left", padx=5)
+        font_box.bind("<<ComboboxSelected>>", lambda e: self._apply_font())
         ttk.Button(toolbar, text="Font", command=self._apply_font).pack(side="left")
 
         self.size_var = tk.StringVar(value="12")
         sizes = ["10", "12", "14", "16", "18", "20", "24"]
-        ttk.Combobox(toolbar, textvariable=self.size_var, values=sizes, width=3,
-                     state="readonly").pack(side="left", padx=5)
+        size_box = ttk.Combobox(
+            toolbar,
+            textvariable=self.size_var,
+            values=sizes,
+            width=3,
+            state="readonly",
+        )
+        size_box.pack(side="left", padx=5)
+        size_box.bind("<<ComboboxSelected>>", lambda e: self._apply_size())
         ttk.Button(toolbar, text="Size", command=self._apply_size).pack(side="left")
 
         ttk.Button(toolbar, text="Color", command=self._apply_color).pack(side="left", padx=5)
@@ -55,10 +69,21 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             return
-        if toggle and self.text.tag_nextrange(tag, start, end):
-            self.text.tag_remove(tag, start, end)
+        if toggle:
+            full = False
+            ranges = self.text.tag_ranges(tag)
+            for i in range(0, len(ranges), 2):
+                r_start, r_end = ranges[i], ranges[i + 1]
+                if self.text.compare(r_start, "<=", start) and self.text.compare(r_end, ">=", end):
+                    full = True
+                    break
+            if full:
+                self.text.tag_remove(tag, start, end)
+            else:
+                self.text.tag_add(tag, start, end)
         else:
             self.text.tag_add(tag, start, end)
+        self.text.tag_add("sel", start, end)
 
     def _make_bold(self):
         self._apply_tag_to_sel("bold", toggle=True)

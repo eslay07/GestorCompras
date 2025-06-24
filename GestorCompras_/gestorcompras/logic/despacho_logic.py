@@ -66,7 +66,10 @@ def process_order(email_session, orden):
         return f"⚠ No se encontró archivo para la OC {orden}."
     
     ruc, tarea = extraer_info_de_pdf(pdf_path)
-    suppliers = {ruc_db: email for (_id, name, ruc_db, email) in get_suppliers()}
+    suppliers = {
+        ruc_db: (email, email_alt)
+        for (_id, name, ruc_db, email, email_alt) in get_suppliers()
+    }
     if not (ruc and ruc in suppliers):
         return f"⚠ No se encontró correo para el RUC {ruc} (OC: {orden})."
     
@@ -74,7 +77,7 @@ def process_order(email_session, orden):
         "orden": orden,
         "tarea": tarea,
         "folder_name": folder_name,
-        "email_to": suppliers[ruc]
+        "email_to": ", ".join(filter(None, suppliers[ruc]))
     }
     
     # Seleccionar formato de correo según la configuración

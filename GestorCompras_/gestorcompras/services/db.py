@@ -21,14 +21,22 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
     # Tabla de proveedores
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS suppliers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             ruc TEXT UNIQUE NOT NULL,
-            email TEXT NOT NULL
+            email TEXT NOT NULL,
+            email_alt TEXT
         )
-    """)
+        """
+    )
+    # Aseguramos que la columna email_alt exista en instalaciones antiguas
+    cursor.execute("PRAGMA table_info(suppliers)")
+    cols = [c[1] for c in cursor.fetchall()]
+    if "email_alt" not in cols:
+        cursor.execute("ALTER TABLE suppliers ADD COLUMN email_alt TEXT")
     # Tabla para tareas temporales
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tasks_temp (
@@ -69,32 +77,40 @@ def init_db():
 def get_suppliers():
     """
     Retorna una lista con los proveedores registrados.
-    Cada elemento es una tupla (id, name, ruc, email).
+    Cada elemento es una tupla (id, name, ruc, email, email_alt).
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, ruc, email FROM suppliers")
+    cursor.execute("SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers")
     rows = cursor.fetchall()
     conn.close()
     return rows
 
-def add_supplier(name, ruc, email):
+def add_supplier(name, ruc, email, email_alt=None):
     """
     Agrega o actualiza un proveedor en la tabla.
+    El correo secundario es opcional.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO suppliers (name, ruc, email) VALUES (?, ?, ?)", (name, ruc, email))
+    cursor.execute(
+        "INSERT OR REPLACE INTO suppliers (name, ruc, email, email_alt) VALUES (?, ?, ?, ?)",
+        (name, ruc, email, email_alt),
+    )
     conn.commit()
     conn.close()
 
-def update_supplier(supplier_id, name, ruc, email):
+def update_supplier(supplier_id, name, ruc, email, email_alt=None):
     """
     Actualiza la información de un proveedor.
+    El correo secundario es opcional.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE suppliers SET name=?, ruc=?, email=? WHERE id=?", (name, ruc, email, supplier_id))
+    cursor.execute(
+        "UPDATE suppliers SET name=?, ruc=?, email=?, email_alt=? WHERE id=?",
+        (name, ruc, email, email_alt, supplier_id),
+    )
     conn.commit()
     conn.close()
 

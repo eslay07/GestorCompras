@@ -34,8 +34,7 @@ def send_email(email_session, subject, template_text, template_html, context, at
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    msg["Cc"] = "compras_locales_uio@telconet.ec, bodega_uio@telconet.ec"
-    #msg["Cc"] = "jotoapanta@telconet.ec"
+    msg["Cc"] = "jotoapanta@telconet.ec"
     # Renderizamos el contenido
     content_text = render_email(template_text, context)
     content_html = render_email(template_html, context)
@@ -87,7 +86,7 @@ def send_email_custom(email_session, subject, html_template, context, attachment
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    msg["Cc"] = "compras_locales_uio@telconet.ec, bodega_uio@telconet.ec"
+    msg["Cc"] = "jotoapanta@telconet.ec"
 
     msg.set_content(content_text)
     msg.add_alternative(content_html, subtype="html")

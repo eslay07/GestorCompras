@@ -11,7 +11,8 @@ GestorCompras - Versión Preliminar
  
  Características Principales
  ----------------------------
- - Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Cada proveedor puede tener un correo de respaldo para notificaciones.
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
  - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
 - Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
