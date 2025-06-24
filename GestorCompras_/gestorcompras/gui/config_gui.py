@@ -8,6 +8,9 @@ from gestorcompras.gui.html_editor import HtmlEditor
 class ConfigGUI(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
+        # Ensure the database has all required tables even if this
+        # window is launched directly without going through main()
+        db.init_db()
         self.title("Configuración")
         self.geometry("670x500")
         self.create_widgets()
@@ -338,6 +341,8 @@ class TemplateForm(tk.Toplevel):
             self.signature_var.set(path)
 
     def save_template(self):
+        # Recreate missing tables if the database was not initialized
+        db.init_db()
         name = self.name_var.get().strip()
         raw_text = self.editor.text.get("1.0", "end-1c").strip()
         html = self.editor.get_html().strip()
