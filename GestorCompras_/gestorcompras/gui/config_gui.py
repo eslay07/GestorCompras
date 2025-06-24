@@ -3,6 +3,7 @@ import os
 import tkinter.font as tkFont
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from gestorcompras.services import db
+from gestorcompras.gui.html_editor import HtmlEditor
 
 class ConfigGUI(tk.Toplevel):
     def __init__(self, master=None):
@@ -314,14 +315,14 @@ class TemplateForm(tk.Toplevel):
         ttk.Button(frame_img, text="Seleccionar", style="MyButton.TButton", command=self.select_image).pack(side="left", padx=5)
 
         ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
-        self.text = tk.Text(container, wrap="word")
-        self.text.pack(fill="both", expand=True, pady=5)
+        self.editor = HtmlEditor(container)
+        self.editor.pack(fill="both", expand=True, pady=5)
 
         ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).pack(pady=10)
 
         if self.template_data:
             self.name_var.set(self.template_data[1])
-            self.text.insert("1.0", self.template_data[2])
+            self.editor.set_html(self.template_data[2])
             if self.template_data[3]:
                 self.signature_var.set(self.template_data[3])
 
@@ -332,7 +333,7 @@ class TemplateForm(tk.Toplevel):
 
     def save_template(self):
         name = self.name_var.get().strip()
-        html = self.text.get("1.0", "end").strip()
+        html = self.editor.get_html().strip()
         signature = self.signature_var.get().strip()
         if not (name and html):
             messagebox.showwarning("Advertencia", "El nombre y el contenido son obligatorios.")

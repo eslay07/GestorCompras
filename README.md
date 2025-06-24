@@ -15,7 +15,7 @@ GestorCompras - Versión Preliminar
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
  - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
 - Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
-- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, incluyendo una imagen de firma.
+- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores y tamaños de letra, además de incluir una imagen de firma.
  - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
  - Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
  
@@ -65,7 +65,7 @@ GestorCompras - Versión Preliminar
  Futuras Mejoras
  ---------------
 - Se está diseñando un nuevo módulo para solicitar cotizaciones de manera automática, tanto mediante correo electrónico como a través de la plataforma Katuk, con el objetivo de optimizar aún más el proceso.
-- Se continuarán mejorando las plantillas de correo para facilitar su edición y personalización.
+- Se continuarán ampliando las funciones del editor de plantillas para ofrecer cada vez más opciones de personalización.
  
  Contribuciones y Mejoras
  ------------------------
@@ -77,6 +77,6 @@ GestorCompras - Versión Preliminar
  - Teléfonos:
      - Personal: 0967629643
  
- Última actualización: 24/06/2025
+ Última actualización: 25/06/2025
  
  Este README ha sido actualizado para reflejar la versión actual del proyecto, garantizando claridad en sus funcionalidades, estado de desarrollo y un completo deslinde de responsabilidad legal.
