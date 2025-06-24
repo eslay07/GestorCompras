@@ -164,6 +164,8 @@ class HtmlEditor(ttk.Frame):
                 super().__init__()
                 self.widget = widget
                 self.tag_stack = []
+                self.span_stack = []  # Track tags introduced by <span>
+
             def handle_starttag(self, tag, attrs):
                 if tag in ("b", "strong"):
                     self.tag_stack.append("bold")
@@ -175,16 +177,25 @@ class HtmlEditor(ttk.Frame):
                     self.widget.insert("end", "\n")
                 elif tag == "span":
                     style = dict(attrs).get("style", "")
+                    tags = []
                     for part in style.split(";"):
                         if "font-family" in part:
                             family = part.split(":")[1].strip()
-                            self.tag_stack.append(f"font_{family}")
+                            tag_name = f"font_{family}"
+                            self.tag_stack.append(tag_name)
+                            tags.append(tag_name)
                         elif "font-size" in part:
                             size = part.split(":")[1].strip().rstrip("px").rstrip("pt")
-                            self.tag_stack.append(f"size_{size}")
+                            tag_name = f"size_{size}"
+                            self.tag_stack.append(tag_name)
+                            tags.append(tag_name)
                         elif "color" in part:
                             color = part.split(":")[1].strip()
-                            self.tag_stack.append(f"color_{color}")
+                            tag_name = f"color_{color}"
+                            self.tag_stack.append(tag_name)
+                            tags.append(tag_name)
+                    self.span_stack.append(tags)
+
             def handle_endtag(self, tag):
                 if tag in ("b", "strong"):
                     self._remove("bold")
@@ -193,13 +204,17 @@ class HtmlEditor(ttk.Frame):
                 elif tag == "u":
                     self._remove("underline")
                 elif tag == "span":
-                    if self.tag_stack:
-                        self.tag_stack.pop()
+                    if self.span_stack:
+                        tags = self.span_stack.pop()
+                        for t in tags:
+                            self._remove(t)
+
             def _remove(self, target):
                 if target in self.tag_stack:
                     self.tag_stack.reverse()
                     self.tag_stack.remove(target)
                     self.tag_stack.reverse()
+
             def handle_data(self, data):
                 start = self.widget.index("end-1c")
                 self.widget.insert("end", data)
