@@ -17,6 +17,7 @@ class HtmlEditor(ttk.Frame):
         ttk.Button(toolbar, text="B", width=2, command=self._make_bold).pack(side="left")
         ttk.Button(toolbar, text="I", width=2, command=self._make_italic).pack(side="left")
         ttk.Button(toolbar, text="U", width=2, command=self._make_underline).pack(side="left")
+        ttk.Button(toolbar, text="•", width=2, command=self._insert_bullet).pack(side="left", padx=2)
 
         self.font_var = tk.StringVar(value="Helvetica")
         fonts = sorted(set(tkfont.families()))
@@ -32,15 +33,21 @@ class HtmlEditor(ttk.Frame):
 
         ttk.Button(toolbar, text="Color", command=self._apply_color).pack(side="left", padx=5)
 
-        self.text = tk.Text(self, wrap="word")
-        self.text.pack(fill="both", expand=True)
+        text_frame = ttk.Frame(self)
+        text_frame.pack(fill="both", expand=True)
+
+        self.text = tk.Text(text_frame, wrap="word", undo=True, maxundo=-1)
+        vbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
+        self.text.configure(yscrollcommand=vbar.set)
+        self.text.pack(side="left", fill="both", expand=True)
+        vbar.pack(side="right", fill="y")
 
     def _setup_tags(self):
         self.text.tag_configure("bold", font=tkfont.Font(weight="bold"))
         self.text.tag_configure("italic", font=tkfont.Font(slant="italic"))
         self.text.tag_configure("underline", underline=True)
 
-    def _apply_tag_to_sel(self, tag, **config):
+    def _apply_tag_to_sel(self, tag, toggle=False, **config):
         if config:
             self.text.tag_configure(tag, **config)
         try:
@@ -48,25 +55,47 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             return
-        self.text.tag_add(tag, start, end)
+        if toggle and self.text.tag_nextrange(tag, start, end):
+            self.text.tag_remove(tag, start, end)
+        else:
+            self.text.tag_add(tag, start, end)
 
     def _make_bold(self):
-        self._apply_tag_to_sel("bold")
+        self._apply_tag_to_sel("bold", toggle=True)
 
     def _make_italic(self):
-        self._apply_tag_to_sel("italic")
+        self._apply_tag_to_sel("italic", toggle=True)
 
     def _make_underline(self):
-        self._apply_tag_to_sel("underline")
+        self._apply_tag_to_sel("underline", toggle=True)
+
+    def _insert_bullet(self):
+        self.text.insert("insert", "\u2022 ")
 
     def _apply_font(self):
         family = self.font_var.get()
         tag = f"font_{family}"
+        try:
+            start = self.text.index("sel.first")
+            end = self.text.index("sel.last")
+        except tk.TclError:
+            return
+        for t in self.text.tag_names():
+            if t.startswith("font_"):
+                self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag, font=tkfont.Font(family=family))
 
     def _apply_size(self):
         size = self.size_var.get()
         tag = f"size_{size}"
+        try:
+            start = self.text.index("sel.first")
+            end = self.text.index("sel.last")
+        except tk.TclError:
+            return
+        for t in self.text.tag_names():
+            if t.startswith("size_"):
+                self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag, font=tkfont.Font(size=int(size)))
 
     def _apply_color(self):
@@ -74,6 +103,14 @@ class HtmlEditor(ttk.Frame):
         if not color:
             return
         tag = f"color_{color}"
+        try:
+            start = self.text.index("sel.first")
+            end = self.text.index("sel.last")
+        except tk.TclError:
+            return
+        for t in self.text.tag_names():
+            if t.startswith("color_"):
+                self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag, foreground=color)
 
     # ---------- HTML Import/Export ----------

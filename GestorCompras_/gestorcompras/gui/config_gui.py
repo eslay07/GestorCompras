@@ -268,7 +268,7 @@ class ConfigGUI(tk.Toplevel):
             self.email_template_var.set("Bienes")
 
     def agregar_nuevo_formato(self):
-        TemplateForm(self, "Nuevo Formato", self.load_email_templates)
+        TemplateForm(self, "Nuevo Formato", self.load_email_templates).wait_window()
 
     def editar_formato(self):
         selected = self.templates_list.selection()
@@ -277,7 +277,7 @@ class ConfigGUI(tk.Toplevel):
             return
         tpl_id = self.templates_list.item(selected[0])["values"][0]
         data = db.get_email_template(tpl_id)
-        TemplateForm(self, "Editar Formato", self.load_email_templates, data)
+        TemplateForm(self, "Editar Formato", self.load_email_templates, data).wait_window()
 
     def eliminar_formato(self):
         selected = self.templates_list.selection()
@@ -294,6 +294,10 @@ class TemplateForm(tk.Toplevel):
     def __init__(self, master, title, refresh_callback, template_data=None):
         super().__init__(master)
         self.title(title)
+        self.geometry("700x600")
+        self.transient(master)
+        self.grab_set()
+        self.focus()
         self.refresh_callback = refresh_callback
         self.template_data = template_data
         self.create_widgets()
