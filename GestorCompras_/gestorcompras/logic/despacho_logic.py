@@ -1,8 +1,12 @@
 import os
 import re
 import pdfplumber
-from gestorcompras.services.db import get_config, get_suppliers
-from gestorcompras.services.email_sender import send_email
+from gestorcompras.services.db import (
+    get_config,
+    get_suppliers,
+    get_email_template_by_name,
+)
+from gestorcompras.services.email_sender import send_email, send_email_custom
 
 def buscar_archivo_mas_reciente(orden):
     """
@@ -75,19 +79,45 @@ def process_order(email_session, orden):
     
     # Seleccionar formato de correo según la configuración
     formato = get_config("EMAIL_TEMPLATE", "Bienes")
-    if formato == "Bienes":
+    template_db = get_email_template_by_name(formato)
+    if template_db:
+        template_id, name, html_content, signature_path = template_db
+        template_text = None
+        template_html = None
+    elif formato == "Bienes":
         template_text = "correo_bienes.txt"
         template_html = "correo_bienes.html"
+        html_content = None
+        signature_path = None
     else:
         template_text = "correo_servicios.txt"
         template_html = "correo_servicios.html"
+        html_content = None
+        signature_path = None
     
     # Construimos el asunto con carpeta y tarea
     subject = f"DESPACHO DE OC {orden}" + (f" TAREA {tarea}" if tarea else "") + f" - {folder_name}"
     subject = subject.upper()  # Forzamos mayúsculas
     
     try:
-        send_email(email_session, subject, template_text, template_html, context, attachment_path=pdf_path)
+        if template_db:
+            send_email_custom(
+                email_session,
+                subject,
+                html_content,
+                context,
+                attachment_path=pdf_path,
+                signature_path=signature_path,
+            )
+        else:
+            send_email(
+                email_session,
+                subject,
+                template_text,
+                template_html,
+                context,
+                attachment_path=pdf_path,
+            )
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:
         return f"❌ Error al enviar el correo para OC {orden}: {str(e)}"

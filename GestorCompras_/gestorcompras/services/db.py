@@ -52,6 +52,16 @@ def init_db():
             value TEXT NOT NULL
         )
     """)
+
+    # Tabla para formatos de correo personalizados
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            html TEXT NOT NULL,
+            signature_path TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -205,5 +215,60 @@ def set_config(key, value):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+# ------------------ Email Templates ------------------
+def get_email_templates():
+    """Retorna la lista de formatos de correo registrados."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, html, signature_path FROM email_templates")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def get_email_template(template_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, html, signature_path FROM email_templates WHERE id=?",
+        (template_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def get_email_template_by_name(name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, html, signature_path FROM email_templates WHERE name=?",
+        (name,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def add_email_template(name, html, signature_path=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO email_templates (name, html, signature_path) VALUES (?, ?, ?)",
+        (name, html, signature_path))
+    conn.commit()
+    conn.close()
+
+def update_email_template(template_id, name, html, signature_path=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE email_templates SET name=?, html=?, signature_path=? WHERE id=?",
+        (name, html, signature_path, template_id))
+    conn.commit()
+    conn.close()
+
+def delete_email_template(template_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM email_templates WHERE id=?", (template_id,))
     conn.commit()
     conn.close()
