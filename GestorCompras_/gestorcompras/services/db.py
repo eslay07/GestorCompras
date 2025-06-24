@@ -288,3 +288,8 @@ def delete_email_template(template_id):
     cursor.execute("DELETE FROM email_templates WHERE id=?", (template_id,))
     conn.commit()
     conn.close()
+
+# Inicializamos las tablas al importar el módulo para evitar
+# errores si otras partes del programa acceden a la base de datos
+# antes de abrir la ventana de configuración.
+init_db()

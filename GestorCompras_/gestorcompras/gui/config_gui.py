@@ -2,6 +2,7 @@ import tkinter as tk
 import os
 import tkinter.font as tkFont
 from tkinter import ttk, messagebox, simpledialog, filedialog
+from html import escape
 from gestorcompras.services import db
 from gestorcompras.gui.html_editor import HtmlEditor
 
@@ -346,6 +347,8 @@ class TemplateForm(tk.Toplevel):
         name = self.name_var.get().strip()
         raw_text = self.editor.text.get("1.0", "end-1c").strip()
         html = self.editor.get_html().strip()
+        if not html and raw_text:
+            html = escape(raw_text).replace("\n", "<br>")
         signature = self.signature_var.get().strip()
         if not (name and raw_text):
             messagebox.showwarning(
