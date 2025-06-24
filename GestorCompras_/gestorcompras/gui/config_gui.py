@@ -339,10 +339,14 @@ class TemplateForm(tk.Toplevel):
 
     def save_template(self):
         name = self.name_var.get().strip()
+        raw_text = self.editor.text.get("1.0", "end-1c").strip()
         html = self.editor.get_html().strip()
         signature = self.signature_var.get().strip()
-        if not (name and html):
-            messagebox.showwarning("Advertencia", "El nombre y el contenido son obligatorios.")
+        if not (name and raw_text):
+            messagebox.showwarning(
+                "Advertencia",
+                "El nombre y el contenido son obligatorios.",
+            )
             return
         if self.template_data:
             db.update_email_template(self.template_data[0], name, html, signature)
