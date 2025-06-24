@@ -70,14 +70,15 @@ class HtmlEditor(ttk.Frame):
         except tk.TclError:
             return
         if toggle:
-            full = False
-            ranges = self.text.tag_ranges(tag)
-            for i in range(0, len(ranges), 2):
-                r_start, r_end = ranges[i], ranges[i + 1]
-                if self.text.compare(r_start, "<=", start) and self.text.compare(r_end, ">=", end):
-                    full = True
+            # Determine if every character in the selection already has the tag
+            idx = start
+            fully_tagged = True
+            while self.text.compare(idx, "<", end):
+                if tag not in self.text.tag_names(idx):
+                    fully_tagged = False
                     break
-            if full:
+                idx = self.text.index(f"{idx}+1c")
+            if fully_tagged:
                 self.text.tag_remove(tag, start, end)
             else:
                 self.text.tag_add(tag, start, end)

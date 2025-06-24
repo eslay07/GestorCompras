@@ -83,20 +83,20 @@ def process_order(email_session, orden):
     # Seleccionar formato de correo según la configuración
     formato = get_config("EMAIL_TEMPLATE", "Bienes")
     template_db = get_email_template_by_name(formato)
-    if template_db:
-        template_id, name, html_content, signature_path = template_db
+    html_content = None
+    signature_path = None
+    if template_db and template_db[2].strip():
+        _, _name, html_content, signature_path = template_db
         template_text = None
         template_html = None
-    elif formato == "Bienes":
-        template_text = "correo_bienes.txt"
-        template_html = "correo_bienes.html"
-        html_content = None
-        signature_path = None
     else:
-        template_text = "correo_servicios.txt"
-        template_html = "correo_servicios.html"
-        html_content = None
-        signature_path = None
+        template_db = None
+        if formato == "Bienes":
+            template_text = "correo_bienes.txt"
+            template_html = "correo_bienes.html"
+        else:
+            template_text = "correo_servicios.txt"
+            template_html = "correo_servicios.html"
     
     # Construimos el asunto con carpeta y tarea
     subject = f"DESPACHO DE OC {orden}" + (f" TAREA {tarea}" if tarea else "") + f" - {folder_name}"
