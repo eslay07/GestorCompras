@@ -141,32 +141,43 @@ class HtmlEditor(ttk.Frame):
 
     # ---------- HTML Import/Export ----------
     def get_html(self):
-        dump = self.text.dump("1.0", "end-1c", tag=True, text=True)
+        """Export the current text content as HTML."""
+        end_index = self.text.index("end-1c")
+        index = "1.0"
+        prev_tags = []
         html_chunks = []
-        open_tags = []
-        for _index, kind, value in dump:
-            if kind == "tagon":
-                html_start = self._tag_start_html(value)
-                if html_start:
-                    html_chunks.append(html_start)
-                    open_tags.append(value)
-            elif kind == "tagoff":
-                if value in open_tags:
-                    temp = []
-                    while open_tags:
-                        current = open_tags.pop()
-                        html_chunks.append(self._tag_end_html(current))
-                        if current == value:
-                            break
-                        temp.append(current)
-                    while temp:
-                        t = temp.pop()
-                        html_chunks.append(self._tag_start_html(t))
-                        open_tags.append(t)
-            elif kind == "text":
-                html_chunks.append(escape(value).replace("\n", "<br>"))
-        while open_tags:
-            html_chunks.append(self._tag_end_html(open_tags.pop()))
+
+        def tag_priority(tag):
+            if tag == "bold":
+                return 1
+            if tag == "italic":
+                return 2
+            if tag == "underline":
+                return 3
+            if tag.startswith("font_"):
+                return 4
+            if tag.startswith("size_"):
+                return 5
+            if tag.startswith("color_"):
+                return 6
+            return 99
+
+        while self.text.compare(index, "<=", end_index):
+            char = self.text.get(index)
+            curr_tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
+            # Close tags that no longer apply
+            for t in reversed([tg for tg in prev_tags if tg not in curr_tags]):
+                html_chunks.append(self._tag_end_html(t))
+            # Open new tags
+            for t in sorted([tg for tg in curr_tags if tg not in prev_tags], key=tag_priority):
+                html_chunks.append(self._tag_start_html(t))
+            html_chunks.append(escape(char).replace("\n", "<br>"))
+            prev_tags = curr_tags
+            index = self.text.index(f"{index}+1c")
+
+        for t in reversed(prev_tags):
+            html_chunks.append(self._tag_end_html(t))
+
         return "".join(html_chunks)
 
     def set_html(self, html_string):
