@@ -141,7 +141,16 @@ class HtmlEditor(ttk.Frame):
 
     # ---------- HTML Import/Export ----------
     def get_html(self):
-        """Export the current text content as HTML."""
+        """Return the current text as sanitized HTML.
+
+        The Text widget exposes formatting through tags.  To reliably
+        convert the content we walk each character and compare the tags
+        present at that index against the tags from the previous
+        character.  Closing tags are emitted for styles that end and new
+        tags are opened in a deterministic order before writing the
+        actual character.  This ensures that nested styling is exported
+        with valid markup and that unrecognised tags are ignored.
+        """
         end_index = self.text.index("end-1c")
         index = "1.0"
         prev_tags = []
