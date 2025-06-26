@@ -100,7 +100,7 @@ class HtmlEditor(ttk.Frame):
 
     def _apply_font(self):
         family = self.font_var.get()
-        tag = f"font_{family}"
+        tag = f"font_{family.replace(' ', '_')}"
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -128,7 +128,7 @@ class HtmlEditor(ttk.Frame):
         color = colorchooser.askcolor()[1]
         if not color:
             return
-        tag = f"color_{color}"
+        tag = f"color_{color.lstrip('#')}"
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -181,17 +181,20 @@ class HtmlEditor(ttk.Frame):
                     for part in style.split(";"):
                         if "font-family" in part:
                             family = part.split(":")[1].strip()
-                            tag_name = f"font_{family}"
+                            tag_name = f"font_{family.replace(' ', '_')}"
+                            self.widget.tag_configure(tag_name, font=tkfont.Font(family=family))
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                         elif "font-size" in part:
                             size = part.split(":")[1].strip().rstrip("px").rstrip("pt")
                             tag_name = f"size_{size}"
+                            self.widget.tag_configure(tag_name, font=tkfont.Font(size=int(size)))
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                         elif "color" in part:
                             color = part.split(":")[1].strip()
-                            tag_name = f"color_{color}"
+                            tag_name = f"color_{color.lstrip('#')}"
+                            self.widget.tag_configure(tag_name, foreground=color)
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                     self.span_stack.append(tags)
@@ -233,13 +236,15 @@ class HtmlEditor(ttk.Frame):
         if tag == "underline":
             return "<u>"
         if tag.startswith("font_"):
-            family = tag.split("_", 1)[1]
+            family = tag.split("_", 1)[1].replace("_", " ")
             return f'<span style="font-family:{family}">'
         if tag.startswith("size_"):
             size = tag.split("_", 1)[1]
             return f'<span style="font-size:{size}px">'
         if tag.startswith("color_"):
             color = tag.split("_", 1)[1]
+            if not color.startswith("#"):
+                color = "#" + color
             return f'<span style="color:{color}">'
         return ""
 
