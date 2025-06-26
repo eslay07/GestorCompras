@@ -362,6 +362,7 @@ class TemplateForm(tk.Toplevel):
         # Recreate missing tables if the database was not initialized
         db.init_db()
         name = self.name_var.get().strip()
+        self.editor.text.tag_remove("sel", "1.0", "end")
         raw_text = self.editor.text.get("1.0", "end-1c").strip()
         html = self.editor.get_html().strip()
         if not html and raw_text:

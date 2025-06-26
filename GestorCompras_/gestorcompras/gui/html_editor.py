@@ -146,8 +146,10 @@ class HtmlEditor(ttk.Frame):
         open_tags = []
         for _index, kind, value in dump:
             if kind == "tagon":
-                html_chunks.append(self._tag_start_html(value))
-                open_tags.append(value)
+                html_start = self._tag_start_html(value)
+                if html_start:
+                    html_chunks.append(html_start)
+                    open_tags.append(value)
             elif kind == "tagoff":
                 if value in open_tags:
                     temp = []
