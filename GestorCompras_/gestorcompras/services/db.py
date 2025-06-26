@@ -244,6 +244,19 @@ def get_email_templates():
     conn.close()
     return rows
 
+def search_suppliers(term):
+    """Busca proveedores por coincidencia parcial en nombre o RUC."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    like = f"%{term}%"
+    cursor.execute(
+        "SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers WHERE name LIKE ? OR ruc LIKE ?",
+        (like, like),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
 def get_email_template(template_id):
     conn = get_connection()
     cursor = conn.cursor()
