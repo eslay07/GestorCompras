@@ -143,13 +143,28 @@ class HtmlEditor(ttk.Frame):
     def get_html(self):
         dump = self.text.dump("1.0", "end-1c", tag=True, text=True)
         html_chunks = []
-        for index, kind, value in dump:
+        open_tags = []
+        for _index, kind, value in dump:
             if kind == "tagon":
                 html_chunks.append(self._tag_start_html(value))
+                open_tags.append(value)
             elif kind == "tagoff":
-                html_chunks.append(self._tag_end_html(value))
+                if value in open_tags:
+                    temp = []
+                    while open_tags:
+                        current = open_tags.pop()
+                        html_chunks.append(self._tag_end_html(current))
+                        if current == value:
+                            break
+                        temp.append(current)
+                    while temp:
+                        t = temp.pop()
+                        html_chunks.append(self._tag_start_html(t))
+                        open_tags.append(t)
             elif kind == "text":
                 html_chunks.append(escape(value).replace("\n", "<br>"))
+        while open_tags:
+            html_chunks.append(self._tag_end_html(open_tags.pop()))
         return "".join(html_chunks)
 
     def set_html(self, html_string):
