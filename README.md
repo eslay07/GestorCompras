@@ -34,7 +34,10 @@ GestorCompras - Versión Preliminar
         pip install -r requirements.txt
       (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
    3. Configuración de la Base de Datos:
-      La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
+      La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación.
+      Si el archivo no existe, simplemente ejecute por primera vez:
+         `python main.py`
+      Esto generará el archivo `gestorcompras/services/data/app.db` dentro del directorio "data".
    4. Carga rápida de Proveedores:
       Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
         python import_proveedores.py
