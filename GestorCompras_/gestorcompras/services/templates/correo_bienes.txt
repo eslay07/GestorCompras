@@ -18,9 +18,9 @@ Ing. Jimmy Toapanta
 Asistente de Compras
 Compras locales
 TELCONET LATAM
-jotoapanta@telconet.ec
-0987363350 - Empresa
-0967629643 - Personal
+usuario@example.com
+0980000000 - Empresa
+0960000000 - Personal
 Quito – Ecuador
 www.telconet.ec
 

@@ -9,7 +9,7 @@ caso contrario se factura el primer día hábil de abril.
 
 Nota. - Toda factura debe indicar el número de orden de compra. Enviar en respuesta
 al presente correo, con copia al departamento de Compras Locales Quito:
-compra_locales_uio@telconet.ec
+contacto@example.com
 
 Agradezco su atención.
 
@@ -18,11 +18,11 @@ Saludos,
 Erika M. Acosta Tituaña
 Asistente de Compra
 TELCONET LATAM
-Cel: +593 958997021
-Tel: +593 2 3963100 Ext. 2613
+Cel: +593 000000000
+Tel: +593 2 0000000 Ext. 0000
 Calle Arupos E5-84 y Av. Eloy Alfaro
 Quito - Ecuador
-eacosta@telconet.cec
+usuario@example.com
 
 Toda la información contenida en este correo electrónico es confidencial y podrá ser usada únicamente por los destinatarios.
 No imprimir a menos que sea imprescindible.
