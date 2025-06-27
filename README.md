@@ -72,11 +72,10 @@ GestorCompras - Versión Preliminar
  ------------------------
  Las contribuciones son bienvenidas siempre que se mantenga el enfoque del proyecto y se respeten los derechos de autor. Para sugerencias, mejoras o reportar errores, por favor utilice los canales de contacto indicados a continuación.
  
- Contacto
- --------
- - Correo Electrónico: omar777j@gmail.com
- - Teléfonos:
-     - Personal: 0967629643
+Contacto
+--------
+- Correo Electrónico: contacto@example.com
+
  
  Última actualización: 25/06/2025
  
