@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.db
+# Other temporary files
+.DS_Store
+*.log
+*.sqlite3
+*.pyo
+*.pyd
+*.swp
