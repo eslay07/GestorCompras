@@ -26,15 +26,17 @@ def import_proveedores_from_excel():
         print(f"Error al leer el Excel: {e}")
         return
 
-    # Se asume que el Excel tiene las columnas "name", "ruc" y "email".
+    # Se asume que el Excel tiene las columnas "name", "ruc", "email" y opcionalmente "email2".
     for index, row in df.iterrows():
         name = str(row.get("name", "")).strip()
         ruc = str(row.get("ruc", "")).strip()
         email = str(row.get("email", "")).strip()
+        email2 = str(row.get("email2", "")).strip()
         if name and ruc and email:
             try:
-                db.add_supplier(name, ruc, email)
-                print(f"Proveedor importado: {name} - {ruc} - {email}")
+                db.add_supplier(name, ruc, email, email2)
+                extras = f" , {email2}" if email2 else ""
+                print(f"Proveedor importado: {name} - {ruc} - {email}{extras}")
             except Exception as e:
                 print(f"Error al insertar proveedor {name}: {e}")
         else:

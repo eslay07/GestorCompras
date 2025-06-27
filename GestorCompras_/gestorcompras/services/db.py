@@ -21,14 +21,22 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
     # Tabla de proveedores
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS suppliers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             ruc TEXT UNIQUE NOT NULL,
-            email TEXT NOT NULL
+            email TEXT NOT NULL,
+            email_alt TEXT
         )
-    """)
+        """
+    )
+    # Aseguramos que la columna email_alt exista en instalaciones antiguas
+    cursor.execute("PRAGMA table_info(suppliers)")
+    cols = [c[1] for c in cursor.fetchall()]
+    if "email_alt" not in cols:
+        cursor.execute("ALTER TABLE suppliers ADD COLUMN email_alt TEXT")
     # Tabla para tareas temporales
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tasks_temp (
@@ -52,6 +60,16 @@ def init_db():
             value TEXT NOT NULL
         )
     """)
+
+    # Tabla para formatos de correo personalizados
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            html TEXT NOT NULL,
+            signature_path TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -59,32 +77,40 @@ def init_db():
 def get_suppliers():
     """
     Retorna una lista con los proveedores registrados.
-    Cada elemento es una tupla (id, name, ruc, email).
+    Cada elemento es una tupla (id, name, ruc, email, email_alt).
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, ruc, email FROM suppliers")
+    cursor.execute("SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers")
     rows = cursor.fetchall()
     conn.close()
     return rows
 
-def add_supplier(name, ruc, email):
+def add_supplier(name, ruc, email, email_alt=None):
     """
     Agrega o actualiza un proveedor en la tabla.
+    El correo secundario es opcional.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO suppliers (name, ruc, email) VALUES (?, ?, ?)", (name, ruc, email))
+    cursor.execute(
+        "INSERT OR REPLACE INTO suppliers (name, ruc, email, email_alt) VALUES (?, ?, ?, ?)",
+        (name, ruc, email, email_alt),
+    )
     conn.commit()
     conn.close()
 
-def update_supplier(supplier_id, name, ruc, email):
+def update_supplier(supplier_id, name, ruc, email, email_alt=None):
     """
     Actualiza la información de un proveedor.
+    El correo secundario es opcional.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE suppliers SET name=?, ruc=?, email=? WHERE id=?", (name, ruc, email, supplier_id))
+    cursor.execute(
+        "UPDATE suppliers SET name=?, ruc=?, email=?, email_alt=? WHERE id=?",
+        (name, ruc, email, email_alt, supplier_id),
+    )
     conn.commit()
     conn.close()
 
@@ -207,3 +233,76 @@ def set_config(key, value):
     cursor.execute("INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
     conn.close()
+
+# ------------------ Email Templates ------------------
+def get_email_templates():
+    """Retorna la lista de formatos de correo registrados."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, html, signature_path FROM email_templates")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def search_suppliers(term):
+    """Busca proveedores por coincidencia parcial en nombre o RUC."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    like = f"%{term}%"
+    cursor.execute(
+        "SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers WHERE name LIKE ? OR ruc LIKE ?",
+        (like, like),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def get_email_template(template_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, html, signature_path FROM email_templates WHERE id=?",
+        (template_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def get_email_template_by_name(name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, html, signature_path FROM email_templates WHERE name=?",
+        (name,))
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
+def add_email_template(name, html, signature_path=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO email_templates (name, html, signature_path) VALUES (?, ?, ?)",
+        (name, html, signature_path))
+    conn.commit()
+    conn.close()
+
+def update_email_template(template_id, name, html, signature_path=None):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE email_templates SET name=?, html=?, signature_path=? WHERE id=?",
+        (name, html, signature_path, template_id))
+    conn.commit()
+    conn.close()
+
+def delete_email_template(template_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM email_templates WHERE id=?", (template_id,))
+    conn.commit()
+    conn.close()
+
+# Inicializamos las tablas al importar el módulo para evitar
+# errores si otras partes del programa acceden a la base de datos
+# antes de abrir la ventana de configuración.
+init_db()

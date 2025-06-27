@@ -11,10 +11,12 @@ GestorCompras - Versión Preliminar
  
  Características Principales
  ----------------------------
- - Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Cada proveedor puede tener un correo de respaldo para notificaciones.
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
  - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
- - Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
+- Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
+- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas, además de incluir una imagen de firma.
  - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
  - Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
  
@@ -63,8 +65,8 @@ GestorCompras - Versión Preliminar
  
  Futuras Mejoras
  ---------------
- - Se está diseñando un nuevo módulo para solicitar cotizaciones de manera automática, tanto mediante correo electrónico como a través de la plataforma Katuk, con el objetivo de optimizar aún más el proceso.
- - Se planea implementar la generación de un nuevo formato de usuario desde el módulo de configuraciones, permitiendo una mayor flexibilidad al no depender de un formato HTML preestablecido.
+- Se está diseñando un nuevo módulo para solicitar cotizaciones de manera automática, tanto mediante correo electrónico como a través de la plataforma Katuk, con el objetivo de optimizar aún más el proceso.
+- Se continuarán ampliando las funciones del editor de plantillas para ofrecer cada vez más opciones de personalización.
  
  Contribuciones y Mejoras
  ------------------------
@@ -76,6 +78,6 @@ GestorCompras - Versión Preliminar
  - Teléfonos:
      - Personal: 0967629643
  
- Última actualización: 27/03/2025
+ Última actualización: 25/06/2025
  
  Este README ha sido actualizado para reflejar la versión actual del proyecto, garantizando claridad en sus funcionalidades, estado de desarrollo y un completo deslinde de responsabilidad legal.

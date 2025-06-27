@@ -2,11 +2,16 @@ import tkinter as tk
 import os
 import tkinter.font as tkFont
 from tkinter import ttk, messagebox, simpledialog, filedialog
+from html import escape
 from gestorcompras.services import db
+from gestorcompras.gui.html_editor import HtmlEditor
 
 class ConfigGUI(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
+        # Ensure the database has all required tables even if this
+        # window is launched directly without going through main()
+        db.init_db()
         self.title("Configuración")
         self.geometry("670x500")
         self.create_widgets()
@@ -31,16 +36,28 @@ class ConfigGUI(tk.Toplevel):
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
+        search_frame = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
+        search_frame.pack(fill="x", pady=(0,5))
+        ttk.Label(search_frame, text="Buscar:", style="MyLabel.TLabel").pack(side="left")
+        self.search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=self.search_var, style="MyEntry.TEntry")
+        search_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.search_var.trace_add("write", lambda *args: self.filter_suppliers())
+        ttk.Button(search_frame, text="Limpiar", style="MyButton.TButton", command=lambda: self.search_var.set(""))\
+            .pack(side="left", padx=5)
+
         # Contenedor para el Treeview y sus scrollbars
         container = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
         
         # Creamos el Treeview
-        self.suppliers_list = ttk.Treeview(container,
-                                           style="MyTreeview.Treeview",
-                                           columns=("ID", "Nombre", "RUC", "Correo"),
-                                           show="headings")
-        for col in ("ID", "Nombre", "RUC", "Correo"):
+        self.suppliers_list = ttk.Treeview(
+            container,
+            style="MyTreeview.Treeview",
+            columns=("ID", "Nombre", "RUC", "Correo", "Correo2"),
+            show="headings",
+        )
+        for col in ("ID", "Nombre", "RUC", "Correo", "Correo2"):
             self.suppliers_list.heading(col, text=col)
         
         # Creamos las scrollbars vertical y horizontal
@@ -74,11 +91,18 @@ class ConfigGUI(tk.Toplevel):
                    command=self.delete_supplier).pack(side="left", padx=5)
     
     def load_suppliers(self):
-        for i in self.suppliers_list.get_children():
-            self.suppliers_list.delete(i)
-        for sup in db.get_suppliers():
+        term = getattr(self, "search_var", None)
+        if term and term.get().strip():
+            suppliers = db.search_suppliers(term.get().strip())
+        else:
+            suppliers = db.get_suppliers()
+        self.suppliers_list.delete(*self.suppliers_list.get_children())
+        for sup in suppliers:
             self.suppliers_list.insert("", "end", values=sup)
         self.auto_adjust_columns()
+
+    def filter_suppliers(self):
+        self.load_suppliers()
     
     def auto_adjust_columns(self):
         style = ttk.Style()
@@ -214,16 +238,34 @@ class ConfigGUI(tk.Toplevel):
         ttk.Label(frame, text="Seleccione el Formato de Correo Actual:",
                   style="MyLabel.TLabel").pack(pady=10)
         self.email_template_var = tk.StringVar()
-        self.email_template_var.set(db.get_config("EMAIL_TEMPLATE", "Bienes"))
         self.template_combo = ttk.Combobox(frame, textvariable=self.email_template_var,
-                                           values=["Bienes", "Servicios"], state="readonly")
+                                           state="readonly")
         self.template_combo.pack(pady=5)
         ttk.Button(frame, text="Guardar Formato",
                    style="MyButton.TButton",
                    command=self.save_email_template).pack(pady=10)
-        ttk.Button(frame, text="Agregar Nuevo Formato",
+
+        self.templates_list = ttk.Treeview(frame, style="MyTreeview.Treeview",
+                                           columns=("ID", "Nombre"), show="headings",
+                                           height=5)
+        self.templates_list.heading("ID", text="ID")
+        self.templates_list.heading("Nombre", text="Nombre")
+        self.templates_list.column("ID", width=50)
+        self.templates_list.pack(fill="x", pady=5)
+
+        btn_frame = ttk.Frame(frame, style="MyFrame.TFrame", padding=5)
+        btn_frame.pack(pady=5)
+        ttk.Button(btn_frame, text="Agregar",
                    style="MyButton.TButton",
-                   command=self.agregar_nuevo_formato).pack(pady=5)
+                   command=self.agregar_nuevo_formato).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Editar",
+                   style="MyButton.TButton",
+                   command=self.editar_formato).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Eliminar",
+                   style="MyButton.TButton",
+                   command=self.eliminar_formato).pack(side="left", padx=5)
+
+        self.load_email_templates()
     
     def save_email_template(self):
         formato = self.email_template_var.get().strip()
@@ -232,9 +274,113 @@ class ConfigGUI(tk.Toplevel):
             return
         db.set_config("EMAIL_TEMPLATE", formato)
         messagebox.showinfo("Información", "Formato de correo guardado correctamente.")
-    
+
+    def load_email_templates(self):
+        for i in self.templates_list.get_children():
+            self.templates_list.delete(i)
+        templates = db.get_email_templates()
+        for tpl in templates:
+            self.templates_list.insert("", "end", values=(tpl[0], tpl[1]))
+
+        opciones = ["Bienes", "Servicios"] + [tpl[1] for tpl in templates]
+        self.template_combo["values"] = opciones
+        current = db.get_config("EMAIL_TEMPLATE", "Bienes")
+        if current in opciones:
+            self.email_template_var.set(current)
+        else:
+            self.email_template_var.set("Bienes")
+
     def agregar_nuevo_formato(self):
-        messagebox.showinfo("Formato", "Funcionalidad para agregar nuevo formato pendiente de implementar.")
+        TemplateForm(self, "Nuevo Formato", self.load_email_templates).wait_window()
+
+    def editar_formato(self):
+        selected = self.templates_list.selection()
+        if not selected:
+            messagebox.showwarning("Advertencia", "Seleccione un formato para editar.")
+            return
+        tpl_id = self.templates_list.item(selected[0])["values"][0]
+        data = db.get_email_template(tpl_id)
+        TemplateForm(self, "Editar Formato", self.load_email_templates, data).wait_window()
+
+    def eliminar_formato(self):
+        selected = self.templates_list.selection()
+        if not selected:
+            messagebox.showwarning("Advertencia", "Seleccione un formato para eliminar.")
+            return
+        tpl_id = self.templates_list.item(selected[0])["values"][0]
+        if messagebox.askyesno("Confirmar", "¿Eliminar el formato seleccionado?"):
+            db.delete_email_template(tpl_id)
+            self.load_email_templates()
+
+
+class TemplateForm(tk.Toplevel):
+    def __init__(self, master, title, refresh_callback, template_data=None):
+        super().__init__(master)
+        self.title(title)
+        self.geometry("700x600")
+        self.transient(master)
+        self.grab_set()
+        self.focus()
+        self.refresh_callback = refresh_callback
+        self.template_data = template_data
+        self.create_widgets()
+
+    def create_widgets(self):
+        container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
+        container.pack(fill="both", expand=True)
+
+        self.name_var = tk.StringVar()
+        self.signature_var = tk.StringVar()
+
+        ttk.Label(container, text="Nombre:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        ttk.Entry(container, textvariable=self.name_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
+
+        ttk.Label(container, text="Imagen de firma:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        frame_img = ttk.Frame(container, style="MyFrame.TFrame")
+        frame_img.pack(fill="x")
+        ttk.Entry(frame_img, textvariable=self.signature_var, style="MyEntry.TEntry").pack(side="left", fill="x", expand=True, pady=5)
+        ttk.Button(frame_img, text="Seleccionar", style="MyButton.TButton", command=self.select_image).pack(side="left", padx=5)
+        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).pack(pady=(5,10))
+
+        ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        self.editor = HtmlEditor(container)
+        self.editor.pack(fill="both", expand=True, pady=5)
+
+
+        if self.template_data:
+            self.name_var.set(self.template_data[1])
+            self.editor.set_html(self.template_data[2])
+            if self.template_data[3]:
+                self.signature_var.set(self.template_data[3])
+
+    def select_image(self):
+        path = filedialog.askopenfilename(title="Seleccionar imagen", filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.gif")])
+        if path:
+            self.signature_var.set(path)
+
+    def save_template(self):
+        # Recreate missing tables if the database was not initialized
+        db.init_db()
+        name = self.name_var.get().strip()
+        self.editor.text.tag_remove("sel", "1.0", "end")
+        raw_text = self.editor.text.get("1.0", "end-1c").strip()
+        html = self.editor.get_html().strip()
+        if not html and raw_text:
+            html = escape(raw_text).replace("\n", "<br>")
+        signature = self.signature_var.get().strip()
+        if not (name and raw_text):
+            messagebox.showwarning(
+                "Advertencia",
+                "El nombre y el contenido son obligatorios.",
+            )
+            return
+        if self.template_data:
+            db.update_email_template(self.template_data[0], name, html, signature)
+        else:
+            db.add_email_template(name, html, signature)
+        self.refresh_callback()
+        self.destroy()
+    
 
 class SupplierForm(tk.Toplevel):
     def __init__(self, master, title, refresh_callback, supplier_data=None):
@@ -251,6 +397,7 @@ class SupplierForm(tk.Toplevel):
         self.name_var = tk.StringVar()
         self.ruc_var = tk.StringVar()
         self.email_var = tk.StringVar()
+        self.email2_var = tk.StringVar()
         
         ttk.Label(container, text="Nombre:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
         ttk.Entry(container, textvariable=self.name_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
@@ -260,6 +407,9 @@ class SupplierForm(tk.Toplevel):
         
         ttk.Label(container, text="Correo:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
         ttk.Entry(container, textvariable=self.email_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
+
+        ttk.Label(container, text="Correo 2 (opcional):", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        ttk.Entry(container, textvariable=self.email2_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
         
         ttk.Button(container, text="Guardar",
                    style="MyButton.TButton",
@@ -269,18 +419,24 @@ class SupplierForm(tk.Toplevel):
             self.name_var.set(self.supplier_data[1])
             self.ruc_var.set(self.supplier_data[2])
             self.email_var.set(self.supplier_data[3])
+            if len(self.supplier_data) > 4:
+                self.email2_var.set(self.supplier_data[4])
 
     def save_supplier(self):
         name = self.name_var.get().strip()
         ruc = self.ruc_var.get().strip()
         email = self.email_var.get().strip()
+        email2 = self.email2_var.get().strip()
         if not (name and ruc and email):
-            messagebox.showwarning("Advertencia", "Todos los campos son obligatorios.")
+            messagebox.showwarning(
+                "Advertencia",
+                "Nombre, RUC y el primer correo son obligatorios.",
+            )
             return
         if self.supplier_data:
-            db.update_supplier(self.supplier_data[0], name, ruc, email)
+            db.update_supplier(self.supplier_data[0], name, ruc, email, email2)
         else:
-            db.add_supplier(name, ruc, email)
+            db.add_supplier(name, ruc, email, email2)
         self.refresh_callback()
         self.destroy()
 

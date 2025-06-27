@@ -34,22 +34,39 @@ def open_despacho(master, email_session):
         log_box.configure(state="disabled")
     
     def process_input_orders():
-        orders = text_area.get("1.0", tk.END).strip().splitlines()
+        orders = [o.strip() for o in text_area.get("1.0", tk.END).splitlines() if o.strip()]
         if not orders:
             messagebox.showwarning("Advertencia", "Ingrese al menos un número de OC.")
             return
-        log_func("Procesando órdenes, espere...")
-        
+
+        summaries = []
+        for oc in orders:
+            info, error = despacho_logic.obtener_resumen_orden(oc)
+            if info:
+                emails = ", ".join(info["emails"]) if info["emails"] else ""
+                summaries.append(f"OC {oc} -> {emails}")
+            else:
+                summaries.append(f"OC {oc}: {error}")
+        if not summaries:
+            return
+        if not messagebox.askyesno("Confirmar envíos", "\n".join(summaries) + f"\n\n¿Enviar {len(orders)} correos?"):
+            return
+
+        log_func("Enviando correos, espere...")
+
         def process_all_orders():
+            results = []
             with ThreadPoolExecutor(max_workers=4) as executor:
                 futures = [executor.submit(despacho_logic.process_order, email_session, orden) for orden in orders]
                 for future in as_completed(futures):
                     try:
                         result = future.result()
-                        log_func(result)
                     except Exception as e:
-                        log_func(f"Error en el procesamiento: {str(e)}")
-        
+                        result = f"Error en el procesamiento: {str(e)}"
+                    results.append(result)
+                    log_func(result)
+            messagebox.showinfo("Resultado", "\n".join(results))
+
         threading.Thread(target=process_all_orders).start()
     
     btn_procesar = ttk.Button(main_frame, text="Procesar Despachos",

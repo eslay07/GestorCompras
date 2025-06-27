@@ -1,8 +1,12 @@
 import os
 import re
 import pdfplumber
-from gestorcompras.services.db import get_config, get_suppliers
-from gestorcompras.services.email_sender import send_email
+from gestorcompras.services.db import (
+    get_config,
+    get_suppliers,
+    get_email_template_by_name,
+)
+from gestorcompras.services.email_sender import send_email, send_email_custom
 
 def buscar_archivo_mas_reciente(orden):
     """
@@ -56,38 +60,84 @@ def extraer_info_de_pdf(pdf_path):
         pass
     return ruc, tarea
 
-def process_order(email_session, orden):
+def obtener_resumen_orden(orden):
+    """Obtiene la información necesaria para previsualizar el envío."""
     pdf_path, folder_name = buscar_archivo_mas_reciente(orden)
     if not pdf_path:
-        return f"⚠ No se encontró archivo para la OC {orden}."
-    
+        return None, f"No se encontró archivo para la OC {orden}."
     ruc, tarea = extraer_info_de_pdf(pdf_path)
-    suppliers = {ruc_db: email for (_id, name, ruc_db, email) in get_suppliers()}
+    suppliers = {
+        ruc_db: (email, email_alt)
+        for (_id, name, ruc_db, email, email_alt) in get_suppliers()
+    }
     if not (ruc and ruc in suppliers):
-        return f"⚠ No se encontró correo para el RUC {ruc} (OC: {orden})."
-    
+        return None, f"No se encontró correo para el RUC {ruc} (OC: {orden})."
+    emails = list(filter(None, suppliers[ruc]))
+    return {
+        "orden": orden,
+        "tarea": tarea,
+        "folder_name": folder_name,
+        "emails": emails,
+        "pdf_path": pdf_path,
+    }, None
+
+def process_order(email_session, orden):
+    info, error = obtener_resumen_orden(orden)
+    if not info:
+        return f"⚠ {error}"
+    pdf_path = info["pdf_path"]
+    tarea = info["tarea"]
+    folder_name = info["folder_name"]
+    email_to = ", ".join(info["emails"]) if info["emails"] else ""
+
     context = {
         "orden": orden,
         "tarea": tarea,
         "folder_name": folder_name,
-        "email_to": suppliers[ruc]
+        "email_to": email_to,
     }
     
     # Seleccionar formato de correo según la configuración
     formato = get_config("EMAIL_TEMPLATE", "Bienes")
-    if formato == "Bienes":
-        template_text = "correo_bienes.txt"
-        template_html = "correo_bienes.html"
+    template_db = get_email_template_by_name(formato)
+    html_content = None
+    signature_path = None
+    if template_db and template_db[2].strip():
+        _, _name, html_content, signature_path = template_db
+        template_text = None
+        template_html = None
     else:
-        template_text = "correo_servicios.txt"
-        template_html = "correo_servicios.html"
+        template_db = None
+        if formato == "Bienes":
+            template_text = "correo_bienes.txt"
+            template_html = "correo_bienes.html"
+        else:
+            template_text = "correo_servicios.txt"
+            template_html = "correo_servicios.html"
     
     # Construimos el asunto con carpeta y tarea
     subject = f"DESPACHO DE OC {orden}" + (f" TAREA {tarea}" if tarea else "") + f" - {folder_name}"
     subject = subject.upper()  # Forzamos mayúsculas
     
     try:
-        send_email(email_session, subject, template_text, template_html, context, attachment_path=pdf_path)
+        if template_db:
+            send_email_custom(
+                email_session,
+                subject,
+                html_content,
+                context,
+                attachment_path=pdf_path,
+                signature_path=signature_path,
+            )
+        else:
+            send_email(
+                email_session,
+                subject,
+                template_text,
+                template_html,
+                context,
+                attachment_path=pdf_path,
+            )
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:
         return f"❌ Error al enviar el correo para OC {orden}: {str(e)}"
