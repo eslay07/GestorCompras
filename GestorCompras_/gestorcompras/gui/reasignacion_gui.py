@@ -104,6 +104,8 @@ def cargar_tareas_correo(email_address, email_password, window, status_callback=
         return
 
     date_since_dt = datetime.datetime.strptime(date_input, '%d/%m/%Y')
+    if status_callback:
+        status_callback("Buscando tareas, por favor espere...")
     loaded_count = 0
 
     items = task_folder.Items
@@ -127,7 +129,6 @@ def cargar_tareas_correo(email_address, email_password, window, status_callback=
             break
         if status_callback and i % 10 == 0:
             status_callback(f"Revisando correo {i}/{total}")
-            window.update()
         item = items.Item(i)
         try:
             sender = (getattr(item, "SenderEmailAddress", "") or "").lower()
@@ -292,13 +293,11 @@ def open_reasignacion(master, email_session):
     top_frame.pack(fill="x")
 
     def buscar_tareas():
-        status_label.config(text="Buscando tareas, por favor espere...")
-        window.update()
         cargar_tareas_correo(
             email_session["address"],
             email_session["password"],
             window,
-            status_callback=lambda t: status_label.config(text=t),
+            status_callback=lambda t: [status_label.config(text=t), window.update()],
         )
         actualizar_tareas()
         status_label.config(text="Búsqueda completada")
