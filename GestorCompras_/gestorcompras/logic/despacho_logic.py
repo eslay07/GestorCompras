@@ -60,25 +60,36 @@ def extraer_info_de_pdf(pdf_path):
         pass
     return ruc, tarea
 
-def process_order(email_session, orden):
+def prepare_order_context(orden):
+    """Prepara el contexto para enviar un correo sin ejecutarlo"""
     pdf_path, folder_name = buscar_archivo_mas_reciente(orden)
     if not pdf_path:
-        return f"⚠ No se encontró archivo para la OC {orden}."
-    
+        return None, f"⚠ No se encontró archivo para la OC {orden}."
+
     ruc, tarea = extraer_info_de_pdf(pdf_path)
     suppliers = {
         ruc_db: (email, email_alt)
         for (_id, name, ruc_db, email, email_alt) in get_suppliers()
     }
     if not (ruc and ruc in suppliers):
-        return f"⚠ No se encontró correo para el RUC {ruc} (OC: {orden})."
-    
+        return None, f"⚠ No se encontró correo para el RUC {ruc} (OC: {orden})."
+
     context = {
         "orden": orden,
         "tarea": tarea,
         "folder_name": folder_name,
-        "email_to": ", ".join(filter(None, suppliers[ruc]))
+        "email_to": ", ".join(filter(None, suppliers[ruc])),
+        "pdf_path": pdf_path,
     }
+    return context, None
+
+def process_order(email_session, orden):
+    context, error = prepare_order_context(orden)
+    if error:
+        return error
+    pdf_path = context.pop("pdf_path")
+    folder_name = context["folder_name"]
+    tarea = context.get("tarea")
     
     # Seleccionar formato de correo según la configuración
     formato = get_config("EMAIL_TEMPLATE", "Bienes")

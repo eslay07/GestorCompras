@@ -36,6 +36,21 @@ class ConfigGUI(tk.Toplevel):
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
+        search_bar = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
+        search_bar.pack(fill="x", pady=5)
+        self.search_var = tk.StringVar()
+        ttk.Entry(
+            search_bar,
+            textvariable=self.search_var,
+            style="MyEntry.TEntry",
+        ).pack(side="left", fill="x", expand=True, padx=5)
+        ttk.Button(
+            search_bar,
+            text="Buscar",
+            style="MyButton.TButton",
+            command=self.search_suppliers,
+        ).pack(side="left")
+
         # Contenedor para el Treeview y sus scrollbars
         container = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
@@ -80,12 +95,19 @@ class ConfigGUI(tk.Toplevel):
                    style="MyButton.TButton",
                    command=self.delete_supplier).pack(side="left", padx=5)
     
-    def load_suppliers(self):
+    def load_suppliers(self, query=None):
         for i in self.suppliers_list.get_children():
             self.suppliers_list.delete(i)
-        for sup in db.get_suppliers():
+        if query:
+            rows = db.search_suppliers(query)
+        else:
+            rows = db.get_suppliers()
+        for sup in rows:
             self.suppliers_list.insert("", "end", values=sup)
         self.auto_adjust_columns()
+
+    def search_suppliers(self):
+        self.load_suppliers(self.search_var.get().strip())
     
     def auto_adjust_columns(self):
         style = ttk.Style()
@@ -104,7 +126,7 @@ class ConfigGUI(tk.Toplevel):
             self.suppliers_list.column(col, width=max_width + 20)
     
     def add_supplier(self):
-        SupplierForm(self, "Agregar Proveedor", self.load_suppliers)
+        SupplierForm(self, "Agregar Proveedor", lambda: self.load_suppliers(self.search_var.get().strip()))
     
     def edit_supplier(self):
         selected = self.suppliers_list.selection()
@@ -112,7 +134,7 @@ class ConfigGUI(tk.Toplevel):
             messagebox.showwarning("Advertencia", "Seleccione un proveedor para editar.")
             return
         data = self.suppliers_list.item(selected[0])["values"]
-        SupplierForm(self, "Editar Proveedor", self.load_suppliers, data)
+        SupplierForm(self, "Editar Proveedor", lambda: self.load_suppliers(self.search_var.get().strip()), data)
     
     def delete_supplier(self):
         selected = self.suppliers_list.selection()
@@ -121,7 +143,7 @@ class ConfigGUI(tk.Toplevel):
             return
         supplier_id = self.suppliers_list.item(selected[0])["values"][0]
         db.delete_supplier(supplier_id)
-        self.load_suppliers()
+        self.load_suppliers(self.search_var.get().strip())
         messagebox.showinfo("Información", "Proveedor eliminado.")
     
     def create_assignment_tab(self):

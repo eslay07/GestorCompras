@@ -34,22 +34,50 @@ def open_despacho(master, email_session):
         log_box.configure(state="disabled")
     
     def process_input_orders():
-        orders = text_area.get("1.0", tk.END).strip().splitlines()
+        orders = [o.strip() for o in text_area.get("1.0", tk.END).splitlines() if o.strip()]
         if not orders:
             messagebox.showwarning("Advertencia", "Ingrese al menos un número de OC.")
             return
+
+        previews = []
+        valid_orders = []
+        for orden in orders:
+            ctx, err = despacho_logic.prepare_order_context(orden)
+            if err:
+                previews.append(err)
+            else:
+                previews.append(f"OC {orden} -> {ctx['email_to']}")
+                valid_orders.append(orden)
+
+        if not valid_orders:
+            for line in previews:
+                log_func(line)
+            return
+
+        summary = "\n".join(previews)
+        if not messagebox.askyesno("Confirmar envío", f"Se enviarán {len(valid_orders)} correos:\n{summary}\n¿Continuar?"):
+            return
+
         log_func("Procesando órdenes, espere...")
-        
+
         def process_all_orders():
+            results = []
             with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [executor.submit(despacho_logic.process_order, email_session, orden) for orden in orders]
+                futures = {executor.submit(despacho_logic.process_order, email_session, oc): oc for oc in valid_orders}
                 for future in as_completed(futures):
+                    orden = futures[future]
                     try:
                         result = future.result()
-                        log_func(result)
                     except Exception as e:
-                        log_func(f"Error en el procesamiento: {str(e)}")
-        
+                        result = f"❌ Error al enviar el correo para OC {orden}: {str(e)}"
+                    results.append(result)
+                    log_func(result)
+            errors = [r for r in results if not r.startswith("✅")]
+            if errors:
+                messagebox.showerror("Resultado de envío", "\n".join(errors))
+            else:
+                messagebox.showinfo("Resultado de envío", "Todos los correos fueron enviados correctamente.")
+
         threading.Thread(target=process_all_orders).start()
     
     btn_procesar = ttk.Button(main_frame, text="Procesar Despachos",

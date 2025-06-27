@@ -12,10 +12,11 @@ GestorCompras - Versión Preliminar
  Características Principales
  ----------------------------
 - Gestión de Proveedores: Registro, edición y eliminación de proveedores.
+- Búsqueda rápida por RUC o nombre para ubicar proveedores existentes.
 - Cada proveedor puede tener un correo de respaldo para notificaciones.
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
  - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
-- Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
+- Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables y confirmación previa de los correos a enviar.
 - Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas, además de incluir una imagen de firma.
  - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
  - Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
@@ -35,10 +36,12 @@ GestorCompras - Versión Preliminar
       (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
    3. Configuración de la Base de Datos:
       La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
-   4. Carga rápida de Proveedores:
+   4. Configuración de SMTP (opcional):
+      Puede definir las variables de entorno `SMTP_SERVER`, `SMTP_PORT` y `EMAIL_CC` para personalizar el servidor de correo y la dirección de copia.
+   5. Carga rápida de Proveedores:
       Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
         python import_proveedores.py
-   5. Ejecutar la Aplicación:
+   6. Ejecutar la Aplicación:
         python main.py
  
  Uso
