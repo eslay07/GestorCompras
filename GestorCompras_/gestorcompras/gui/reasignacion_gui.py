@@ -50,11 +50,15 @@ def cargar_tareas_correo(email_address, email_password, window):
         messagebox.showerror("Error", "Formato de fecha inválido. Use DD/MM/YYYY", parent=window)
         return
 
-    filtro_str = simpledialog.askstring("Filtro de Tareas", "Números de tarea separados por comas (opcional):", parent=window)
+    filtro_str = simpledialog.askstring(
+        "Filtro de Tareas",
+        "Números de tarea separados por comas (opcional):",
+        parent=window,
+    )
     if filtro_str:
-        task_filters = [x.strip() for x in filtro_str.split(",") if x.strip()]
+        task_filters = {x.strip() for x in filtro_str.split(",") if x.strip()}
     else:
-        task_filters = []
+        task_filters = set()
 
     pst_path = db.get_config("PST_FILE", "")
     if not pst_path or not os.path.exists(pst_path):
@@ -102,33 +106,47 @@ def cargar_tareas_correo(email_address, email_password, window):
     date_since_dt = datetime.datetime.strptime(date_input, '%d/%m/%Y')
     loaded_count = 0
 
-    def traverse(folder):
-        nonlocal loaded_count
-        for item in getattr(folder, "Items", []):
-            try:
-                sender = (getattr(item, "SenderEmailAddress", "") or "").lower()
-                if sender != "omar777j@gmail.com":
-                    continue
-                msg_date = getattr(item, "ReceivedTime", None)
-                if msg_date and msg_date < date_since_dt:
-                    continue
-                body = getattr(item, "Body", "") or ""
-                tasks_data = process_body(body)
-                for task_info in tasks_data:
-                    if task_filters and task_info["task_number"] not in task_filters:
-                        continue
-                    inserted = db.insert_task_temp(
-                        task_info["task_number"],
-                        task_info["reasignacion"],
-                        task_info["details"])
-                    if inserted:
-                        loaded_count += 1
-            except Exception:
-                continue
+    items = task_folder.Items
+    filter_date = date_since_dt.strftime("%m/%d/%Y %H:%M %p")
+    restrict_query = (
+        f"[SenderEmailAddress] = 'omar777j@gmail.com' AND "
+        f"[ReceivedTime] >= '{filter_date}'"
+    )
+    try:
+        items = items.Restrict(restrict_query)
+    except Exception:
+        pass
 
-    traverse(task_folder)
+    for item in items:
+        try:
+            sender = (getattr(item, "SenderEmailAddress", "") or "").lower()
+            if sender != "omar777j@gmail.com":
+                continue
+            msg_date = getattr(item, "ReceivedTime", None)
+            if msg_date and msg_date < date_since_dt:
+                continue
+            body = getattr(item, "Body", "") or ""
+            if "Tarea:" not in body:
+                continue
+            tasks_data = process_body(body)
+            for task_info in tasks_data:
+                if task_filters and task_info["task_number"] not in task_filters:
+                    continue
+                inserted = db.insert_task_temp(
+                    task_info["task_number"],
+                    task_info["reasignacion"],
+                    task_info["details"])
+                if inserted:
+                    loaded_count += 1
+        except Exception:
+            continue
+
     outlook.RemoveStore(pst_root)
-    messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
+    messagebox.showinfo(
+        "Información",
+        f"Se cargaron {loaded_count} tareas (sin duplicados).",
+        parent=window,
+    )
 
 def login_telcos(driver, username, password):
     driver.get('https://telcos.telconet.ec/inicio/?josso_back_to=http://telcos.telconet.ec/check&josso_partnerapp_host=telcos.telconet.ec')
