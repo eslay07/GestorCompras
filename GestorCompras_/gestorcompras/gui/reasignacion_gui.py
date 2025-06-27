@@ -79,6 +79,22 @@ def cargar_tareas_correo(email_address, email_password, window):
                 continue
         if pst_root is None:
             raise Exception("No se pudo abrir el PST")
+
+        def find_folder(root, name):
+            for fld in getattr(root, "Folders", []):
+                try:
+                    if getattr(fld, "Name", "") == name:
+                        return fld
+                    sub = find_folder(fld, name)
+                    if sub:
+                        return sub
+                except Exception:
+                    continue
+            return None
+
+        task_folder = find_folder(pst_root, "Tareas_por_Reasignar")
+        if task_folder is None:
+            raise Exception("No se encontró la carpeta Tareas_por_Reasignar")
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo abrir el archivo PST: {e}", parent=window)
         return
@@ -109,9 +125,8 @@ def cargar_tareas_correo(email_address, email_password, window):
                         loaded_count += 1
             except Exception:
                 continue
-        for sub in getattr(folder, "Folders", []):
-            traverse(sub)
-    traverse(pst_root)
+
+    traverse(task_folder)
     outlook.RemoveStore(pst_root)
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 

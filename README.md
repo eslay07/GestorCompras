@@ -15,7 +15,7 @@ GestorCompras - Versión Preliminar
 - Cada proveedor puede tener un correo de respaldo para notificaciones.
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
 - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
-- Lectura de correos desde un archivo PST local configurable (requiere pywin32 en Windows).
+- Lectura de correos desde un archivo PST local configurable (carpeta "Tareas_por_Reasignar", requiere pywin32 en Windows).
 - Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
 - Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas, además de incluir una imagen de firma.
  - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
