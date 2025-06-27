@@ -65,9 +65,18 @@ def cargar_tareas_correo(email_address, email_password, window):
         return
     try:
         outlook = win32.Dispatch("Outlook.Application").GetNamespace("MAPI")
-        existing = [f.StoreID for f in outlook.Folders]
         outlook.AddStore(pst_path)
-        pst_root = next((f for f in outlook.Folders if f.StoreID not in existing), None)
+        pst_root = None
+        for store in outlook.Stores:
+            try:
+                if (
+                    getattr(store, "FilePath", "")
+                    and os.path.normcase(store.FilePath) == os.path.normcase(pst_path)
+                ):
+                    pst_root = store.GetRootFolder()
+                    break
+            except Exception:
+                continue
         if pst_root is None:
             raise Exception("No se pudo abrir el PST")
     except Exception as e:
