@@ -39,7 +39,7 @@ def process_body(body):
         tasks_data.append(task_info)
     return tasks_data
 
-def cargar_tareas_correo(email_address, email_password, window):
+def cargar_tareas_correo(email_address, email_password, window, status_callback=None):
     date_input = simpledialog.askstring("Fecha", "Ingresa la fecha (DD/MM/YYYY):", parent=window)
     if not date_input:
         messagebox.showwarning("Advertencia", "No se ingresó fecha.", parent=window)
@@ -107,6 +107,7 @@ def cargar_tareas_correo(email_address, email_password, window):
     loaded_count = 0
 
     items = task_folder.Items
+    items.Sort("[ReceivedTime]", True)
     filter_date = date_since_dt.strftime("%m/%d/%Y %H:%M %p")
     restrict_query = (
         f"[SenderEmailAddress] = 'omar777j@gmail.com' AND "
@@ -117,7 +118,12 @@ def cargar_tareas_correo(email_address, email_password, window):
     except Exception:
         pass
 
-    for item in items:
+    total = items.Count
+    for i in range(1, total + 1):
+        if status_callback and i % 10 == 0:
+            status_callback(f"Revisando correo {i}/{total}")
+            window.update()
+        item = items.Item(i)
         try:
             sender = (getattr(item, "SenderEmailAddress", "") or "").lower()
             if sender != "omar777j@gmail.com":
@@ -287,6 +293,7 @@ def open_reasignacion(master, email_session):
             email_session["address"],
             email_session["password"],
             window,
+            status_callback=lambda t: status_label.config(text=t),
         )
         actualizar_tareas()
         status_label.config(text="Búsqueda completada")
