@@ -5,11 +5,10 @@ import threading
 import time
 import datetime
 import os
-import email
 try:
-    import pypff
+    import win32com.client as win32
 except ImportError:  # pragma: no cover - library may not be available during tests
-    pypff = None
+    win32 = None
 import re
 
 from selenium import webdriver
@@ -46,7 +45,7 @@ def cargar_tareas_correo(email_address, email_password, window):
         messagebox.showwarning("Advertencia", "No se ingresó fecha.", parent=window)
         return
     try:
-        date_since = datetime.datetime.strptime(date_input, '%d/%m/%Y').strftime('%d-%b-%Y')
+        datetime.datetime.strptime(date_input, '%d/%m/%Y')
     except Exception:
         messagebox.showerror("Error", "Formato de fecha inválido. Use DD/MM/YYYY", parent=window)
         return
@@ -61,12 +60,16 @@ def cargar_tareas_correo(email_address, email_password, window):
     if not pst_path or not os.path.exists(pst_path):
         messagebox.showerror("Error", "No se encontró el archivo PST configurado.", parent=window)
         return
-    if pypff is None:
-        messagebox.showerror("Error", "La librería pypff no está instalada.", parent=window)
+    if win32 is None:
+        messagebox.showerror("Error", "La librería pywin32 no está instalada.", parent=window)
         return
     try:
-        pst = pypff.file()
-        pst.open(pst_path)
+        outlook = win32.Dispatch("Outlook.Application").GetNamespace("MAPI")
+        existing = [f.StoreID for f in outlook.Folders]
+        outlook.AddStore(pst_path)
+        pst_root = next((f for f in outlook.Folders if f.StoreID not in existing), None)
+        if pst_root is None:
+            raise Exception("No se pudo abrir el PST")
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo abrir el archivo PST: {e}", parent=window)
         return
@@ -76,20 +79,15 @@ def cargar_tareas_correo(email_address, email_password, window):
 
     def traverse(folder):
         nonlocal loaded_count
-        for i in range(folder.number_of_sub_messages):
+        for item in getattr(folder, "Items", []):
             try:
-                msg = folder.get_sub_message(i)
-                sender = (msg.sender_email_address or "").lower()
+                sender = (getattr(item, "SenderEmailAddress", "") or "").lower()
                 if sender != "omar777j@gmail.com":
                     continue
-                msg_date = msg.client_submit_time or msg.delivery_time
+                msg_date = getattr(item, "ReceivedTime", None)
                 if msg_date and msg_date < date_since_dt:
                     continue
-                body = ""
-                if msg.plain_text_body:
-                    body = msg.plain_text_body.decode(errors='ignore')
-                elif msg.html_body:
-                    body = msg.html_body.decode(errors='ignore')
+                body = getattr(item, "Body", "") or ""
                 tasks_data = process_body(body)
                 for task_info in tasks_data:
                     if task_filters and task_info["task_number"] not in task_filters:
@@ -102,11 +100,10 @@ def cargar_tareas_correo(email_address, email_password, window):
                         loaded_count += 1
             except Exception:
                 continue
-        for j in range(folder.number_of_sub_folders):
-            traverse(folder.get_sub_folder(j))
-
-    traverse(pst.get_root_folder())
-    pst.close()
+        for sub in getattr(folder, "Folders", []):
+            traverse(sub)
+    traverse(pst_root)
+    outlook.RemoveStore(pst_root)
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 
 def login_telcos(driver, username, password):
