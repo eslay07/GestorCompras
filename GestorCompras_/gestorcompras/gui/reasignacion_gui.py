@@ -280,12 +280,23 @@ def open_reasignacion(master, email_session):
     top_frame = ttk.Frame(window, style="MyFrame.TFrame", padding=5)
     top_frame.pack(fill="x")
 
+    def buscar_tareas():
+        status_label.config(text="Buscando tareas, por favor espere...")
+        window.update()
+        cargar_tareas_correo(
+            email_session["address"],
+            email_session["password"],
+            window,
+        )
+        actualizar_tareas()
+        status_label.config(text="Búsqueda completada")
+        window.after(3000, lambda: status_label.config(text=""))
+
     btn_cargar = ttk.Button(
         top_frame,
         text="Buscar Tareas",
         style="MyButton.TButton",
-        command=lambda: [cargar_tareas_correo(email_session["address"], email_session["password"], window),
-                         actualizar_tareas()]
+        command=buscar_tareas,
     )
     btn_cargar.pack(side="left", padx=5)
 
