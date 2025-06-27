@@ -119,7 +119,12 @@ def cargar_tareas_correo(email_address, email_password, window, status_callback=
         pass
 
     total = items.Count
+    start = time.monotonic()
     for i in range(1, total + 1):
+        if time.monotonic() - start > 60:
+            if status_callback:
+                status_callback("Búsqueda detenida por tiempo excedido")
+            break
         if status_callback and i % 10 == 0:
             status_callback(f"Revisando correo {i}/{total}")
             window.update()
