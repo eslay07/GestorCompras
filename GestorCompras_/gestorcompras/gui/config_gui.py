@@ -211,10 +211,24 @@ class ConfigGUI(tk.Toplevel):
         self.pdf_entry = ttk.Entry(frame, textvariable=self.pdf_path_var,
                                    style="MyEntry.TEntry", width=50)
         self.pdf_entry.pack(pady=5)
-        
+
         ttk.Button(frame, text="Seleccionar Carpeta",
                    style="MyButton.TButton",
                    command=self.select_pdf_folder).pack(pady=5)
+
+        ttk.Label(frame, text="Ruta del archivo PST:",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.pst_path_var = tk.StringVar()
+        self.pst_path_var.set(db.get_config("PST_FILE", ""))
+
+        self.pst_entry = ttk.Entry(frame, textvariable=self.pst_path_var,
+                                   style="MyEntry.TEntry", width=50)
+        self.pst_entry.pack(pady=5)
+
+        ttk.Button(frame, text="Seleccionar Archivo",
+                   style="MyButton.TButton",
+                   command=self.select_pst_file).pack(pady=5)
         
         ttk.Button(frame, text="Guardar Configuración",
                    style="MyButton.TButton",
@@ -224,13 +238,26 @@ class ConfigGUI(tk.Toplevel):
         folder_selected = filedialog.askdirectory(title="Seleccionar carpeta para PDFs")
         if folder_selected:
             self.pdf_path_var.set(folder_selected)
-    
+
+    def select_pst_file(self):
+        file_selected = filedialog.askopenfilename(
+            title="Seleccionar archivo PST",
+            filetypes=[("Archivos PST", "*.pst"), ("Todos", "*.*")]
+        )
+        if file_selected:
+            self.pst_path_var.set(file_selected)
+
     def save_general_config(self):
         pdf_folder = self.pdf_path_var.get().strip()
-        if not pdf_folder:
-            messagebox.showwarning("Advertencia", "La ruta de la carpeta no puede estar vacía.")
+        pst_file = self.pst_path_var.get().strip()
+        if not pdf_folder or not pst_file:
+            messagebox.showwarning(
+                "Advertencia",
+                "La ruta de la carpeta y el archivo PST no pueden estar vacíos."
+            )
             return
         db.set_config("PDF_FOLDER", pdf_folder)
+        db.set_config("PST_FILE", pst_file)
         messagebox.showinfo("Información", "Configuración guardada correctamente.")
     
     def create_email_templates_tab(self):

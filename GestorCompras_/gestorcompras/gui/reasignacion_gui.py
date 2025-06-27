@@ -4,8 +4,12 @@ from gestorcompras.services import db
 import threading
 import time
 import datetime
-import imaplib
+import os
 import email
+try:
+    import pypff
+except ImportError:  # pragma: no cover - library may not be available during tests
+    pypff = None
 import re
 
 from selenium import webdriver
@@ -53,44 +57,56 @@ def cargar_tareas_correo(email_address, email_password, window):
     else:
         task_filters = []
 
-    imap_url = 'pop.telconet.ec'
+    pst_path = db.get_config("PST_FILE", "")
+    if not pst_path or not os.path.exists(pst_path):
+        messagebox.showerror("Error", "No se encontró el archivo PST configurado.", parent=window)
+        return
+    if pypff is None:
+        messagebox.showerror("Error", "La librería pypff no está instalada.", parent=window)
+        return
     try:
-        mail = imaplib.IMAP4_SSL(imap_url, 993)
-        mail.login(email_address, email_password)
-        mail.select("inbox")
+        pst = pypff.file()
+        pst.open(pst_path)
     except Exception as e:
-        messagebox.showerror("Error", f"Error de autenticación en correo: {e}", parent=window)
+        messagebox.showerror("Error", f"No se pudo abrir el archivo PST: {e}", parent=window)
         return
 
-    query = f'(FROM "omar777j@gmail.com" SINCE "{date_since}")'
-    status, messages = mail.search(None, query)
-    messages = messages[0].split()
-    if not messages:
-        messagebox.showinfo("Información", f"No se encontraron correos desde {date_input}.", parent=window)
-        mail.logout()
-        return
-
+    date_since_dt = datetime.datetime.strptime(date_input, '%d/%m/%Y')
     loaded_count = 0
-    for mail_id in messages:
-        status, data = mail.fetch(mail_id, '(RFC822)')
-        for response_part in data:
-            if isinstance(response_part, tuple):
-                try:
-                    msg = email.message_from_bytes(response_part[1])
-                    body = msg.get_payload(decode=True).decode()
-                except Exception:
+
+    def traverse(folder):
+        nonlocal loaded_count
+        for i in range(folder.number_of_sub_messages):
+            try:
+                msg = folder.get_sub_message(i)
+                sender = (msg.sender_email_address or "").lower()
+                if sender != "omar777j@gmail.com":
                     continue
+                msg_date = msg.client_submit_time or msg.delivery_time
+                if msg_date and msg_date < date_since_dt:
+                    continue
+                body = ""
+                if msg.plain_text_body:
+                    body = msg.plain_text_body.decode(errors='ignore')
+                elif msg.html_body:
+                    body = msg.html_body.decode(errors='ignore')
                 tasks_data = process_body(body)
                 for task_info in tasks_data:
                     if task_filters and task_info["task_number"] not in task_filters:
                         continue
-                    inserted = db.insert_task_temp(task_info["task_number"],
-                                                   task_info["reasignacion"],
-                                                   task_info["details"])
+                    inserted = db.insert_task_temp(
+                        task_info["task_number"],
+                        task_info["reasignacion"],
+                        task_info["details"])
                     if inserted:
                         loaded_count += 1
-                        print("DEBUG tras insert:", db.get_tasks_temp())
-    mail.logout()
+            except Exception:
+                continue
+        for j in range(folder.number_of_sub_folders):
+            traverse(folder.get_sub_folder(j))
+
+    traverse(pst.get_root_folder())
+    pst.close()
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 
 def login_telcos(driver, username, password):
