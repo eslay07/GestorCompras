@@ -33,6 +33,8 @@ GestorCompras - Versión Preliminar
    2. Instalar las dependencias:
         pip install -r requirements.txt
       (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
+      Para ejecutar las pruebas unitarias, instale además:
+        pip install -r requirements-dev.txt
    3. Configuración de la Base de Datos:
       La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
    4. Carga rápida de Proveedores:
@@ -40,14 +42,21 @@ GestorCompras - Versión Preliminar
         python import_proveedores.py
    5. Ejecutar la Aplicación:
         python main.py
- 
- Uso
- ---
+
+Uso
+---
  Al iniciar la aplicación se presenta una pantalla de inicio de sesión. Una vez autenticado, el usuario accede a un menú principal que permite:
    - Administrar proveedores.
    - Configurar asignaciones de departamentos.
    - Cargar y gestionar tareas temporales notificadas por correo.
    - Enviar solicitudes de despacho a través de correos electrónicos predefinidos.
+
+Pruebas
+-------
+Con las dependencias de desarrollo instaladas, ejecute las pruebas con:
+```
+pytest
+```
  
  Aclaraciones y Disclaimer Legal
  ---------------------------------
