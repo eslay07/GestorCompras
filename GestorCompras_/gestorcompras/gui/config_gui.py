@@ -36,6 +36,16 @@ class ConfigGUI(tk.Toplevel):
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
+        search_frame = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
+        search_frame.pack(fill="x", pady=(0,5))
+        ttk.Label(search_frame, text="Buscar:", style="MyLabel.TLabel").pack(side="left")
+        self.search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=self.search_var, style="MyEntry.TEntry")
+        search_entry.pack(side="left", fill="x", expand=True, padx=5)
+        self.search_var.trace_add("write", lambda *args: self.filter_suppliers())
+        ttk.Button(search_frame, text="Limpiar", style="MyButton.TButton", command=lambda: self.search_var.set(""))\
+            .pack(side="left", padx=5)
+
         # Contenedor para el Treeview y sus scrollbars
         container = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
@@ -81,11 +91,18 @@ class ConfigGUI(tk.Toplevel):
                    command=self.delete_supplier).pack(side="left", padx=5)
     
     def load_suppliers(self):
-        for i in self.suppliers_list.get_children():
-            self.suppliers_list.delete(i)
-        for sup in db.get_suppliers():
+        term = getattr(self, "search_var", None)
+        if term and term.get().strip():
+            suppliers = db.search_suppliers(term.get().strip())
+        else:
+            suppliers = db.get_suppliers()
+        self.suppliers_list.delete(*self.suppliers_list.get_children())
+        for sup in suppliers:
             self.suppliers_list.insert("", "end", values=sup)
         self.auto_adjust_columns()
+
+    def filter_suppliers(self):
+        self.load_suppliers()
     
     def auto_adjust_columns(self):
         style = ttk.Style()
@@ -345,6 +362,7 @@ class TemplateForm(tk.Toplevel):
         # Recreate missing tables if the database was not initialized
         db.init_db()
         name = self.name_var.get().strip()
+        self.editor.text.tag_remove("sel", "1.0", "end")
         raw_text = self.editor.text.get("1.0", "end-1c").strip()
         html = self.editor.get_html().strip()
         if not html and raw_text:

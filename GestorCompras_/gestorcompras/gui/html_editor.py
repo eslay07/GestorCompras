@@ -100,7 +100,7 @@ class HtmlEditor(ttk.Frame):
 
     def _apply_font(self):
         family = self.font_var.get()
-        tag = f"font_{family}"
+        tag = f"font_{family.replace(' ', '_')}"
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -128,7 +128,7 @@ class HtmlEditor(ttk.Frame):
         color = colorchooser.askcolor()[1]
         if not color:
             return
-        tag = f"color_{color}"
+        tag = f"color_{color.lstrip('#')}"
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -141,15 +141,52 @@ class HtmlEditor(ttk.Frame):
 
     # ---------- HTML Import/Export ----------
     def get_html(self):
-        dump = self.text.dump("1.0", "end-1c", tag=True, text=True)
+        """Return the current text as sanitized HTML.
+
+        The Text widget exposes formatting through tags.  To reliably
+        convert the content we walk each character and compare the tags
+        present at that index against the tags from the previous
+        character.  Closing tags are emitted for styles that end and new
+        tags are opened in a deterministic order before writing the
+        actual character.  This ensures that nested styling is exported
+        with valid markup and that unrecognised tags are ignored.
+        """
+        end_index = self.text.index("end-1c")
+        index = "1.0"
+        prev_tags = []
         html_chunks = []
-        for index, kind, value in dump:
-            if kind == "tagon":
-                html_chunks.append(self._tag_start_html(value))
-            elif kind == "tagoff":
-                html_chunks.append(self._tag_end_html(value))
-            elif kind == "text":
-                html_chunks.append(escape(value).replace("\n", "<br>"))
+
+        def tag_priority(tag):
+            if tag == "bold":
+                return 1
+            if tag == "italic":
+                return 2
+            if tag == "underline":
+                return 3
+            if tag.startswith("font_"):
+                return 4
+            if tag.startswith("size_"):
+                return 5
+            if tag.startswith("color_"):
+                return 6
+            return 99
+
+        while self.text.compare(index, "<=", end_index):
+            char = self.text.get(index)
+            curr_tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
+            # Close tags that no longer apply
+            for t in reversed([tg for tg in prev_tags if tg not in curr_tags]):
+                html_chunks.append(self._tag_end_html(t))
+            # Open new tags
+            for t in sorted([tg for tg in curr_tags if tg not in prev_tags], key=tag_priority):
+                html_chunks.append(self._tag_start_html(t))
+            html_chunks.append(escape(char).replace("\n", "<br>"))
+            prev_tags = curr_tags
+            index = self.text.index(f"{index}+1c")
+
+        for t in reversed(prev_tags):
+            html_chunks.append(self._tag_end_html(t))
+
         return "".join(html_chunks)
 
     def set_html(self, html_string):
@@ -181,17 +218,20 @@ class HtmlEditor(ttk.Frame):
                     for part in style.split(";"):
                         if "font-family" in part:
                             family = part.split(":")[1].strip()
-                            tag_name = f"font_{family}"
+                            tag_name = f"font_{family.replace(' ', '_')}"
+                            self.widget.tag_configure(tag_name, font=tkfont.Font(family=family))
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                         elif "font-size" in part:
                             size = part.split(":")[1].strip().rstrip("px").rstrip("pt")
                             tag_name = f"size_{size}"
+                            self.widget.tag_configure(tag_name, font=tkfont.Font(size=int(size)))
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                         elif "color" in part:
                             color = part.split(":")[1].strip()
-                            tag_name = f"color_{color}"
+                            tag_name = f"color_{color.lstrip('#')}"
+                            self.widget.tag_configure(tag_name, foreground=color)
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
                     self.span_stack.append(tags)
@@ -233,13 +273,15 @@ class HtmlEditor(ttk.Frame):
         if tag == "underline":
             return "<u>"
         if tag.startswith("font_"):
-            family = tag.split("_", 1)[1]
+            family = tag.split("_", 1)[1].replace("_", " ")
             return f'<span style="font-family:{family}">'
         if tag.startswith("size_"):
             size = tag.split("_", 1)[1]
             return f'<span style="font-size:{size}px">'
         if tag.startswith("color_"):
             color = tag.split("_", 1)[1]
+            if not color.startswith("#"):
+                color = "#" + color
             return f'<span style="color:{color}">'
         return ""
 

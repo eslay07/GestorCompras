@@ -60,24 +60,41 @@ def extraer_info_de_pdf(pdf_path):
         pass
     return ruc, tarea
 
-def process_order(email_session, orden):
+def obtener_resumen_orden(orden):
+    """Obtiene la información necesaria para previsualizar el envío."""
     pdf_path, folder_name = buscar_archivo_mas_reciente(orden)
     if not pdf_path:
-        return f"⚠ No se encontró archivo para la OC {orden}."
-    
+        return None, f"No se encontró archivo para la OC {orden}."
     ruc, tarea = extraer_info_de_pdf(pdf_path)
     suppliers = {
         ruc_db: (email, email_alt)
         for (_id, name, ruc_db, email, email_alt) in get_suppliers()
     }
     if not (ruc and ruc in suppliers):
-        return f"⚠ No se encontró correo para el RUC {ruc} (OC: {orden})."
-    
+        return None, f"No se encontró correo para el RUC {ruc} (OC: {orden})."
+    emails = list(filter(None, suppliers[ruc]))
+    return {
+        "orden": orden,
+        "tarea": tarea,
+        "folder_name": folder_name,
+        "emails": emails,
+        "pdf_path": pdf_path,
+    }, None
+
+def process_order(email_session, orden):
+    info, error = obtener_resumen_orden(orden)
+    if not info:
+        return f"⚠ {error}"
+    pdf_path = info["pdf_path"]
+    tarea = info["tarea"]
+    folder_name = info["folder_name"]
+    email_to = ", ".join(info["emails"]) if info["emails"] else ""
+
     context = {
         "orden": orden,
         "tarea": tarea,
         "folder_name": folder_name,
-        "email_to": ", ".join(filter(None, suppliers[ruc]))
+        "email_to": email_to,
     }
     
     # Seleccionar formato de correo según la configuración
