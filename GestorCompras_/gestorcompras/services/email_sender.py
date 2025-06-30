@@ -14,12 +14,15 @@ env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
 SMTP_SERVER = "smtp.telconet.ec"
 SMTP_PORT = 587
 
+# Dirección utilizada por defecto para enviar copias de los correos
+DEFAULT_CC = "jotoapanta@telconet.ec"
+
 def get_cc_address():
     """Obtiene la dirección de correo en copia (CC)."""
     env_cc = os.getenv("EMAIL_CC")
     if env_cc:
         return env_cc
-    return db.get_config("EMAIL_CC", "")
+    return db.get_config("EMAIL_CC", DEFAULT_CC)
 
 def render_email(template_name, context):
     """
