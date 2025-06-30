@@ -44,7 +44,7 @@ GestorCompras - Versión Preliminar
      Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
        python import_proveedores.py
   6. Ejecutar la Aplicación:
-       python main.py
+       python run.py
 
 Uso
 ---
