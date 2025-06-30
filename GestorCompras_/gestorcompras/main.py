@@ -20,31 +20,44 @@ def test_email_connection(email_address, email_password):
 def init_styles():
     style = ttk.Style()
     style.theme_use("clam")
-    
-    # Colores
-    bg_base        = "#F5F7FA"
-    bg_frame       = "#E9ECF0"
-    color_primario = "#2D9CDB"
-    color_hover    = "#1B6A8C"
+
+    # Palette
+    bg_base        = "#F0F4F8"
+    bg_frame       = "#FFFFFF"
+    color_primario = "#1E90FF"
+    color_hover    = "#155D91"
     color_texto    = "#333333"
-    color_titulos  = "#222222"
+    color_titulos  = "#212121"
     color_blanco   = "#FFFFFF"
+
+    # Fonts
+    fuente_normal = ("Segoe UI", 11)
+    fuente_bold   = ("Segoe UI", 11, "bold")
+    fuente_banner = ("Segoe UI", 20, "bold")
+    fuente_entry  = ("Segoe UI", 14)
     
-    # Fuentes aumentadas
-    fuente_normal = ("Helvetica", 14)
-    fuente_bold   = ("Helvetica", 16, "bold")
-    fuente_banner = ("Helvetica", 24, "bold")
-    fuente_entry  = ("Helvetica", 20)
-    
-    style.configure("MyFrame.TFrame", background=bg_frame)
+    style.configure("MyFrame.TFrame", background=bg_frame, relief="groove", borderwidth=1)
     style.configure("MyLabel.TLabel", background=bg_frame, foreground=color_texto, font=fuente_normal)
-    style.configure("MyButton.TButton", font=fuente_bold, foreground=color_blanco,
-                    background=color_primario, padding=10)
+    style.configure(
+        "MyButton.TButton",
+        font=fuente_bold,
+        foreground=color_blanco,
+        background=color_primario,
+        padding=10,
+        relief="raised",
+        borderwidth=1,
+    )
     style.map("MyButton.TButton",
               background=[("active", color_hover),
                           ("disabled", "#CCCCCC")])
     style.configure("MyCheckbutton.TCheckbutton", background=bg_frame, foreground=color_texto, font=fuente_normal)
-    style.configure("MyEntry.TEntry", font=fuente_entry)
+    style.configure(
+        "MyEntry.TEntry",
+        font=fuente_entry,
+        padding=5,
+        relief="solid",
+        borderwidth=1,
+    )
     style.configure("MyNotebook.TNotebook", background=bg_base, borderwidth=0)
     style.configure("MyNotebook.TNotebook.Tab", padding=[12, 8], font=fuente_bold)
     style.map("MyNotebook.TNotebook.Tab",
@@ -52,8 +65,14 @@ def init_styles():
                           ("active", color_hover)],
               foreground=[("selected", color_blanco),
                           ("active", color_blanco)])
-    style.configure("MyTreeview.Treeview", background=color_blanco, foreground=color_texto, rowheight=30,
-                    fieldbackground="#FAFAFA", font=fuente_normal)
+    style.configure(
+        "MyTreeview.Treeview",
+        background=color_blanco,
+        foreground=color_texto,
+        rowheight=28,
+        fieldbackground="#F7F9FB",
+        font=fuente_normal,
+    )
     style.configure("MyTreeview.Treeview.Heading", background=color_primario, foreground=color_blanco, font=fuente_bold)
     style.map("MyTreeview.Treeview.Heading", background=[("active", color_hover)])
     style.configure("MyVertical.TScrollbar", gripcount=0, background=color_primario, troughcolor=bg_frame,
@@ -73,14 +92,14 @@ class LoginScreen(tk.Frame):
         container.pack(fill="both", expand=True)
         
         banner = ttk.Label(container, text="Sistema de automatización - compras")
-        banner.configure(font=("Helvetica", 24, "bold"), foreground="#222222")
+        banner.configure(font=fuente_banner, foreground=color_titulos)
         banner.pack(pady=(20,10))
         
         login_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
         login_frame.place(relx=0.5, rely=0.5, anchor="center")
         
         lbl_title = ttk.Label(login_frame, text="Inicio de Sesión", style="MyLabel.TLabel")
-        lbl_title.configure(font=("Helvetica", 18, "bold"), foreground="#222222")
+        lbl_title.configure(font=fuente_bold, foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15)
         
         lbl_user = ttk.Label(login_frame, text="Usuario Telcos:", style="MyLabel.TLabel")
@@ -88,14 +107,14 @@ class LoginScreen(tk.Frame):
         
         self.user_entry = ttk.Entry(login_frame, style="MyEntry.TEntry")
         self.user_entry.grid(row=2, column=0, pady=5)
-        self.user_entry.config(font=("Helvetica", 16))
+        self.user_entry.config(font=fuente_entry)
         
         lbl_pass = ttk.Label(login_frame, text="Contraseña:", style="MyLabel.TLabel")
         lbl_pass.grid(row=3, column=0, sticky="w", pady=(5,0))
         
         self.pass_entry = ttk.Entry(login_frame, show="*", style="MyEntry.TEntry")
         self.pass_entry.grid(row=4, column=0, pady=5)
-        self.pass_entry.config(font=("Helvetica", 16))
+        self.pass_entry.config(font=fuente_entry)
         self.pass_entry.bind("<Return>", lambda event: self.attempt_login())
         
         btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
@@ -126,14 +145,14 @@ class MainMenu(tk.Frame):
         container.pack(fill="both", expand=True)
         
         banner = ttk.Label(container, text="Sistema de automatización - compras")
-        banner.configure(font=("Helvetica", 24, "bold"), foreground="#222222")
+        banner.configure(font=fuente_banner, foreground=color_titulos)
         banner.pack(pady=(20,10))
         
         menu_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
         menu_frame.place(relx=0.5, rely=0.5, anchor="center")
         
         lbl_title = ttk.Label(menu_frame, text="Menú Principal", style="MyLabel.TLabel")
-        lbl_title.configure(font=("Helvetica", 18, "bold"), foreground="#222222")
+        lbl_title.configure(font=fuente_bold, foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15, sticky="n")
         
         # Lista de botones
@@ -164,7 +183,7 @@ def main():
     db.init_db()
     root = tk.Tk()
     root.title("Sistema de Automatización")
-    root.geometry("700x550")
+    root.geometry("800x600")
     
     init_styles()
     

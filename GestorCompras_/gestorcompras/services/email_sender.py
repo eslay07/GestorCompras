@@ -5,12 +5,21 @@ import re
 from email.message import EmailMessage
 from jinja2 import Environment, FileSystemLoader
 
+from . import db
+
 # Configuración de la ruta donde se ubicarán las plantillas
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
 
 SMTP_SERVER = "smtp.telconet.ec"
 SMTP_PORT = 587
+
+def get_cc_address():
+    """Obtiene la dirección de correo en copia (CC)."""
+    env_cc = os.getenv("EMAIL_CC")
+    if env_cc:
+        return env_cc
+    return db.get_config("EMAIL_CC", "")
 
 def render_email(template_name, context):
     """
@@ -34,7 +43,9 @@ def send_email(email_session, subject, template_text, template_html, context, at
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    msg["Cc"] = "jotoapanta@telconet.ec"
+    cc = get_cc_address()
+    if cc:
+        msg["Cc"] = cc
     # Renderizamos el contenido
     content_text = render_email(template_text, context)
     content_html = render_email(template_html, context)
@@ -86,7 +97,9 @@ def send_email_custom(email_session, subject, html_template, context, attachment
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    msg["Cc"] = "jotoapanta@telconet.ec"
+    cc = get_cc_address()
+    if cc:
+        msg["Cc"] = cc
 
     msg.set_content(content_text)
     msg.add_alternative(content_html, subtype="html")

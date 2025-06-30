@@ -8,7 +8,7 @@ from gestorcompras.logic import despacho_logic
 def open_despacho(master, email_session):
     window = tk.Toplevel(master)
     window.title("Solicitud de Despachos")
-    window.geometry("520x400")
+    window.geometry("600x450")
     window.transient(master)
     window.grab_set()
     
