@@ -16,7 +16,8 @@ GestorCompras - Versión Preliminar
  - Configuración de Asignaciones: Asignación única de personas a departamentos.
  - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
 - Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
-- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas, además de incluir una imagen de firma.
+- Protección contra envíos duplicados: el botón "Procesar Despachos" se desactiva durante el procesamiento.
+- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas (con controles de sangría), además de incluir una imagen de firma.
  - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
  - Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
  
