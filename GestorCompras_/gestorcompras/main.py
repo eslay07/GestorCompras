@@ -6,6 +6,21 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 
+# Palette
+bg_base = "#F0F4F8"
+bg_frame = "#FFFFFF"
+color_primario = "#1E90FF"
+color_hover = "#155D91"
+color_texto = "#333333"
+color_titulos = "#212121"
+color_blanco = "#FFFFFF"
+
+# Fonts
+fuente_normal = ("Segoe UI", 11)
+fuente_bold = ("Segoe UI", 11, "bold")
+fuente_banner = ("Segoe UI", 20, "bold")
+fuente_entry = ("Segoe UI", 14)
+
 email_session = {}
 
 def test_email_connection(email_address, email_password):
@@ -20,21 +35,6 @@ def test_email_connection(email_address, email_password):
 def init_styles():
     style = ttk.Style()
     style.theme_use("clam")
-
-    # Palette
-    bg_base        = "#F0F4F8"
-    bg_frame       = "#FFFFFF"
-    color_primario = "#1E90FF"
-    color_hover    = "#155D91"
-    color_texto    = "#333333"
-    color_titulos  = "#212121"
-    color_blanco   = "#FFFFFF"
-
-    # Fonts
-    fuente_normal = ("Segoe UI", 11)
-    fuente_bold   = ("Segoe UI", 11, "bold")
-    fuente_banner = ("Segoe UI", 20, "bold")
-    fuente_entry  = ("Segoe UI", 14)
     
     style.configure("MyFrame.TFrame", background=bg_frame, relief="groove", borderwidth=1)
     style.configure("MyLabel.TLabel", background=bg_frame, foreground=color_texto, font=fuente_normal)
