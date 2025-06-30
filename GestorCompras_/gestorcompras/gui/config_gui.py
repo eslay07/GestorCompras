@@ -1,6 +1,7 @@
 import tkinter as tk
 import os
 import tkinter.font as tkFont
+import re
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
 from gestorcompras.services import db
@@ -13,7 +14,7 @@ class ConfigGUI(tk.Toplevel):
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
-        self.geometry("670x500")
+        self.geometry("800x600")
         self.create_widgets()
     
     def create_widgets(self):
@@ -211,6 +212,15 @@ class ConfigGUI(tk.Toplevel):
         self.pdf_entry = ttk.Entry(frame, textvariable=self.pdf_path_var,
                                    style="MyEntry.TEntry", width=50)
         self.pdf_entry.pack(pady=5)
+
+        ttk.Label(frame, text="Correos CC (hasta 9, separados por ';'):",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.cc_var = tk.StringVar()
+        self.cc_var.set(db.get_config("EMAIL_CC", ""))
+
+        ttk.Entry(frame, textvariable=self.cc_var,
+                  style="MyEntry.TEntry", width=50).pack(pady=5)
         
         ttk.Button(frame, text="Seleccionar Carpeta",
                    style="MyButton.TButton",
@@ -228,10 +238,21 @@ class ConfigGUI(tk.Toplevel):
     def save_general_config(self):
         pdf_folder = self.pdf_path_var.get().strip()
         if not pdf_folder:
-            messagebox.showwarning("Advertencia", "La ruta de la carpeta no puede estar vacía.")
+            messagebox.showwarning(
+                "Advertencia", "La ruta de la carpeta no puede estar vacía.")
             return
+
+        cc_text = self.cc_var.get().strip()
+        emails = [e.strip() for e in re.split(r"[;,]+", cc_text) if e.strip()]
+        if len(emails) > 9:
+            messagebox.showwarning(
+                "Advertencia", "Se permiten máximo 9 correos en CC.")
+            return
+
         db.set_config("PDF_FOLDER", pdf_folder)
-        messagebox.showinfo("Información", "Configuración guardada correctamente.")
+        db.set_config("EMAIL_CC", ";".join(emails) if emails else "")
+        messagebox.showinfo(
+            "Información", "Configuración guardada correctamente.")
     
     def create_email_templates_tab(self):
         frame = self.email_templates_frame
@@ -317,7 +338,7 @@ class TemplateForm(tk.Toplevel):
     def __init__(self, master, title, refresh_callback, template_data=None):
         super().__init__(master)
         self.title(title)
-        self.geometry("700x600")
+        self.geometry("800x600")
         self.transient(master)
         self.grab_set()
         self.focus()

@@ -209,7 +209,7 @@ def process_task(task, email_session):
 def open_reasignacion(master, email_session):
     window = tk.Toplevel(master)
     window.title("Reasignación de Tareas")
-    window.geometry("670x600")
+    window.geometry("820x650")
     window.transient(master)
     window.grab_set()
 

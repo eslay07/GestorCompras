@@ -8,7 +8,7 @@ from gestorcompras.logic import despacho_logic
 def open_despacho(master, email_session):
     window = tk.Toplevel(master)
     window.title("Solicitud de Despachos")
-    window.geometry("520x400")
+    window.geometry("600x450")
     window.transient(master)
     window.grab_set()
     
@@ -53,6 +53,7 @@ def open_despacho(master, email_session):
             return
 
         log_func("Enviando correos, espere...")
+        btn_procesar.configure(state="disabled")
 
         def process_all_orders():
             results = []
@@ -66,6 +67,7 @@ def open_despacho(master, email_session):
                     results.append(result)
                     log_func(result)
             messagebox.showinfo("Resultado", "\n".join(results))
+            window.after(0, lambda: btn_procesar.configure(state="normal"))
 
         threading.Thread(target=process_all_orders).start()
     

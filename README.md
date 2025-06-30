@@ -37,13 +37,14 @@ GestorCompras - Versión Preliminar
         pip install -r requirements-dev.txt
   3. Configuración de la Base de Datos:
      La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
-  4. Configurar dirección en copia (CC) *(opcional)*:
-     Defina la dirección que recibirá copia de los correos estableciendo la variable de entorno `EMAIL_CC` o guardando la clave `EMAIL_CC` en la base de datos. Si no se especifica, se utilizará `jotoapanta@telconet.ec`.
+  4. Configurar correos en copia (CC) *(opcional)*:
+     Desde la ventana de **Configuración** puede ingresar hasta 9 direcciones separadas por `;` en el campo CC.
+     También puede definir la variable de entorno `EMAIL_CC` con el mismo formato. Si se deja vacío, no se enviarán copias.
   5. Carga rápida de Proveedores:
      Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
        python import_proveedores.py
   6. Ejecutar la Aplicación:
-       python main.py
+       python run.py
 
 Uso
 ---
