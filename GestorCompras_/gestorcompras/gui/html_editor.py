@@ -18,6 +18,8 @@ class HtmlEditor(ttk.Frame):
         ttk.Button(toolbar, text="I", width=2, command=self._make_italic).pack(side="left")
         ttk.Button(toolbar, text="U", width=2, command=self._make_underline).pack(side="left")
         ttk.Button(toolbar, text="•", width=2, command=self._insert_bullet).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="\u2192", width=2, command=self._indent_line).pack(side="left")
+        ttk.Button(toolbar, text="\u2190", width=2, command=self._dedent_line).pack(side="left")
 
         self.font_var = tk.StringVar(value="Helvetica")
         fonts = sorted(set(tkfont.families()))
@@ -97,6 +99,18 @@ class HtmlEditor(ttk.Frame):
 
     def _insert_bullet(self):
         self.text.insert("insert", "\u2022 ")
+
+    def _indent_line(self):
+        index = self.text.index("insert")
+        line_start = self.text.index(f"{index} linestart")
+        self.text.insert(line_start, "    ")
+
+    def _dedent_line(self):
+        index = self.text.index("insert")
+        line_start = self.text.index(f"{index} linestart")
+        leading = self.text.get(line_start, f"{line_start}+4c")
+        if leading.startswith("    "):
+            self.text.delete(line_start, f"{line_start}+4c")
 
     def _apply_font(self):
         family = self.font_var.get()
@@ -180,7 +194,15 @@ class HtmlEditor(ttk.Frame):
             # Open new tags
             for t in sorted([tg for tg in curr_tags if tg not in prev_tags], key=tag_priority):
                 html_chunks.append(self._tag_start_html(t))
-            html_chunks.append(escape(char).replace("\n", "<br>"))
+            if char == " ":
+                start_line = self.text.index(f"{index} linestart")
+                preceding = self.text.get(start_line, index)
+                if preceding == "" or preceding.isspace():
+                    html_chunks.append("&nbsp;")
+                else:
+                    html_chunks.append(" ")
+            else:
+                html_chunks.append(escape(char).replace("\n", "<br>"))
             prev_tags = curr_tags
             index = self.text.index(f"{index}+1c")
 
@@ -256,6 +278,7 @@ class HtmlEditor(ttk.Frame):
                     self.tag_stack.reverse()
 
             def handle_data(self, data):
+                data = data.replace("\xa0", " ")
                 start = self.widget.index("end-1c")
                 self.widget.insert("end", data)
                 end = self.widget.index("end-1c")
