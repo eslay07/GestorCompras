@@ -35,13 +35,15 @@ GestorCompras - Versión Preliminar
       (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
       Para ejecutar las pruebas unitarias, instale además:
         pip install -r requirements-dev.txt
-   3. Configuración de la Base de Datos:
-      La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
-   4. Carga rápida de Proveedores:
-      Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
-        python import_proveedores.py
-   5. Ejecutar la Aplicación:
-        python main.py
+  3. Configuración de la Base de Datos:
+     La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
+  4. Configurar dirección en copia (CC) *(opcional)*:
+     Defina la dirección que recibirá copia de los correos estableciendo la variable de entorno `EMAIL_CC` o guardando la clave `EMAIL_CC` en la base de datos. Si no se especifica, se utilizará `jotoapanta@telconet.ec`.
+  5. Carga rápida de Proveedores:
+     Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
+       python import_proveedores.py
+  6. Ejecutar la Aplicación:
+       python main.py
 
 Uso
 ---
