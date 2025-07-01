@@ -213,6 +213,19 @@ class ConfigGUI(tk.Toplevel):
                                    style="MyEntry.TEntry", width=50)
         self.pdf_entry.pack(pady=5)
 
+        ttk.Label(frame, text="Credenciales Google (JSON):",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.google_creds_var = tk.StringVar()
+        self.google_creds_var.set(db.get_config("GOOGLE_CREDS", ""))
+
+        ttk.Entry(frame, textvariable=self.google_creds_var,
+                  style="MyEntry.TEntry", width=50).pack(pady=5)
+
+        ttk.Button(frame, text="Seleccionar Credenciales",
+                   style="MyButton.TButton",
+                   command=self.select_google_creds).pack(pady=5)
+
         ttk.Label(frame, text="Correos CC (hasta 9, separados por ';'):",
                   style="MyLabel.TLabel").pack(pady=5)
 
@@ -234,6 +247,11 @@ class ConfigGUI(tk.Toplevel):
         folder_selected = filedialog.askdirectory(title="Seleccionar carpeta para PDFs")
         if folder_selected:
             self.pdf_path_var.set(folder_selected)
+
+    def select_google_creds(self):
+        path = filedialog.askopenfilename(title="Seleccionar archivo de credenciales", filetypes=[("JSON", "*.json")])
+        if path:
+            self.google_creds_var.set(path)
     
     def save_general_config(self):
         pdf_folder = self.pdf_path_var.get().strip()
@@ -251,6 +269,7 @@ class ConfigGUI(tk.Toplevel):
 
         db.set_config("PDF_FOLDER", pdf_folder)
         db.set_config("EMAIL_CC", ";".join(emails) if emails else "")
+        db.set_config("GOOGLE_CREDS", self.google_creds_var.get().strip())
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
     

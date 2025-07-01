@@ -81,7 +81,7 @@ def obtener_resumen_orden(orden):
         "pdf_path": pdf_path,
     }, None
 
-def process_order(email_session, orden):
+def process_order(email_session, orden, include_pdf=True, template_name=None):
     info, error = obtener_resumen_orden(orden)
     if not info:
         return f"⚠ {error}"
@@ -98,7 +98,7 @@ def process_order(email_session, orden):
     }
     
     # Seleccionar formato de correo según la configuración
-    formato = get_config("EMAIL_TEMPLATE", "Bienes")
+    formato = template_name or get_config("EMAIL_TEMPLATE", "Bienes")
     template_db = get_email_template_by_name(formato)
     html_content = None
     signature_path = None
@@ -126,7 +126,7 @@ def process_order(email_session, orden):
                 subject,
                 html_content,
                 context,
-                attachment_path=pdf_path,
+                attachment_path=pdf_path if include_pdf else None,
                 signature_path=signature_path,
             )
         else:
@@ -136,7 +136,7 @@ def process_order(email_session, orden):
                 template_text,
                 template_html,
                 context,
-                attachment_path=pdf_path,
+                attachment_path=pdf_path if include_pdf else None,
             )
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:

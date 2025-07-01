@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+import os
+from typing import List, Dict
+
+import gspread
+from google.oauth2.service_account import Credentials
+
+
+SCOPE = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
+
+
+def get_client(creds_path: str) -> gspread.Client:
+    """Return an authorized gspread client."""
+    if not os.path.isfile(creds_path):
+        raise FileNotFoundError(f"Credenciales no encontradas: {creds_path}")
+    creds = Credentials.from_service_account_file(creds_path, scopes=SCOPE)
+    return gspread.authorize(creds)
+
+
+def read_report(creds_path: str, spreadsheet_id: str, sheet_name: str) -> List[Dict[str, str]]:
+    """Read the custom report from the given worksheet.
+
+    Returns a list of dictionaries with keys:
+    'Hoja', 'Tarea', 'Artículo', 'Orden de Compra', 'Proveedor'.
+    """
+    client = get_client(creds_path)
+    ws = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+    data = ws.get_all_values()
+    result: List[Dict[str, str]] = []
+    row = 0
+    total = len(data)
+    while row < total:
+        value = str(data[row][3]).strip().upper() if len(data[row]) > 3 else ""
+        if value == "PENDIENTE ENTREGA":
+            end = row + 1
+            while end < total:
+                val_fin = str(data[end][3]).strip().upper() if len(data[end]) > 3 else ""
+                if val_fin == "DELIMITADOR":
+                    break
+                end += 1
+            if end >= total:
+                break
+            tarea_row = row - 2
+            if tarea_row >= 0:
+                col_a = str(data[tarea_row][0]).strip().upper()
+                col_b = str(data[tarea_row][1]).strip()
+                es_tarea = col_a.startswith("TAREA")
+                es_num = col_b.isdigit() and 6 <= len(col_b) <= 11
+                if es_tarea and es_num:
+                    tarea = col_b
+                    for k in range(row + 1, end):
+                        fila = data[k]
+                        articulo = fila[0].strip() if len(fila) > 0 else ""
+                        val_d = fila[3] if len(fila) > 3 else ""
+                        oc = fila[4].strip() if len(fila) > 4 else ""
+                        proveedor = fila[5].strip() if len(fila) > 5 else ""
+                        pendiente = (
+                            val_d == ""
+                            or isinstance(val_d, str)
+                            or (isinstance(val_d, (int, float)) and val_d != 0)
+                        )
+                        if articulo and oc and proveedor and pendiente:
+                            result.append(
+                                {
+                                    "Hoja": sheet_name,
+                                    "Tarea": tarea,
+                                    "Artículo": articulo,
+                                    "Orden de Compra": oc,
+                                    "Proveedor": proveedor,
+                                }
+                            )
+            row = end
+        else:
+            row += 1
+    result.sort(key=lambda x: (x["Tarea"], int("".join(filter(str.isdigit, x["Orden de Compra"])) or 0)))
+    return result
