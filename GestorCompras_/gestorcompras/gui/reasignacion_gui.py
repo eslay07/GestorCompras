@@ -7,6 +7,10 @@ import datetime
 import imaplib
 import email
 import re
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -89,7 +93,7 @@ def cargar_tareas_correo(email_address, email_password, window):
                                                    task_info["details"])
                     if inserted:
                         loaded_count += 1
-                        print("DEBUG tras insert:", db.get_tasks_temp())
+                        logger.debug("Tasks after insert: %s", db.get_tasks_temp())
     mail.logout()
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 
@@ -102,7 +106,16 @@ def login_telcos(driver, username, password):
     password_input.send_keys(Keys.RETURN)
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
 
-def process_task(task, email_session):
+
+def wait_clickable_or_error(driver, locator, parent, description, timeout=30):
+    try:
+        return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
+    except Exception as e:
+        driver.quit()
+        messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
+        raise Exception(f"Elemento faltante: {description}") from e
+
+def process_task(task, email_session, parent_window):
     service = Service(ChromeDriverManager().install())
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -124,11 +137,14 @@ def process_task(task, email_session):
     assignments = db.get_assignment_config_single()
     empleado = assignments[dept] if (dept in assignments and assignments[dept].strip()) else "SIN ASIGNAR"
     
-    element = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'spanTareasPersonales')))
+    element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
     driver.execute_script("arguments[0].click();", element)
     
-    search_input = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, 'input[type="search"].form-control.form-control-sm'))
+    search_input = wait_clickable_or_error(
+        driver,
+        (By.CSS_SELECTOR, 'input[type="search"].form-control.form-control-sm'),
+        parent_window,
+        'el campo de búsqueda'
     )
     search_input.clear()
     search_input.send_keys(task_number)
@@ -136,8 +152,11 @@ def process_task(task, email_session):
     
     try:
         time.sleep(0.5)
-        WebDriverWait(driver, 20).until(
-            EC.element_to_be_clickable((By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'))
+        wait_clickable_or_error(
+            driver,
+            (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'),
+            parent_window,
+            'el botón para abrir la tarea'
         ).click()
     except Exception:
         driver.quit()
@@ -145,34 +164,53 @@ def process_task(task, email_session):
         raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
     
     time.sleep(1)
-    comment_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'txtObservacionTarea')))
+    comment_input = wait_clickable_or_error(
+        driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')
     comment_input.send_keys('SE RECIBE LA MERCADERIA')
     time.sleep(1)
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'btnGrabarEjecucionTarea'))).click()
+    wait_clickable_or_error(
+        driver, (By.ID, 'btnGrabarEjecucionTarea'), parent_window, 'el botón Grabar Ejecución').click()
     time.sleep(2)
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'btnSmsCustomOk'))).click()
+    wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación inicial').click()
     time.sleep(2)
     
     for detail in task["details"]:
-        tracking_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable(
-            (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']")))
+        tracking_button = wait_clickable_or_error(
+            driver,
+            (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']"),
+            parent_window,
+            'el botón de seguimiento'
+        )
         tracking_button.click()
         time.sleep(2)
-        tracking_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'txtSeguimientoTarea')))
+        tracking_input = wait_clickable_or_error(
+            driver,
+            (By.ID, 'txtSeguimientoTarea'),
+            parent_window,
+            'el campo de seguimiento'
+        )
         tracking_message = f"SE INGRESA LA FACTURA {detail['Factura']} CON EL INGRESO {detail['Ingreso']}"
         tracking_input.clear()
         tracking_input.send_keys(tracking_message)
         time.sleep(2)
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'btnIngresoSeguimiento'))).click()
+        wait_clickable_or_error(driver, (By.ID, 'btnIngresoSeguimiento'), parent_window, 'el botón Ingreso Seguimiento').click()
         time.sleep(2)
-        WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'btnSmsCustomOk'))).click()
+        wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación de seguimiento').click()
         time.sleep(2)
     
-    WebDriverWait(driver, 20).until(EC.element_to_be_clickable(
-        (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard')
-    )).click()
+    wait_clickable_or_error(
+        driver,
+        (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
+        parent_window,
+        'el botón de reasignar'
+    ).click()
     time.sleep(2)
-    department_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'txtDepartment')))
+    department_input = wait_clickable_or_error(
+        driver,
+        (By.ID, 'txtDepartment'),
+        parent_window,
+        'el campo Departamento'
+    )
     department_input.clear()
     #department_input.send_keys('Compras L')
     department_input.send_keys('Bodeg')
@@ -184,7 +222,12 @@ def process_task(task, email_session):
     time.sleep(2)
     department_input.send_keys(Keys.TAB)
     time.sleep(2)
-    employee_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'txtEmpleado')))
+    employee_input = wait_clickable_or_error(
+        driver,
+        (By.NAME, 'txtEmpleado'),
+        parent_window,
+        'el campo Empleado'
+    )
     employee_input.click()
     employee_input.send_keys(empleado)
     time.sleep(1)
@@ -192,15 +235,35 @@ def process_task(task, email_session):
     time.sleep(2)
     employee_input.send_keys(Keys.TAB)
     time.sleep(2)
-    observation_textarea = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'txtaObsTareaFinalReasigna')))
+    observation_textarea = wait_clickable_or_error(
+        driver,
+        (By.ID, 'txtaObsTareaFinalReasigna'),
+        parent_window,
+        'el área de observación'
+    )
     observation_textarea.send_keys('TRABAJO REALIZADO')
-    WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "modalReasignarTarea")))
-    boton = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "btnGrabarReasignaTarea")))
+    try:
+        WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "modalReasignarTarea")))
+    except Exception as e:
+        driver.quit()
+        messagebox.showerror("Error", "No se abrió la ventana de reasignación.", parent=parent_window)
+        raise Exception("Ventana de reasignación no visible") from e
+    boton = wait_clickable_or_error(
+        driver,
+        (By.ID, "btnGrabarReasignaTarea"),
+        parent_window,
+        'el botón Guardar'
+    )
     # Se mueve el ratón al botón antes de hacer clic
     from selenium.webdriver.common.action_chains import ActionChains
     ActionChains(driver).move_to_element(boton).perform()
     boton.click()
-    final_confirm_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, 'btnMensajeFinTarea')))
+    final_confirm_button = wait_clickable_or_error(
+        driver,
+        (By.ID, 'btnMensajeFinTarea'),
+        parent_window,
+        'el mensaje final'
+    )
     final_confirm_button.click()
     time.sleep(2)
     
@@ -290,7 +353,7 @@ def open_reasignacion(master, email_session):
 
     def actualizar_tareas():
         all_tasks = db.get_tasks_temp()
-        print("DEBUG - Tareas en DB:", all_tasks)
+        logger.debug("Tareas en DB: %s", all_tasks)
 
         for widget in tasks_frame.winfo_children():
             widget.destroy()
@@ -338,7 +401,7 @@ def open_reasignacion(master, email_session):
             if var.get():
                 task = tasks_dict[t_id]
                 try:
-                    process_task(task, email_session)
+                    process_task(task, email_session, window)
                     db.delete_task_temp(t_id)
                 except Exception as e:
                     errors.append(str(e))
