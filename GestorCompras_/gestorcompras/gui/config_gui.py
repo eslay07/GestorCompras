@@ -226,6 +226,24 @@ class ConfigGUI(tk.Toplevel):
                    style="MyButton.TButton",
                    command=self.select_google_creds).pack(pady=5)
 
+        ttk.Label(frame, text="ID de Spreadsheet:",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.sheet_id_var = tk.StringVar()
+        self.sheet_id_var.set(db.get_config("GOOGLE_SHEET_ID", ""))
+
+        ttk.Entry(frame, textvariable=self.sheet_id_var,
+                  style="MyEntry.TEntry", width=50).pack(pady=5)
+
+        ttk.Label(frame, text="Nombre de la Hoja:",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.sheet_name_var = tk.StringVar()
+        self.sheet_name_var.set(db.get_config("GOOGLE_SHEET_NAME", ""))
+
+        ttk.Entry(frame, textvariable=self.sheet_name_var,
+                  style="MyEntry.TEntry", width=50).pack(pady=5)
+
         ttk.Label(frame, text="Correos CC (hasta 9, separados por ';'):",
                   style="MyLabel.TLabel").pack(pady=5)
 
@@ -270,6 +288,8 @@ class ConfigGUI(tk.Toplevel):
         db.set_config("PDF_FOLDER", pdf_folder)
         db.set_config("EMAIL_CC", ";".join(emails) if emails else "")
         db.set_config("GOOGLE_CREDS", self.google_creds_var.get().strip())
+        db.set_config("GOOGLE_SHEET_ID", self.sheet_id_var.get().strip())
+        db.set_config("GOOGLE_SHEET_NAME", self.sheet_name_var.get().strip())
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
     
