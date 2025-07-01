@@ -222,18 +222,12 @@ def process_task(task, email_session, parent_window):
     time.sleep(2)
     department_input.send_keys(Keys.TAB)
     time.sleep(2)
-    employee_input = wait_clickable_or_error(
-        driver,
-        (By.ID, 'txtEmpleado'),
-        parent_window,
-        'el campo Empleado'
-    )
-    employee_input.click()
-    employee_input.send_keys(empleado)
+    active_element = driver.switch_to.active_element
+    active_element.send_keys(empleado)
     time.sleep(1)
-    employee_input.send_keys(Keys.DOWN, Keys.RETURN)
+    active_element.send_keys(Keys.DOWN, Keys.RETURN)
     time.sleep(2)
-    employee_input.send_keys(Keys.TAB)
+    active_element.send_keys(Keys.TAB)
     time.sleep(2)
     observation_textarea = wait_clickable_or_error(
         driver,
