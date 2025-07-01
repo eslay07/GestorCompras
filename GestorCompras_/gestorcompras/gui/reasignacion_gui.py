@@ -222,12 +222,15 @@ def process_task(task, email_session, parent_window):
     time.sleep(2)
     department_input.send_keys(Keys.TAB)
     time.sleep(2)
-    active_element = driver.switch_to.active_element
-    active_element.send_keys(empleado)
+    employee_input = WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.NAME, 'txtEmpleado'))
+    )
+    employee_input.click()
+    employee_input.send_keys(empleado)
     time.sleep(1)
-    active_element.send_keys(Keys.DOWN, Keys.RETURN)
+    employee_input.send_keys(Keys.DOWN, Keys.RETURN)
     time.sleep(2)
-    active_element.send_keys(Keys.TAB)
+    employee_input.send_keys(Keys.TAB)
     time.sleep(2)
     observation_textarea = wait_clickable_or_error(
         driver,
@@ -248,15 +251,11 @@ def process_task(task, email_session, parent_window):
         parent_window,
         'el botón Guardar'
     )
-    # Se mueve el ratón al botón antes de hacer clic
     from selenium.webdriver.common.action_chains import ActionChains
     ActionChains(driver).move_to_element(boton).perform()
     boton.click()
-    final_confirm_button = wait_clickable_or_error(
-        driver,
-        (By.ID, 'btnMensajeFinTarea'),
-        parent_window,
-        'el mensaje final'
+    final_confirm_button = WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.ID, 'btnMensajeFinTarea'))
     )
     final_confirm_button.click()
     time.sleep(2)
