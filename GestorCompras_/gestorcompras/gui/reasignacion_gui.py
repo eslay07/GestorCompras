@@ -134,8 +134,9 @@ def process_task(task, email_session, parent_window):
     
     task_number = task["task_number"]
     dept = task["reasignacion"].strip().upper()
-    assignments = db.get_assignment_config_single()
-    empleado = assignments[dept] if (dept in assignments and assignments[dept].strip()) else "SIN ASIGNAR"
+    assignments = db.get_assignment_config()
+    empleado = assignments.get(dept, {}).get("person", "SIN ASIGNAR")
+    dept_name = assignments.get(dept, {}).get("department", "")
     
     element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
     driver.execute_script("arguments[0].click();", element)
@@ -212,8 +213,7 @@ def process_task(task, email_session, parent_window):
         'el campo Departamento'
     )
     department_input.clear()
-    #department_input.send_keys('Compras L')
-    department_input.send_keys('Bodeg')
+    department_input.send_keys(dept_name)
     time.sleep(1)
     #elemento para pruebas compras
     #department_input.send_keys(Keys.UP, Keys.RETURN)

@@ -23,3 +23,17 @@ def test_get_suppliers_returns_inserted_suppliers(monkeypatch):
         assert suppliers == [(1, 'Prov', '123', 'a@b.com', 'c@d.com')]
     finally:
         tmp.cleanup()
+
+
+def test_assignment_crud(monkeypatch):
+    tmp = setup_temp_db(monkeypatch)
+    try:
+        db.set_assignment_config('GENERAL', 'Bodega', 'Juan')
+        rows = db.get_assignments()
+        assert rows == [('GENERAL', 'Bodega', 'Juan')]
+        db.set_assignment_config('GENERAL', 'Bodega', 'Pedro')
+        assert db.get_assignments() == [('GENERAL', 'Bodega', 'Pedro')]
+        db.delete_assignment('GENERAL')
+        assert db.get_assignments() == []
+    finally:
+        tmp.cleanup()

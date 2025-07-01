@@ -143,59 +143,54 @@ class ConfigGUI(tk.Toplevel):
         messagebox.showinfo("Información", "Proveedor eliminado.")
     
     def create_assignment_tab(self):
-        ttk.Label(self.assign_frame, text="Seleccione el Departamento:",
-                  style="MyLabel.TLabel").pack(pady=5)
-        
-        self.dept_var = tk.StringVar(value="GENERAL")
-        self.dept_combo = ttk.Combobox(self.assign_frame,
-                                       textvariable=self.dept_var,
-                                       values=["GENERAL", "MOVILIZACIÓN", "OBRA CIVIL"],
-                                       state="readonly")
-        self.dept_combo.pack(pady=5)
-        self.dept_combo.bind("<<ComboboxSelected>>", lambda e: self.load_assignment_config())
-        
-        ttk.Label(self.assign_frame, text="Persona asignada:",
-                  style="MyLabel.TLabel").pack(pady=5)
-        
-        self.person_var = tk.StringVar()
-        self.person_entry = ttk.Entry(self.assign_frame, textvariable=self.person_var,
-                                      style="MyEntry.TEntry", width=50)
-        self.person_entry.pack(pady=5)
-        
+        self.assign_list = ttk.Treeview(
+            self.assign_frame,
+            columns=("Subdepto", "Departamento", "Persona"),
+            show="headings",
+            style="MyTreeview.Treeview",
+            height=10,
+        )
+        for col in ("Subdepto", "Departamento", "Persona"):
+            self.assign_list.heading(col, text=col)
+        self.assign_list.pack(fill="both", expand=True, pady=5)
+
         btn_frame = ttk.Frame(self.assign_frame, style="MyFrame.TFrame", padding=5)
         btn_frame.pack(pady=5)
-        
-        ttk.Button(btn_frame, text="Guardar",
-                   style="MyButton.TButton",
-                   command=self.save_assignment).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Eliminar",
-                   style="MyButton.TButton",
+        ttk.Button(btn_frame, text="Agregar", style="MyButton.TButton",
+                   command=self.add_assignment).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Editar", style="MyButton.TButton",
+                   command=self.edit_assignment).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Eliminar", style="MyButton.TButton",
                    command=self.delete_assignment).pack(side="left", padx=5)
-        
-        self.load_assignment_config()
-    
-    def load_assignment_config(self):
-        dept = self.dept_var.get()
-        config = db.get_assignment_config_single()
-        if dept in config:
-            self.person_var.set(config[dept])
-        else:
-            self.person_var.set("")
-    
-    def save_assignment(self):
-        dept = self.dept_var.get()
-        person = self.person_var.get().strip()
-        if not person:
-            messagebox.showwarning("Advertencia", "El campo persona no puede estar vacío.")
+
+        self.load_assignments()
+
+    def load_assignments(self):
+        for i in self.assign_list.get_children():
+            self.assign_list.delete(i)
+        for sub, dept, person in db.get_assignments():
+            self.assign_list.insert("", "end", values=(sub, dept, person))
+
+    def add_assignment(self):
+        AssignmentForm(self, "Nueva Asignación", self.load_assignments).wait_window()
+
+    def edit_assignment(self):
+        sel = self.assign_list.selection()
+        if not sel:
+            messagebox.showwarning("Advertencia", "Seleccione un registro a editar.")
             return
-        db.set_assignment_config(dept, person)
-        messagebox.showinfo("Información", "Asignación guardada correctamente.")
-    
+        values = self.assign_list.item(sel[0])["values"]
+        AssignmentForm(self, "Editar Asignación", self.load_assignments, tuple(values)).wait_window()
+
     def delete_assignment(self):
-        dept = self.dept_var.get()
-        db.set_assignment_config(dept, "")
-        self.person_var.set("")
-        messagebox.showinfo("Información", "Asignación eliminada.")
+        sel = self.assign_list.selection()
+        if not sel:
+            messagebox.showwarning("Advertencia", "Seleccione un registro a eliminar.")
+            return
+        sub = self.assign_list.item(sel[0])["values"][0]
+        if messagebox.askyesno("Confirmar", "¿Eliminar la asignación seleccionada?"):
+            db.delete_assignment(sub)
+            self.load_assignments()
     
     def create_general_tab(self):
         frame = self.general_frame
@@ -497,6 +492,52 @@ class SupplierForm(tk.Toplevel):
             db.update_supplier(self.supplier_data[0], name, ruc, email, email2)
         else:
             db.add_supplier(name, ruc, email, email2)
+        self.refresh_callback()
+        self.destroy()
+
+
+class AssignmentForm(tk.Toplevel):
+    def __init__(self, master, title, refresh_callback, data=None):
+        super().__init__(master)
+        self.title(title)
+        self.refresh_callback = refresh_callback
+        self.data = data
+        self.create_widgets()
+
+    def create_widgets(self):
+        container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
+        container.pack(fill="both", expand=True)
+
+        self.sub_var = tk.StringVar()
+        self.dept_var = tk.StringVar()
+        self.person_var = tk.StringVar()
+
+        ttk.Label(container, text="Subdepartamento:", style="MyLabel.TLabel").pack(anchor="w")
+        ttk.Entry(container, textvariable=self.sub_var, style="MyEntry.TEntry").pack(fill="x", pady=5)
+
+        ttk.Label(container, text="Departamento:", style="MyLabel.TLabel").pack(anchor="w")
+        ttk.Entry(container, textvariable=self.dept_var, style="MyEntry.TEntry").pack(fill="x", pady=5)
+
+        ttk.Label(container, text="Persona:", style="MyLabel.TLabel").pack(anchor="w")
+        ttk.Entry(container, textvariable=self.person_var, style="MyEntry.TEntry").pack(fill="x", pady=5)
+
+        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save).pack(pady=10)
+
+        if self.data:
+            self.sub_var.set(self.data[0])
+            self.dept_var.set(self.data[1])
+            self.person_var.set(self.data[2])
+
+    def save(self):
+        sub = self.sub_var.get().strip().upper()
+        dept = self.dept_var.get().strip()
+        person = self.person_var.get().strip()
+        if not (sub and dept and person):
+            messagebox.showwarning("Advertencia", "Todos los campos son obligatorios.")
+            return
+        if self.data and self.data[0] != sub:
+            db.delete_assignment(self.data[0])
+        db.set_assignment_config(sub, dept, person)
         self.refresh_callback()
         self.destroy()
 
