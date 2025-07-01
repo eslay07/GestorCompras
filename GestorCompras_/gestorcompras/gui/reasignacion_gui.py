@@ -224,7 +224,7 @@ def process_task(task, email_session, parent_window):
     time.sleep(2)
     employee_input = wait_clickable_or_error(
         driver,
-        (By.NAME, 'txtEmpleado'),
+        (By.ID, 'txtEmpleado'),
         parent_window,
         'el campo Empleado'
     )
@@ -348,8 +348,6 @@ def open_reasignacion(master, email_session):
     )
     process_btn.pack(side="right")
 
-    status_label = ttk.Label(window, text="", style="MyLabel.TLabel", foreground="blue")
-    status_label.pack(pady=2)
 
     def actualizar_tareas():
         all_tasks = db.get_tasks_temp()
@@ -389,8 +387,7 @@ def open_reasignacion(master, email_session):
             messagebox.showwarning("Advertencia", "No se ha seleccionado ninguna tarea.", parent=window)
             return
 
-        process_btn.config(state="disabled")
-        status_label.config(text="Procesando tareas, por favor espere...")
+        process_btn.config(state="disabled", text="Procesando...")
         window.update()
 
         errors = []
@@ -413,8 +410,7 @@ def open_reasignacion(master, email_session):
         else:
             messagebox.showinfo("Éxito", "Tareas procesadas exitosamente.", parent=window)
 
-        status_label.config(text="")
-        process_btn.config(state="normal")
+        process_btn.config(state="normal", text="Reasignar Tareas")
         actualizar_tareas()
         window.destroy()
 
