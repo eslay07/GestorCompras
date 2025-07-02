@@ -114,14 +114,12 @@ def open_seguimientos(master, email_session):
                 else:
                     summaries.append(f"OC {oc}: {error}")
             else:
-                supplier = db.get_supplier_by_name(r.get("Proveedor"))
-                if supplier:
-                    emails = ", ".join(filter(None, [supplier[3], supplier[4]]))
+                info, error = despacho_logic.obtener_resumen_orden(oc)
+                if info:
+                    emails = ", ".join(info["emails"]) if info["emails"] else ""
                     summaries.append(f"OC {oc} -> {emails}")
                 else:
-                    summaries.append(
-                        f"OC {oc}: Proveedor {r.get('Proveedor')} no encontrado"
-                    )
+                    summaries.append(f"OC {oc}: {error}")
         confirm_msg = (
             "\n".join(summaries)
             + f"\n\nFormato: {formato_var.get()}"
@@ -137,7 +135,6 @@ def open_seguimientos(master, email_session):
                 include_pdf=attach_var.get(),
                 template_name=formato_var.get(),
                 cc_key="EMAIL_CC_SEGUIMIENTO",
-                provider_name=r.get("Proveedor"),
             )
             log(result)
         messagebox.showinfo("Finalizado", "Proceso completado")

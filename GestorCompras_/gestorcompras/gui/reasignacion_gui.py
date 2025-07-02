@@ -40,22 +40,58 @@ def process_body(body):
         tasks_data.append(task_info)
     return tasks_data
 
+
+class DateDialog(simpledialog.Dialog):
+    """Ventana para seleccionar una fecha con flechas."""
+
+    def body(self, master):
+        self.cur_date = datetime.date.today()
+        ttk.Label(master, text="Ingresa la fecha (DD/MM/YYYY):").pack()
+        ttk.Label(
+            master,
+            text=(
+                "Los correos solo se podran buscar hasta maximo 15 dias atras "
+                "debido a que el servidor de telconet los borra en ese periodo de tiempo"
+            ),
+            wraplength=300,
+        ).pack(pady=(0, 5))
+        self.entry = ttk.Entry(master)
+        self.entry.pack()
+        self._update()
+        self.entry.bind("<Up>", self._prev)
+        self.entry.bind("<Down>", self._next)
+        return self.entry
+
+    def _update(self):
+        self.entry.delete(0, tk.END)
+        self.entry.insert(0, self.cur_date.strftime("%d/%m/%Y"))
+
+    def _prev(self, event):
+        self.cur_date -= datetime.timedelta(days=1)
+        self._update()
+        return "break"
+
+    def _next(self, event):
+        self.cur_date += datetime.timedelta(days=1)
+        self._update()
+        return "break"
+
+    def apply(self):
+        self.result = self.entry.get()
+
 def cargar_tareas_correo(email_address, email_password, window):
-    date_input = simpledialog.askstring("Fecha", "Ingresa la fecha (DD/MM/YYYY):", parent=window)
+    dialog = DateDialog(window)
+    date_input = dialog.result
     if not date_input:
         messagebox.showwarning("Advertencia", "No se ingresó fecha.", parent=window)
         return
     try:
-        date_since = datetime.datetime.strptime(date_input, '%d/%m/%Y').strftime('%d-%b-%Y')
+        date_since = datetime.datetime.strptime(date_input, "%d/%m/%Y").strftime("%d-%b-%Y")
     except Exception:
         messagebox.showerror("Error", "Formato de fecha inválido. Use DD/MM/YYYY", parent=window)
         return
 
-    filtro_str = simpledialog.askstring("Filtro de Tareas", "Números de tarea separados por comas (opcional):", parent=window)
-    if filtro_str:
-        task_filters = [x.strip() for x in filtro_str.split(",") if x.strip()]
-    else:
-        task_filters = []
+    task_filters = []
 
     imap_url = 'pop.telconet.ec'
     try:
