@@ -44,12 +44,13 @@ def open_seguimientos(master, email_session):
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
+    ttk.Label(frame, text="Estado del Proceso:", style="MyLabel.TLabel").grid(row=5, column=0, sticky="w")
     log_box = ScrolledText(frame, height=6, state="disabled")
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
 
     ttk.Label(frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
-    formatos = ["Bienes", "Servicios"] + [tpl[1] for tpl in db.get_email_templates()]
-    formato_var = tk.StringVar(value=db.get_config("EMAIL_TEMPLATE", "Bienes"))
+    formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
+    formato_var = tk.StringVar(value="FORMATO")
     ttk.Combobox(frame, textvariable=formato_var, values=formatos, state="readonly").grid(row=4, column=0, sticky="e", padx=(150,0))
 
     attach_var = tk.BooleanVar(value=True)
@@ -98,14 +99,42 @@ def open_seguimientos(master, email_session):
         if not selected:
             messagebox.showwarning("Advertencia", "No hay órdenes seleccionadas")
             return
-        if not messagebox.askyesno("Confirmar", f"¿Enviar {len(selected)} correos?"):
+        if formato_var.get() == "FORMATO":
+            messagebox.showwarning("Advertencia", "Debe seleccionar un formato de correo.")
             return
+
+        summaries = []
+        for r in selected:
+            oc = str(r["Orden de Compra"])
+            if attach_var.get():
+                info, error = despacho_logic.obtener_resumen_orden(oc)
+                if info:
+                    emails = ", ".join(info["emails"]) if info["emails"] else ""
+                    summaries.append(f"OC {oc} -> {emails}")
+                else:
+                    summaries.append(f"OC {oc}: {error}")
+            else:
+                info, error = despacho_logic.obtener_resumen_orden(oc)
+                if info:
+                    emails = ", ".join(info["emails"]) if info["emails"] else ""
+                    summaries.append(f"OC {oc} -> {emails}")
+                else:
+                    summaries.append(f"OC {oc}: {error}")
+        confirm_msg = (
+            "\n".join(summaries)
+            + f"\n\nFormato: {formato_var.get()}"
+            + f"\n¿Enviar {len(selected)} correos?"
+        )
+        if not messagebox.askyesno("Confirmar", confirm_msg):
+            return
+
         for r in selected:
             result = despacho_logic.process_order(
                 email_session,
                 str(r["Orden de Compra"]),
                 include_pdf=attach_var.get(),
                 template_name=formato_var.get(),
+                cc_key="EMAIL_CC_SEGUIMIENTO",
             )
             log(result)
         messagebox.showinfo("Finalizado", "Proceso completado")

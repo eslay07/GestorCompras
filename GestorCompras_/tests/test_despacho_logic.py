@@ -15,3 +15,41 @@ def test_obtener_resumen_orden(monkeypatch):
     assert info['folder_name'] == 'FOO'
     assert info['emails'] == ['a@b.com', 'b@b.com']
     assert info['pdf_path'] == '/tmp/file.pdf'
+
+
+def test_process_order_without_pdf(monkeypatch):
+    """Incluso sin adjuntar PDF se usa la información del archivo para obtener correos."""
+    called = {}
+
+    def fake_send(sess, subject, html, ctx, attachment_path=None, signature_path=None, cc_key=None):
+        called['attachment'] = attachment_path
+        called['cc_key'] = cc_key
+
+    monkeypatch.setattr(despacho_logic, 'send_email_custom', fake_send)
+    monkeypatch.setattr(despacho_logic, 'get_email_template_by_name', lambda n: (1, n, '<b>{{orden}}</b>', None))
+    monkeypatch.setattr(
+        despacho_logic,
+        'obtener_resumen_orden',
+        lambda o: (
+            {
+                'orden': o,
+                'tarea': '1',
+                'folder_name': 'F',
+                'emails': ['to@x.com'],
+                'pdf_path': '/tmp/file.pdf',
+            },
+            None,
+        ),
+    )
+
+    msg = despacho_logic.process_order(
+        {'address': 'from@x.com'},
+        'OC1',
+        include_pdf=False,
+        template_name='F1',
+        cc_key='EMAIL_CC_SEGUIMIENTO',
+    )
+
+    assert '✅' in msg
+    assert called['attachment'] is None
+    assert called['cc_key'] == 'EMAIL_CC_SEGUIMIENTO'
