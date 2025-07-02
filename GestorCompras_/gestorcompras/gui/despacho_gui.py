@@ -56,7 +56,12 @@ def open_despacho(master, email_session):
                 summaries.append(f"OC {oc}: {error}")
         if not summaries:
             return
-        if not messagebox.askyesno("Confirmar envíos", "\n".join(summaries) + f"\n\n¿Enviar {len(orders)} correos?"):
+        confirm_msg = (
+            "\n".join(summaries)
+            + f"\n\nFormato: {formato_var.get()}"
+            + f"\n¿Enviar {len(orders)} correos?"
+        )
+        if not messagebox.askyesno("Confirmar envíos", confirm_msg):
             return
 
         log_func("Enviando correos, espere...")

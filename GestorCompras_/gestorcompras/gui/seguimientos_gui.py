@@ -99,8 +99,34 @@ def open_seguimientos(master, email_session):
         if not selected:
             messagebox.showwarning("Advertencia", "No hay órdenes seleccionadas")
             return
-        if not messagebox.askyesno("Confirmar", f"¿Enviar {len(selected)} correos?"):
+
+        summaries = []
+        for r in selected:
+            oc = str(r["Orden de Compra"])
+            if attach_var.get():
+                info, error = despacho_logic.obtener_resumen_orden(oc)
+                if info:
+                    emails = ", ".join(info["emails"]) if info["emails"] else ""
+                    summaries.append(f"OC {oc} -> {emails}")
+                else:
+                    summaries.append(f"OC {oc}: {error}")
+            else:
+                supplier = db.get_supplier_by_name(r.get("Proveedor"))
+                if supplier:
+                    emails = ", ".join(filter(None, [supplier[3], supplier[4]]))
+                    summaries.append(f"OC {oc} -> {emails}")
+                else:
+                    summaries.append(
+                        f"OC {oc}: Proveedor {r.get('Proveedor')} no encontrado"
+                    )
+        confirm_msg = (
+            "\n".join(summaries)
+            + f"\n\nFormato: {formato_var.get()}"
+            + f"\n¿Enviar {len(selected)} correos?"
+        )
+        if not messagebox.askyesno("Confirmar", confirm_msg):
             return
+
         for r in selected:
             result = despacho_logic.process_order(
                 email_session,
