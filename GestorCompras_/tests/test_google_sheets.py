@@ -26,8 +26,8 @@ class DummyClient:
 
 def test_read_report_filters_aprobadas(monkeypatch):
     data = [
-        ["Hoja", "Tarea", "Artículo", "Orden de Compra", "Proveedor", "Estado"],
-        ["H1", "123", "Item", "OC1", "Prov", "Aprobada"],
+        ["Hoja", "Tarea", "Artículo", "Orden de Compra", "Proveedor", "Estado Aprobación"],
+        ["H1", "123", "Item", "OC1", "Prov", "Aprobado"],
         ["H1", "124", "Item2", "OC2", "Prov", "Pendiente"],
     ]
     monkeypatch.setattr(google_sheets, "get_client", lambda path: DummyClient(data))
@@ -39,6 +39,6 @@ def test_read_report_filters_aprobadas(monkeypatch):
             "Artículo": "Item",
             "Orden de Compra": "OC1",
             "Proveedor": "Prov",
-            "Estado": "Aprobada",
+            "Estado Aprobación": "Aprobado",
         }
     ]
