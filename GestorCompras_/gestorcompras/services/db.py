@@ -46,13 +46,33 @@ def init_db():
             details TEXT NOT NULL
         )
     """)
-    # Configuración de asignación: solo 1 persona por departamento
+    # Configuración de asignación: subdepartamento -> departamento y persona
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS config_assignment (
-            department TEXT PRIMARY KEY,
+            subdepartment TEXT PRIMARY KEY,
+            department TEXT NOT NULL,
             person TEXT NOT NULL
         )
     """)
+    # Migrar esquema antiguo si es necesario (solo columnas department/person)
+    cursor.execute("PRAGMA table_info(config_assignment)")
+    cols = [c[1] for c in cursor.fetchall()]
+    if cols == ["department", "person"]:
+        cursor.execute("ALTER TABLE config_assignment RENAME TO config_assignment_old")
+        cursor.execute(
+            """
+            CREATE TABLE config_assignment (
+                subdepartment TEXT PRIMARY KEY,
+                department TEXT NOT NULL,
+                person TEXT NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            "INSERT INTO config_assignment (subdepartment, department, person) "
+            "SELECT department, '', person FROM config_assignment_old"
+        )
+        cursor.execute("DROP TABLE config_assignment_old")
     # Tabla para configuración general de la aplicación
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS app_config (
@@ -125,29 +145,38 @@ def delete_supplier(supplier_id):
     conn.close()
 
 # ------------------ Configuración de Asignación Única ------------------
-def set_assignment_config(dept, person):
-    """
-    Inserta o actualiza la asignación para un departamento (solo 1 persona).
-    """
+def set_assignment_config(subdept: str, department: str, person: str):
+    """Inserta o actualiza la asignación para un subdepartamento."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO config_assignment (department, person) VALUES (?, ?)", (dept, person))
+    cursor.execute(
+        "INSERT OR REPLACE INTO config_assignment (subdepartment, department, person) VALUES (?, ?, ?)",
+        (subdept, department, person),
+    )
     conn.commit()
     conn.close()
 
-def get_assignment_config_single():
-    """
-    Retorna un diccionario con la asignación única: {department: person}.
-    """
+def delete_assignment(subdept: str):
+    """Elimina la configuración de un subdepartamento."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT department, person FROM config_assignment")
+    cursor.execute("DELETE FROM config_assignment WHERE subdepartment=?", (subdept,))
+    conn.commit()
+    conn.close()
+
+def get_assignments():
+    """Retorna la lista completa de asignaciones."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT subdepartment, department, person FROM config_assignment")
     rows = cursor.fetchall()
     conn.close()
-    config = {}
-    for dept, person in rows:
-        config[dept] = person
-    return config
+    return rows
+
+def get_assignment_config():
+    """Retorna un diccionario {subdepartment: {department, person}}."""
+    rows = get_assignments()
+    return {r[0].upper(): {"department": r[1], "person": r[2]} for r in rows}
 
 # ------------------ Tareas Temporales ------------------
 def clear_tasks_temp():
