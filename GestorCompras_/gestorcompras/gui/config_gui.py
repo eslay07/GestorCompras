@@ -23,17 +23,20 @@ class ConfigGUI(tk.Toplevel):
         
         self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.general_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
+        self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
+        self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         
         self.notebook.add(self.suppliers_frame, text="Proveedores")
         self.notebook.add(self.assign_frame, text="Asignación")
-        self.notebook.add(self.general_frame, text="General")
+        self.notebook.add(self.tracking_frame, text="Seguimientos")
+        self.notebook.add(self.dispatch_frame, text="Despacho")
         self.notebook.add(self.email_templates_frame, text="Formatos de Correo")
         
         self.create_suppliers_tab()
         self.create_assignment_tab()
-        self.create_general_tab()
+        self.create_tracking_tab()
+        self.create_dispatch_tab()
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
@@ -192,21 +195,11 @@ class ConfigGUI(tk.Toplevel):
             db.delete_assignment(sub)
             self.load_assignments()
     
-    def create_general_tab(self):
-        frame = self.general_frame
-        
-        ttk.Label(frame, text="Configuración General",
+    def create_tracking_tab(self):
+        frame = self.tracking_frame
+
+        ttk.Label(frame, text="Configuración Seguimientos",
                   style="MyLabel.TLabel").pack(pady=10)
-        
-        ttk.Label(frame, text="Ruta de la carpeta para PDFs:",
-                  style="MyLabel.TLabel").pack(pady=5)
-        
-        self.pdf_path_var = tk.StringVar()
-        self.pdf_path_var.set(db.get_config("PDF_FOLDER", os.path.join(os.path.dirname(__file__), "pdfs")))
-        
-        self.pdf_entry = ttk.Entry(frame, textvariable=self.pdf_path_var,
-                                   style="MyEntry.TEntry", width=50)
-        self.pdf_entry.pack(pady=5)
 
         ttk.Label(frame, text="Credenciales Google (JSON):",
                   style="MyLabel.TLabel").pack(pady=5)
@@ -239,22 +232,51 @@ class ConfigGUI(tk.Toplevel):
         ttk.Entry(frame, textvariable=self.sheet_name_var,
                   style="MyEntry.TEntry", width=50).pack(pady=5)
 
-        ttk.Label(frame, text="Correos CC (hasta 9, separados por ';'):",
+        ttk.Label(frame, text="Correos CC Seguimiento (hasta 9, separados por ';'):",
                   style="MyLabel.TLabel").pack(pady=5)
 
-        self.cc_var = tk.StringVar()
-        self.cc_var.set(db.get_config("EMAIL_CC", ""))
+        self.cc_tracking_var = tk.StringVar()
+        self.cc_tracking_var.set(db.get_config("EMAIL_CC_SEGUIMIENTO", ""))
 
-        ttk.Entry(frame, textvariable=self.cc_var,
+        ttk.Entry(frame, textvariable=self.cc_tracking_var,
                   style="MyEntry.TEntry", width=50).pack(pady=5)
-        
+
+        ttk.Button(frame, text="Guardar Configuración",
+                   style="MyButton.TButton",
+                   command=self.save_tracking_config).pack(pady=10)
+
+    def create_dispatch_tab(self):
+        frame = self.dispatch_frame
+
+        ttk.Label(frame, text="Configuración Despacho",
+                  style="MyLabel.TLabel").pack(pady=10)
+
+        ttk.Label(frame, text="Ruta de la carpeta para PDFs:",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.pdf_path_var = tk.StringVar()
+        self.pdf_path_var.set(db.get_config("PDF_FOLDER", os.path.join(os.path.dirname(__file__), "pdfs")))
+
+        self.pdf_entry = ttk.Entry(frame, textvariable=self.pdf_path_var,
+                                   style="MyEntry.TEntry", width=50)
+        self.pdf_entry.pack(pady=5)
+
         ttk.Button(frame, text="Seleccionar Carpeta",
                    style="MyButton.TButton",
                    command=self.select_pdf_folder).pack(pady=5)
-        
+
+        ttk.Label(frame, text="Correos CC Despachos (hasta 9, separados por ';'):",
+                  style="MyLabel.TLabel").pack(pady=5)
+
+        self.cc_dispatch_var = tk.StringVar()
+        self.cc_dispatch_var.set(db.get_config("EMAIL_CC_DESPACHO", ""))
+
+        ttk.Entry(frame, textvariable=self.cc_dispatch_var,
+                  style="MyEntry.TEntry", width=50).pack(pady=5)
+
         ttk.Button(frame, text="Guardar Configuración",
                    style="MyButton.TButton",
-                   command=self.save_general_config).pack(pady=10)
+                   command=self.save_dispatch_config).pack(pady=10)
     
     def select_pdf_folder(self):
         folder_selected = filedialog.askdirectory(title="Seleccionar carpeta para PDFs")
@@ -266,14 +288,29 @@ class ConfigGUI(tk.Toplevel):
         if path:
             self.google_creds_var.set(path)
     
-    def save_general_config(self):
+    def save_tracking_config(self):
+        cc_text = self.cc_tracking_var.get().strip()
+        emails = [e.strip() for e in re.split(r"[;,]+", cc_text) if e.strip()]
+        if len(emails) > 9:
+            messagebox.showwarning(
+                "Advertencia", "Se permiten máximo 9 correos en CC.")
+            return
+
+        db.set_config("GOOGLE_CREDS", self.google_creds_var.get().strip())
+        db.set_config("GOOGLE_SHEET_ID", self.sheet_id_var.get().strip())
+        db.set_config("GOOGLE_SHEET_NAME", self.sheet_name_var.get().strip())
+        db.set_config("EMAIL_CC_SEGUIMIENTO", ";".join(emails) if emails else "")
+        messagebox.showinfo(
+            "Información", "Configuración guardada correctamente.")
+
+    def save_dispatch_config(self):
         pdf_folder = self.pdf_path_var.get().strip()
         if not pdf_folder:
             messagebox.showwarning(
                 "Advertencia", "La ruta de la carpeta no puede estar vacía.")
             return
 
-        cc_text = self.cc_var.get().strip()
+        cc_text = self.cc_dispatch_var.get().strip()
         emails = [e.strip() for e in re.split(r"[;,]+", cc_text) if e.strip()]
         if len(emails) > 9:
             messagebox.showwarning(
@@ -281,10 +318,7 @@ class ConfigGUI(tk.Toplevel):
             return
 
         db.set_config("PDF_FOLDER", pdf_folder)
-        db.set_config("EMAIL_CC", ";".join(emails) if emails else "")
-        db.set_config("GOOGLE_CREDS", self.google_creds_var.get().strip())
-        db.set_config("GOOGLE_SHEET_ID", self.sheet_id_var.get().strip())
-        db.set_config("GOOGLE_SHEET_NAME", self.sheet_name_var.get().strip())
+        db.set_config("EMAIL_CC_DESPACHO", ";".join(emails) if emails else "")
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
     

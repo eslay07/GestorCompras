@@ -286,6 +286,18 @@ def search_suppliers(term):
     conn.close()
     return rows
 
+def get_supplier_by_name(name: str):
+    """Retorna la información de un proveedor buscándolo por nombre exacto."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers WHERE UPPER(name)=UPPER(?)",
+        (name,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
 def get_email_template(template_id):
     conn = get_connection()
     cursor = conn.cursor()

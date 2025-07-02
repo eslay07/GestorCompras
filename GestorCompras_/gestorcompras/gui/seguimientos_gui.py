@@ -44,6 +44,7 @@ def open_seguimientos(master, email_session):
     canvas.pack(side="left", fill="both", expand=True)
     scrollbar.pack(side="right", fill="y")
 
+    ttk.Label(frame, text="Estado del Proceso:", style="MyLabel.TLabel").grid(row=5, column=0, sticky="w")
     log_box = ScrolledText(frame, height=6, state="disabled")
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
 
@@ -106,6 +107,8 @@ def open_seguimientos(master, email_session):
                 str(r["Orden de Compra"]),
                 include_pdf=attach_var.get(),
                 template_name=formato_var.get(),
+                cc_key="EMAIL_CC_SEGUIMIENTO",
+                provider_name=r.get("Proveedor"),
             )
             log(result)
         messagebox.showinfo("Finalizado", "Proceso completado")

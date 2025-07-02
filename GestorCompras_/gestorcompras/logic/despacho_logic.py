@@ -81,14 +81,24 @@ def obtener_resumen_orden(orden):
         "pdf_path": pdf_path,
     }, None
 
-def process_order(email_session, orden, include_pdf=True, template_name=None):
-    info, error = obtener_resumen_orden(orden)
-    if not info:
-        return f"⚠ {error}"
-    pdf_path = info["pdf_path"]
-    tarea = info["tarea"]
-    folder_name = info["folder_name"]
-    email_to = ", ".join(info["emails"]) if info["emails"] else ""
+def process_order(email_session, orden, include_pdf=True, template_name=None, cc_key="EMAIL_CC_DESPACHO", provider_name=None):
+    if include_pdf:
+        info, error = obtener_resumen_orden(orden)
+        if not info:
+            return f"⚠ {error}"
+        pdf_path = info["pdf_path"]
+        tarea = info["tarea"]
+        folder_name = info["folder_name"]
+        emails = info["emails"]
+    else:
+        supplier = get_supplier_by_name(provider_name) if provider_name else None
+        if not supplier:
+            return f"⚠ No se encontró proveedor {provider_name} para la OC {orden}."
+        emails = list(filter(None, [supplier[3], supplier[4]]))
+        pdf_path = None
+        tarea = None
+        folder_name = ""
+    email_to = ", ".join(emails) if emails else ""
 
     context = {
         "orden": orden,
@@ -128,6 +138,7 @@ def process_order(email_session, orden, include_pdf=True, template_name=None):
                 context,
                 attachment_path=pdf_path if include_pdf else None,
                 signature_path=signature_path,
+                cc_key=cc_key,
             )
         else:
             send_email(
@@ -137,6 +148,7 @@ def process_order(email_session, orden, include_pdf=True, template_name=None):
                 template_html,
                 context,
                 attachment_path=pdf_path if include_pdf else None,
+                cc_key=cc_key,
             )
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:

@@ -14,12 +14,12 @@ env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
 SMTP_SERVER = "smtp.telconet.ec"
 SMTP_PORT = 587
 
-def get_cc_address():
-    """Obtiene la dirección de correo en copia (CC)."""
-    env_cc = os.getenv("EMAIL_CC")
+def get_cc_address(key="EMAIL_CC_DESPACHO"):
+    """Obtiene la dirección de correo en copia (CC) para la clave dada."""
+    env_cc = os.getenv(key)
     if env_cc:
         return env_cc
-    return db.get_config("EMAIL_CC", "")
+    return db.get_config(key, "")
 
 def render_email(template_name, context):
     """
@@ -28,7 +28,7 @@ def render_email(template_name, context):
     template = env.get_template(template_name)
     return template.render(context)
 
-def send_email(email_session, subject, template_text, template_html, context, attachment_path=None):
+def send_email(email_session, subject, template_text, template_html, context, attachment_path=None, cc_key="EMAIL_CC_DESPACHO"):
     """
     Envía un correo utilizando SMTP.
     
@@ -43,7 +43,7 @@ def send_email(email_session, subject, template_text, template_html, context, at
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address()
+    cc = get_cc_address(cc_key)
     if cc:
         msg["Cc"] = cc
     # Renderizamos el contenido
@@ -84,7 +84,7 @@ def image_to_data_uri(path):
     ext = os.path.splitext(path)[1].lower().strip(".") or "png"
     return f"data:image/{ext};base64,{data}"
 
-def send_email_custom(email_session, subject, html_template, context, attachment_path=None, signature_path=None):
+def send_email_custom(email_session, subject, html_template, context, attachment_path=None, signature_path=None, cc_key="EMAIL_CC_DESPACHO"):
     """Envía un correo usando una plantilla HTML personalizada."""
     if signature_path:
         context = dict(context)
@@ -97,7 +97,7 @@ def send_email_custom(email_session, subject, html_template, context, attachment
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address()
+    cc = get_cc_address(cc_key)
     if cc:
         msg["Cc"] = cc
 
