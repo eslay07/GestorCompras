@@ -108,48 +108,26 @@ def process_order(email_session, orden, include_pdf=True, template_name=None, cc
     }
     
     # Seleccionar formato de correo según la configuración
-    formato = template_name or get_config("EMAIL_TEMPLATE", "Bienes")
+    formato = template_name or get_config("EMAIL_TEMPLATE", "FORMATO")
     template_db = get_email_template_by_name(formato)
-    html_content = None
-    signature_path = None
-    if template_db and template_db[2].strip():
-        _, _name, html_content, signature_path = template_db
-        template_text = None
-        template_html = None
-    else:
-        template_db = None
-        if formato == "Bienes":
-            template_text = "correo_bienes.txt"
-            template_html = "correo_bienes.html"
-        else:
-            template_text = "correo_servicios.txt"
-            template_html = "correo_servicios.html"
+    if not template_db or not template_db[2].strip():
+        return f"⚠ Formato de correo '{formato}' no encontrado."
+    _, _name, html_content, signature_path = template_db
     
     # Construimos el asunto con carpeta y tarea
     subject = f"DESPACHO DE OC {orden}" + (f" TAREA {tarea}" if tarea else "") + f" - {folder_name}"
     subject = subject.upper()  # Forzamos mayúsculas
     
     try:
-        if template_db:
-            send_email_custom(
-                email_session,
-                subject,
-                html_content,
-                context,
-                attachment_path=pdf_path if include_pdf else None,
-                signature_path=signature_path,
-                cc_key=cc_key,
-            )
-        else:
-            send_email(
-                email_session,
-                subject,
-                template_text,
-                template_html,
-                context,
-                attachment_path=pdf_path if include_pdf else None,
-                cc_key=cc_key,
-            )
+        send_email_custom(
+            email_session,
+            subject,
+            html_content,
+            context,
+            attachment_path=pdf_path if include_pdf else None,
+            signature_path=signature_path,
+            cc_key=cc_key,
+        )
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:
         return f"❌ Error al enviar el correo para OC {orden}: {str(e)}"

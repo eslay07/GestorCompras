@@ -371,13 +371,13 @@ class ConfigGUI(tk.Toplevel):
         for tpl in templates:
             self.templates_list.insert("", "end", values=(tpl[0], tpl[1]))
 
-        opciones = ["Bienes", "Servicios"] + [tpl[1] for tpl in templates]
+        opciones = ["FORMATO"] + [tpl[1] for tpl in templates]
         self.template_combo["values"] = opciones
-        current = db.get_config("EMAIL_TEMPLATE", "Bienes")
+        current = db.get_config("EMAIL_TEMPLATE", "FORMATO")
         if current in opciones:
             self.email_template_var.set(current)
         else:
-            self.email_template_var.set("Bienes")
+            self.email_template_var.set("FORMATO")
 
     def agregar_nuevo_formato(self):
         TemplateForm(self, "Nuevo Formato", self.load_email_templates).wait_window()

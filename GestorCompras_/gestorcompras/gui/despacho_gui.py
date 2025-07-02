@@ -30,8 +30,8 @@ def open_despacho(master, email_session):
     log_box.grid(row=3, column=0, sticky="nsew", padx=5, pady=5)
 
     ttk.Label(main_frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
-    formatos = ["Bienes", "Servicios"] + [tpl[1] for tpl in db.get_email_templates()]
-    formato_var = tk.StringVar(value=db.get_config("EMAIL_TEMPLATE", "Bienes"))
+    formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
+    formato_var = tk.StringVar(value="FORMATO")
     ttk.Combobox(main_frame, textvariable=formato_var, values=formatos, state="readonly").grid(row=4, column=0, sticky="e", padx=(150,0))
     
     def log_func(message):
@@ -44,6 +44,10 @@ def open_despacho(master, email_session):
         orders = [o.strip() for o in text_area.get("1.0", tk.END).splitlines() if o.strip()]
         if not orders:
             messagebox.showwarning("Advertencia", "Ingrese al menos un número de OC.")
+            return
+
+        if formato_var.get() == "FORMATO":
+            messagebox.showwarning("Advertencia", "Debe seleccionar un formato de correo.")
             return
 
         summaries = []

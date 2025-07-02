@@ -49,8 +49,8 @@ def open_seguimientos(master, email_session):
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
 
     ttk.Label(frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
-    formatos = ["Bienes", "Servicios"] + [tpl[1] for tpl in db.get_email_templates()]
-    formato_var = tk.StringVar(value=db.get_config("EMAIL_TEMPLATE", "Bienes"))
+    formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
+    formato_var = tk.StringVar(value="FORMATO")
     ttk.Combobox(frame, textvariable=formato_var, values=formatos, state="readonly").grid(row=4, column=0, sticky="e", padx=(150,0))
 
     attach_var = tk.BooleanVar(value=True)
@@ -98,6 +98,9 @@ def open_seguimientos(master, email_session):
         selected = [r for var, r in order_vars if var.get()]
         if not selected:
             messagebox.showwarning("Advertencia", "No hay órdenes seleccionadas")
+            return
+        if formato_var.get() == "FORMATO":
+            messagebox.showwarning("Advertencia", "Debe seleccionar un formato de correo.")
             return
 
         summaries = []
