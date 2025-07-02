@@ -5,6 +5,7 @@ from gestorcompras.services.db import (
     get_config,
     get_suppliers,
     get_email_template_by_name,
+    get_supplier_by_name,
 )
 from gestorcompras.services.email_sender import send_email, send_email_custom
 
