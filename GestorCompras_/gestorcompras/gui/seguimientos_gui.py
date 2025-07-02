@@ -7,9 +7,9 @@ from gestorcompras.services import google_sheets
 from gestorcompras.logic import despacho_logic
 
 
-def open_sheet_report(master, email_session):
+def open_seguimientos(master, email_session):
     window = tk.Toplevel(master)
-    window.title("Reporte Google Sheets")
+    window.title("Seguimientos desde Sheet")
     window.geometry("700x500")
     window.transient(master)
     window.grab_set()
@@ -28,11 +28,21 @@ def open_sheet_report(master, email_session):
     last_label = ttk.Label(frame, text="Datos no cargados", style="MyLabel.TLabel")
     last_label.grid(row=2, column=0, sticky="w")
 
-    tree = ttk.Treeview(frame, columns=("tarea", "oc", "proveedor"), show="headings", style="MyTreeview.Treeview")
-    tree.heading("tarea", text="Tarea")
-    tree.heading("oc", text="Orden")
-    tree.heading("proveedor", text="Proveedor")
-    tree.grid(row=3, column=0, sticky="nsew", pady=5)
+    list_lf = ttk.LabelFrame(frame, text="Órdenes de Compra", style="MyLabelFrame.TLabelframe", padding=5)
+    list_lf.grid(row=3, column=0, sticky="nsew", pady=5)
+
+    canvas = tk.Canvas(list_lf, background="#FFFFFF", highlightthickness=1, highlightbackground="#CCCCCC")
+    scrollbar = ttk.Scrollbar(list_lf, orient="vertical", command=canvas.yview)
+    orders_frame = ttk.Frame(canvas, style="MyFrame.TFrame")
+
+    def on_frame_configure(event):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    orders_frame.bind("<Configure>", on_frame_configure)
+    canvas.create_window((0, 0), window=orders_frame, anchor="nw")
+    canvas.configure(yscrollcommand=scrollbar.set)
+    canvas.pack(side="left", fill="both", expand=True)
+    scrollbar.pack(side="right", fill="y")
 
     log_box = ScrolledText(frame, height=6, state="disabled")
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
@@ -51,42 +61,65 @@ def open_sheet_report(master, email_session):
         log_box.see(tk.END)
         log_box.configure(state="disabled")
 
+    order_vars = []
+
     def load_report():
         creds = db.get_config("GOOGLE_CREDS", "")
         if not (creds and sid and sname):
-            messagebox.showwarning("Advertencia", "Debe completar Spreadsheet ID y nombre de hoja y configurar las credenciales.")
+            messagebox.showwarning(
+                "Advertencia",
+                "Debe completar Spreadsheet ID y nombre de hoja y configurar las credenciales.",
+            )
             return
         try:
             rows = google_sheets.read_report(creds, sid, sname)
         except Exception as e:
             messagebox.showerror("Error", str(e))
             return
-        for i in tree.get_children():
-            tree.delete(i)
+
+        for widget in orders_frame.winfo_children():
+            widget.destroy()
+        order_vars.clear()
+
         for r in rows:
-            tree.insert("", "end", values=(r["Tarea"], r["Orden de Compra"], r["Proveedor"]))
+            text = f"OC {r['Orden de Compra']} - {r['Proveedor']} (Tarea {r['Tarea']})"
+            var = tk.BooleanVar(value=False)
+            chk = ttk.Checkbutton(
+                orders_frame, text=text, variable=var, style="MyCheckbutton.TCheckbutton"
+            )
+            chk.pack(anchor="w", pady=2)
+            order_vars.append((var, r))
         last_label.config(text=f"Datos cargados: {len(rows)} registros")
+        canvas.update_idletasks()
+        canvas.yview_moveto(0.0)
 
     def send_emails():
-        items = tree.get_children()
-        if not items:
-            messagebox.showwarning("Advertencia", "No hay datos para enviar")
+        selected = [r for var, r in order_vars if var.get()]
+        if not selected:
+            messagebox.showwarning("Advertencia", "No hay órdenes seleccionadas")
             return
-        if not messagebox.askyesno("Confirmar", f"¿Enviar {len(items)} correos?"):
+        if not messagebox.askyesno("Confirmar", f"¿Enviar {len(selected)} correos?"):
             return
-        for it in items:
-            tarea, oc, prov = tree.item(it)["values"]
+        for r in selected:
             result = despacho_logic.process_order(
                 email_session,
-                str(oc),
+                str(r["Orden de Compra"]),
                 include_pdf=attach_var.get(),
                 template_name=formato_var.get(),
             )
             log(result)
         messagebox.showinfo("Finalizado", "Proceso completado")
 
+    select_all_var = tk.BooleanVar(value=False)
+
+    def toggle_all():
+        val = select_all_var.get()
+        for var, _ in order_vars:
+            var.set(val)
+
     btn_frame = ttk.Frame(frame, style="MyFrame.TFrame")
     btn_frame.grid(row=8, column=0, pady=10)
+    ttk.Checkbutton(btn_frame, text="Marcar todas", variable=select_all_var, command=toggle_all, style="MyCheckbutton.TCheckbutton").pack(side="left", padx=5)
     ttk.Button(btn_frame, text="Cargar Reporte", style="MyButton.TButton", command=load_report).pack(side="left", padx=5)
     ttk.Button(btn_frame, text="Enviar Correos", style="MyButton.TButton", command=send_emails).pack(side="left", padx=5)
 

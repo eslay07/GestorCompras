@@ -5,7 +5,7 @@ from gestorcompras.services import db
 from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
-from gestorcompras.gui import google_sheet_gui
+from gestorcompras.gui import seguimientos_gui
 
 # Palette
 bg_base = "#F0F4F8"
@@ -160,7 +160,7 @@ class MainMenu(tk.Frame):
         buttons = [
             ("Reasignación de Tareas", self.open_reasignacion),
             ("Solicitud de Despachos", self.open_despacho),
-            ("Despachos desde Sheet", self.open_sheet_report),
+            ("Seguimientos", self.open_seguimientos),
             ("Cotizador", self.open_cotizador),
             ("Configuración", self.open_config),
             ("Salir", self.master.quit)
@@ -175,8 +175,8 @@ class MainMenu(tk.Frame):
     def open_despacho(self):
         despacho_gui.open_despacho(self.master, email_session)
 
-    def open_sheet_report(self):
-        google_sheet_gui.open_sheet_report(self.master, email_session)
+    def open_seguimientos(self):
+        seguimientos_gui.open_seguimientos(self.master, email_session)
     
     def open_config(self):
         config_gui.open_config_gui(self.master)
