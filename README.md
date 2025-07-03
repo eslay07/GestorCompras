@@ -87,7 +87,7 @@ pytest
  
 Contacto
 --------
-- Correo Electrónico: contacto@example.com
+
 
  
  Última actualización: 25/06/2025
