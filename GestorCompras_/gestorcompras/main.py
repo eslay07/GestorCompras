@@ -6,6 +6,7 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
+from gestorcompras.gui import descarga_oc_gui
 
 # Palette
 bg_base = "#F0F4F8"
@@ -161,6 +162,7 @@ class MainMenu(tk.Frame):
             ("Reasignación de Tareas", self.open_reasignacion),
             ("Solicitud de Despachos", self.open_despacho),
             ("Seguimientos", self.open_seguimientos),
+            ("Descarga de OC", self.open_descarga_oc),
             ("Cotizador", self.open_cotizador),
             ("Configuración", self.open_config),
             ("Salir", self.master.quit)
@@ -177,7 +179,10 @@ class MainMenu(tk.Frame):
 
     def open_seguimientos(self):
         seguimientos_gui.open_seguimientos(self.master, email_session)
-    
+
+    def open_descarga_oc(self):
+        descarga_oc_gui.open_descarga_oc(self.master, email_session)
+
     def open_config(self):
         config_gui.open_config_gui(self.master)
     
