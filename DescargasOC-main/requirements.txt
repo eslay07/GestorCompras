@@ -1,0 +1,5 @@
+PyPDF2
+selenium
+requests
+requests-mock
+python-dotenv
