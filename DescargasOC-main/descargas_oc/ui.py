@@ -63,9 +63,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         scanning_lock.release()
 
 
-def main():
-    root = tk.Tk()
-    root.title("Descargas OC")
+def _build_interface(root: tk.Misc) -> tk.Misc:
     root.lift()
     root.attributes('-topmost', True)
 
@@ -138,6 +136,19 @@ def main():
     btn_interval = tk.Button(frame, text="Guardar", command=actualizar_intervalo)
     btn_interval.pack(side=tk.LEFT, padx=5)
 
+    return root
+
+
+def open_window(parent: tk.Misc) -> tk.Misc:
+    window = tk.Toplevel(parent)
+    window.title("Descargas OC")
+    return _build_interface(window)
+
+
+def main():
+    root = tk.Tk()
+    root.title("Descargas OC")
+    _build_interface(root)
     root.mainloop()
 
 
