@@ -99,10 +99,18 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
     }
 
-    def _find(name: str, condition, timeout: int = 20):
+    def _notify(title: str, msg: str, kind: str = "error") -> None:
+        root = Tk()
+        root.attributes("-topmost", True)
+        root.withdraw()
+        getattr(messagebox, f"show{kind}")(title, msg)
+        root.destroy()
+
+    def _find(name: str, condition, timeout: int = 40):
         try:
             return WebDriverWait(driver, timeout).until(condition)
         except Exception as exc:  # pragma: no cover - interface errors
+            _notify("Error Selenium", f"Fallo al localizar '{name}'")
             raise RuntimeError(f"Fallo al localizar '{name}'") from exc
 
     errores: list[str] = []
@@ -161,7 +169,13 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                 ).click()
                 _find(
                     "descargar_orden",
+                    EC.presence_of_element_located(elements["descargar_orden"]),
+                    timeout=60,
+                )
+                _find(
+                    "descargar_orden",
                     EC.element_to_be_clickable(elements["descargar_orden"]),
+                    timeout=60,
                 ).click()
 
                 antes = set(download_dir.glob("*.pdf"))
@@ -180,17 +194,18 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                     archivo.rename(nuevo_nombre)
             except Exception as exc:  # pragma: no cover - runtime issues
                 errores.append(f"OC {numero}: {exc}")
+                _notify("Error OC", f"OC {numero}: {exc}")
     finally:
         driver.quit()
 
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-    messagebox.showinfo(
-        "Prueba Selenium",
-        "✅ Script automático de Selenium terminó",
-    )
-    root.destroy()
+    if errores:
+        _notify("Descarga incompleta", "\n".join(errores))
+    else:
+        _notify(
+            "Prueba Selenium",
+            "✅ Script automático de Selenium terminó",
+            kind="info",
+        )
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes = mover_oc(cfg, numeros)
