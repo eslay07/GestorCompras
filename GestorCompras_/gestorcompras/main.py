@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import smtplib
+import subprocess
+import sys
+from pathlib import Path
 from gestorcompras.services import db
 from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
@@ -161,6 +164,7 @@ class MainMenu(tk.Frame):
             ("Reasignación de Tareas", self.open_reasignacion),
             ("Solicitud de Despachos", self.open_despacho),
             ("Seguimientos", self.open_seguimientos),
+            ("Descargas OC", self.open_descargas_oc),
             ("Cotizador", self.open_cotizador),
             ("Configuración", self.open_config),
             ("Salir", self.master.quit)
@@ -177,7 +181,11 @@ class MainMenu(tk.Frame):
 
     def open_seguimientos(self):
         seguimientos_gui.open_seguimientos(self.master, email_session)
-    
+
+    def open_descargas_oc(self):
+        script = Path(__file__).resolve().parents[2] / "DescargasOC-main" / "descargas_oc" / "ui.py"
+        subprocess.Popen([sys.executable, str(script)])
+
     def open_config(self):
         config_gui.open_config_gui(self.master)
     
