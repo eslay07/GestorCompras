@@ -12,3 +12,4 @@ consulta_ordenes -> //span[contains(@class,'simple-sidenav__text') and text()='C
 digitar_oc -> input[data-placeholder='Digite el número de la O/C']
 btnbuscarorden -> //button[.//span[text()='Aplicar filtros']]
 descargar_orden -> //mat-icon[normalize-space()='save_alt']
+toast -> div.toast-container

@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from selenium import webdriver
+from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -97,6 +98,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             By.XPATH,
             "//mat-icon[normalize-space()='save_alt']",
         ),
+        "toast": (By.CSS_SELECTOR, "div.toast-container"),
     }
 
     def _notify(title: str, msg: str, kind: str = "error") -> None:
@@ -167,16 +169,28 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                     "btnbuscarorden",
                     EC.element_to_be_clickable(elements["btnbuscarorden"]),
                 ).click()
+
+                # Esperar a que desaparezca cualquier notificación tipo toast
+                try:  # pragma: no cover - depende del front-end
+                    WebDriverWait(driver, 10).until(
+                        EC.invisibility_of_element_located(elements["toast"])
+                    )
+                except TimeoutException:
+                    pass
                 _find(
                     "descargar_orden",
                     EC.presence_of_element_located(elements["descargar_orden"]),
                     timeout=60,
                 )
-                _find(
+                boton_descarga = _find(
                     "descargar_orden",
                     EC.element_to_be_clickable(elements["descargar_orden"]),
                     timeout=60,
-                ).click()
+                )
+                try:
+                    boton_descarga.click()
+                except ElementClickInterceptedException:
+                    driver.execute_script("arguments[0].click();", boton_descarga)
 
                 antes = set(download_dir.glob("*.pdf"))
                 for _ in range(120):  # esperar hasta 60 s
