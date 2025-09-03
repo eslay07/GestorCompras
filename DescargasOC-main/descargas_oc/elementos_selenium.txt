@@ -1,0 +1,14 @@
+usuario -> input#username
+contrasena -> input#password
+iniciar_sesion -> input.btn.btn-block.btn-submit[name='submit']
+lista_accesos -> //span[contains(@class,'simple-sidenav__text') and text()='Accesos']
+seleccion_compania -> //span[contains(@class,'simple-sidenav__text') and text()='Selección de Compañía']
+lista_companias -> input[aria-autocomplete='list']
+telconet_sa -> //div[contains(@class,'ng-star-inserted') and contains(.,'TELCONET S.A.')]
+boton_elegir -> //span[text()='Elegir']
+companias_boton_ok -> button.swal2-confirm.swal2-styled
+lista_consultas -> //span[contains(@class,'simple-sidenav__text') and text()='Consultas']
+consulta_ordenes -> //span[contains(@class,'simple-sidenav__text') and text()='Consulta de Órdenes de Compra']
+digitar_oc -> input[data-placeholder='Digite el número de la O/C']
+btnbuscarorden -> //button[.//span[text()='Aplicar filtros']]
+descargar_orden -> //mat-icon[normalize-space()='save_alt']

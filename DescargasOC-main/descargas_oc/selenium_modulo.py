@@ -1,9 +1,15 @@
 """Automatizaciones con Selenium para Descargas OC.
 
-Este módulo realiza el proceso de inicio de sesión y navegación inicial en el
-portal de Telconet. Se asignan nombres legibles a los elementos para un mejor
-control de errores y trazabilidad.
+Este módulo realiza el proceso completo de autenticación y descarga de órdenes
+de compra desde el portal de Telconet. Cada elemento de la interfaz recibe un
+nombre legible para facilitar el control de errores y la trazabilidad.
 """
+
+from __future__ import annotations
+
+import re
+import time
+from pathlib import Path
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -19,36 +25,33 @@ except ImportError:  # pragma: no cover
     from mover_pdf import mover_oc
 
 
-def descargar_oc(
-    numero_oc,
-    fecha_aut=None,
-    fecha_orden=None,
-    username=None,
-    password=None,
-):
-    """Descarga una orden de compra luego de autenticar al usuario.
+def descargar_oc(ordenes, username: str | None = None, password: str | None = None):
+    """Descarga una o varias órdenes de compra.
 
-    Se aceptan credenciales explícitas, de lo contrario se utilizan las
-    configuradas en el módulo. Si el nombre de usuario contiene un ``@``, se
-    elimina el dominio para compatibilidad con el portal de Telconet.
+    ``ordenes`` es una lista de diccionarios con las claves ``numero`` y
+    ``proveedor``. El proceso inicia sesión una sola vez y repite la búsqueda y
+    descarga para cada OC encontrada en el correo.
     """
 
-    cfg = Config()
-    download_dir = cfg.carpeta_destino_local
+    if isinstance(ordenes, dict):
+        ordenes = [ordenes]
 
-    # Credenciales: priorizar las proporcionadas por la sesión principal
+    cfg = Config()
+    download_dir = Path.home() / "Documentos"
+    download_dir.mkdir(parents=True, exist_ok=True)
+    cfg.data["carpeta_destino_local"] = str(download_dir)
+    cfg.data["carpeta_analizar"] = str(download_dir)
+
     user = username if username is not None else cfg.usuario
     if user:
         user = user.split("@")[0]
     pwd = password if password is not None else cfg.password
 
     options = webdriver.ChromeOptions()
-    if download_dir:
-        prefs = {"download.default_directory": download_dir}
-        options.add_experimental_option("prefs", prefs)
+    prefs = {"download.default_directory": str(download_dir)}
+    options.add_experimental_option("prefs", prefs)
     driver = webdriver.Chrome(options=options)
 
-    # Mapeo de elementos utilizados y sus selectores
     elements = {
         "usuario": (By.ID, "username"),
         "contrasena": (By.ID, "password"),
@@ -82,14 +85,27 @@ def descargar_oc(
             By.XPATH,
             "//span[contains(@class,'simple-sidenav__text') and text()='Consulta de Órdenes de Compra']",
         ),
+        "digitar_oc": (
+            By.CSS_SELECTOR,
+            "input[data-placeholder='Digite el número de la O/C']",
+        ),
+        "btnbuscarorden": (
+            By.XPATH,
+            "//button[.//span[text()='Aplicar filtros']]",
+        ),
+        "descargar_orden": (
+            By.XPATH,
+            "//mat-icon[normalize-space()='save_alt']",
+        ),
     }
 
-    def _find(name, condition, timeout=20):
+    def _find(name: str, condition, timeout: int = 20):
         try:
             return WebDriverWait(driver, timeout).until(condition)
         except Exception as exc:  # pragma: no cover - interface errors
             raise RuntimeError(f"Fallo al localizar '{name}'") from exc
 
+    errores: list[str] = []
     try:
         driver.get(
             "https://cas.telconet.ec/cas/login?service="
@@ -97,7 +113,7 @@ def descargar_oc(
         )
 
         _find("usuario", EC.presence_of_element_located(elements["usuario"])).send_keys(
-            user or ""
+            user or "",
         )
         _find(
             "contrasena", EC.presence_of_element_located(elements["contrasena"])
@@ -129,11 +145,46 @@ def descargar_oc(
         _find(
             "consulta_ordenes", EC.element_to_be_clickable(elements["consulta_ordenes"])
         ).click()
+
+        for oc in ordenes:
+            numero = oc.get("numero")
+            proveedor = oc.get("proveedor", "")
+            try:
+                campo = _find(
+                    "digitar_oc", EC.presence_of_element_located(elements["digitar_oc"])
+                )
+                campo.clear()
+                campo.send_keys(numero)
+                _find(
+                    "btnbuscarorden",
+                    EC.element_to_be_clickable(elements["btnbuscarorden"]),
+                ).click()
+                _find(
+                    "descargar_orden",
+                    EC.element_to_be_clickable(elements["descargar_orden"]),
+                ).click()
+
+                antes = set(download_dir.glob("*.pdf"))
+                for _ in range(120):  # esperar hasta 60 s
+                    time.sleep(0.5)
+                    nuevos = set(download_dir.glob("*.pdf")) - antes
+                    if nuevos:
+                        archivo = nuevos.pop()
+                        break
+                else:
+                    raise RuntimeError("No se descargó archivo")
+
+                if proveedor:
+                    prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    archivo.rename(nuevo_nombre)
+            except Exception as exc:  # pragma: no cover - runtime issues
+                errores.append(f"OC {numero}: {exc}")
     finally:
         driver.quit()
 
     root = Tk()
-    root.attributes('-topmost', True)
+    root.attributes("-topmost", True)
     root.withdraw()
     messagebox.showinfo(
         "Prueba Selenium",
@@ -141,5 +192,12 @@ def descargar_oc(
     )
     root.destroy()
 
-    return mover_oc(cfg, [numero_oc])
+    numeros = [oc.get("numero") for oc in ordenes]
+    subidos, faltantes = mover_oc(cfg, numeros)
+    faltantes.extend(n for n in numeros if any(n in e for e in errores))
+    return subidos, faltantes
+
+
+if __name__ == "__main__":  # pragma: no cover
+    descargar_oc([])
 
