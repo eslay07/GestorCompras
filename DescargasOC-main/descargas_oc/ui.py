@@ -48,12 +48,15 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         ordenes = buscar_ocs(cfg)
         exitosas: list[str] = []
         faltantes: list[str] = []
-        for oc in ordenes:
-            append(f"Procesando OC {oc['numero']}\n")
-            subidos, no_encontrados = descargar_oc(oc['numero'], oc['fecha_aut'], oc['fecha_orden'])
+        if ordenes:
+            append(f"Procesando {len(ordenes)} OC(s)\n")
+            subidos, no_encontrados = descargar_oc(ordenes)
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
-            append(f"✔️ OC {oc['numero']} procesada\n")
+            for num in subidos:
+                append(f"✔️ OC {num} procesada\n")
+            for num in no_encontrados:
+                append(f"❌ OC {num} faltante\n")
         enviar_reporte(exitosas, faltantes, cfg)
         append("Proceso finalizado\n")
         lbl_last.config(
