@@ -1,18 +1,11 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import smtplib
-import sys
-from pathlib import Path
 from gestorcompras.services import db
 from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
-
-DESCARGAS_OC_DIR = Path(__file__).resolve().parents[2] / "DescargasOC-main"
-if str(DESCARGAS_OC_DIR) not in sys.path:
-    sys.path.append(str(DESCARGAS_OC_DIR))
-from descargas_oc import ui as descargas_ui
 
 # Palette
 bg_base = "#F0F4F8"
@@ -168,7 +161,6 @@ class MainMenu(tk.Frame):
             ("Reasignación de Tareas", self.open_reasignacion),
             ("Solicitud de Despachos", self.open_despacho),
             ("Seguimientos", self.open_seguimientos),
-            ("Descargas OC", self.open_descargas_oc),
             ("Cotizador", self.open_cotizador),
             ("Configuración", self.open_config),
             ("Salir", self.master.quit)
@@ -188,16 +180,9 @@ class MainMenu(tk.Frame):
     
     def open_config(self):
         config_gui.open_config_gui(self.master)
-
+    
     def open_cotizador(self):
         messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo")
-
-    def open_descargas_oc(self):
-        creds = {
-            "username": email_session.get("address", "").split("@")[0],
-            "password": email_session.get("password", ""),
-        }
-        descargas_ui.open_window(self.master.winfo_toplevel(), creds)
 
 def main():
     db.init_db()

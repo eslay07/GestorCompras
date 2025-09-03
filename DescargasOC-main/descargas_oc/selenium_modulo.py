@@ -1,7 +1,7 @@
 """Automatizaciones con Selenium para Descargas OC.
 
 Este módulo realiza el proceso de inicio de sesión y navegación inicial en el
-portal de Telconet.  Se asignan nombres legibles a los elementos para un mejor
+portal de Telconet. Se asignan nombres legibles a los elementos para un mejor
 control de errores y trazabilidad.
 """
 
@@ -19,13 +19,27 @@ except ImportError:  # pragma: no cover
     from mover_pdf import mover_oc
 
 
-def descargar_oc(numero_oc, fecha_aut=None, fecha_orden=None, username=None, password=None):
+def descargar_oc(
+    numero_oc,
+    fecha_aut=None,
+    fecha_orden=None,
+    username=None,
+    password=None,
+):
+    """Descarga una orden de compra luego de autenticar al usuario.
+
+    Se aceptan credenciales explícitas, de lo contrario se utilizan las
+    configuradas en el módulo. Si el nombre de usuario contiene un ``@``, se
+    elimina el dominio para compatibilidad con el portal de Telconet.
+    """
+
     cfg = Config()
     download_dir = cfg.carpeta_destino_local
 
-    # Credenciales: usar las proporcionadas desde la sesión principal si existen,
-    # de lo contrario se recurre a la configuración local del módulo.
+    # Credenciales: priorizar las proporcionadas por la sesión principal
     user = username if username is not None else cfg.usuario
+    if user:
+        user = user.split("@")[0]
     pwd = password if password is not None else cfg.password
 
     options = webdriver.ChromeOptions()
