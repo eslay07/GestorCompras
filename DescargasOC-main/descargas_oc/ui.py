@@ -33,7 +33,7 @@ class TextHandler(logging.Handler):
         self.widget.after(0, lambda m=msg: (self.widget.insert(tk.END, m), self.widget.see(tk.END)))
 
 
-def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
+def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label, username: str | None = None, password: str | None = None):
     if not scanning_lock.acquire(blocking=False):
         text_widget.insert(tk.END, "Escaneo en progreso...\n")
         text_widget.see(tk.END)
@@ -50,7 +50,9 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         faltantes: list[str] = []
         for oc in ordenes:
             append(f"Procesando OC {oc['numero']}\n")
-            subidos, no_encontrados = descargar_oc(oc['numero'], oc['fecha_aut'], oc['fecha_orden'])
+            subidos, no_encontrados = descargar_oc(
+                oc['numero'], oc['fecha_aut'], oc['fecha_orden'], username, password
+            )
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
             append(f"✔️ OC {oc['numero']} procesada\n")
@@ -63,7 +65,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         scanning_lock.release()
 
 
-def _build_interface(root: tk.Misc) -> tk.Misc:
+def _build_interface(root: tk.Misc, credentials: dict | None = None) -> tk.Misc:
     root.lift()
     root.attributes('-topmost', True)
 
@@ -85,10 +87,18 @@ def _build_interface(root: tk.Misc) -> tk.Misc:
 
     cfg = Config()
 
+    # Credenciales opcionales para iniciar sesión en el portal
+    user = credentials.get("username") if credentials else None
+    pwd = credentials.get("password") if credentials else None
+
     def actualizar_contador():
         if estado["activo"]:
             if estado["contador"] <= 0:
-                threading.Thread(target=realizar_escaneo, args=(text, lbl_last), daemon=True).start()
+                threading.Thread(
+                    target=realizar_escaneo,
+                    args=(text, lbl_last, user, pwd),
+                    daemon=True,
+                ).start()
                 estado["contador"] = cfg.scan_interval
             lbl_contador.config(text=f"Siguiente escaneo en {estado['contador']} s")
             estado["contador"] -= 1
@@ -108,7 +118,11 @@ def _build_interface(root: tk.Misc) -> tk.Misc:
 
     def escanear_ahora():
         estado["contador"] = cfg.scan_interval
-        threading.Thread(target=realizar_escaneo, args=(text, lbl_last), daemon=True).start()
+        threading.Thread(
+            target=realizar_escaneo,
+            args=(text, lbl_last, user, pwd),
+            daemon=True,
+        ).start()
 
     def actualizar_intervalo():
         try:
@@ -139,10 +153,10 @@ def _build_interface(root: tk.Misc) -> tk.Misc:
     return root
 
 
-def open_window(parent: tk.Misc) -> tk.Misc:
+def open_window(parent: tk.Misc, credentials: dict | None = None) -> tk.Misc:
     window = tk.Toplevel(parent)
     window.title("Descargas OC")
-    return _build_interface(window)
+    return _build_interface(window, credentials)
 
 
 def main():

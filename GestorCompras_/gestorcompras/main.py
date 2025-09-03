@@ -193,7 +193,11 @@ class MainMenu(tk.Frame):
         messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo")
 
     def open_descargas_oc(self):
-        descargas_ui.open_window(self.master.winfo_toplevel())
+        creds = {
+            "username": email_session.get("address", "").split("@")[0],
+            "password": email_session.get("password", ""),
+        }
+        descargas_ui.open_window(self.master.winfo_toplevel(), creds)
 
 def main():
     db.init_db()

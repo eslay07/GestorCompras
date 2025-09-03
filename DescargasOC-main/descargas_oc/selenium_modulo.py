@@ -19,9 +19,14 @@ except ImportError:  # pragma: no cover
     from mover_pdf import mover_oc
 
 
-def descargar_oc(numero_oc, fecha_aut=None, fecha_orden=None):
+def descargar_oc(numero_oc, fecha_aut=None, fecha_orden=None, username=None, password=None):
     cfg = Config()
     download_dir = cfg.carpeta_destino_local
+
+    # Credenciales: usar las proporcionadas desde la sesión principal si existen,
+    # de lo contrario se recurre a la configuración local del módulo.
+    user = username if username is not None else cfg.usuario
+    pwd = password if password is not None else cfg.password
 
     options = webdriver.ChromeOptions()
     if download_dir:
@@ -78,11 +83,11 @@ def descargar_oc(numero_oc, fecha_aut=None, fecha_orden=None):
         )
 
         _find("usuario", EC.presence_of_element_located(elements["usuario"])).send_keys(
-            cfg.usuario or ""
+            user or ""
         )
         _find(
             "contrasena", EC.presence_of_element_located(elements["contrasena"])
-        ).send_keys(cfg.password or "")
+        ).send_keys(pwd or "")
         _find(
             "iniciar_sesion",
             EC.element_to_be_clickable(elements["iniciar_sesion"]),
