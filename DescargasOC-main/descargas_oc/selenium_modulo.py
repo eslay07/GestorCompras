@@ -92,8 +92,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
         "btnbuscarorden": (
             By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]"
-            time.sleep(3),
+            "//button[.//span[text()='Aplicar filtros']]",
         ),
         "descargar_orden": (
             By.XPATH,
@@ -166,6 +165,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                 )
                 campo.clear()
                 campo.send_keys(numero)
+                time.sleep(3)
                 _find(
                     "btnbuscarorden",
                     EC.element_to_be_clickable(elements["btnbuscarorden"]),
