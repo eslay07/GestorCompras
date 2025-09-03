@@ -92,7 +92,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
         "btnbuscarorden": (
             By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]",
+            "//button[.//span[text()='Aplicar filtros']]"
+            time.sleep(3),
         ),
         "descargar_orden": (
             By.XPATH,
