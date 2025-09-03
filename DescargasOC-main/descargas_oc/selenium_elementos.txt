@@ -1,0 +1,11 @@
+usuario: <input class="form-control required" id="username" size="25" tabindex="1" type="text" accesskey="u" autocomplete="off" placeholder="Nombre de Usuario" name="username" value="">
+contrasena: <input class="form-control required" type="password" id="password" size="25" tabindex="2" accesskey="c" autocomplete="off" placeholder="Contraseña" name="password" value="">
+iniciar_sesion: <input class="btn btn-block btn-submit" name="submit" accesskey="l" value="INICIAR SESIÓN" tabindex="6" type="submit">
+lista_accesos: <span class="simple-sidenav__text ng-tns-c75-2">Accesos</span>
+seleccion_compania: <span class="simple-sidenav__text ng-tns-c75-7">Selección de Compañía</span>
+lista_companias: <input aria-autocomplete="list" type="text" autocorrect="off" autocapitalize="off" autocomplete="a9904dde666d" aria-activedescendant="a9904dde666d-0" aria-controls="a9904dde666d">
+telconet_sa: <div _ngcontent-wdi-c217="" style="display: flex;" class="ng-star-inserted"><strong _ngcontent-wdi-c217=""></strong> TELCONET S.A. </div>
+boton_elegir: <span class="mat-button-wrapper">Elegir</span>
+companias_boton_ok: <button type="button" class="swal2-confirm swal2-styled" aria-label="" style="display: inline-block; border-left-color: rgb(48, 133, 214); border-right-color: rgb(48, 133, 214);">OK</button>
+lista_consultas: <span class="simple-sidenav__text ng-tns-c75-3">Consultas</span>
+consulta_ordenes: <span class="simple-sidenav__text ng-tns-c75-5">Consulta de Órdenes de Compra</span>
