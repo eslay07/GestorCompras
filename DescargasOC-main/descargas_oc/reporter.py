@@ -14,15 +14,15 @@ SMTP_SERVER = "smtp.telconet.ec"
 SMTP_PORT = 465
 
 
-def enviar_reporte(exitosas, faltantes, cfg: Config):
+def enviar_reporte(exitosas, faltantes, cfg: Config) -> bool:
     if not exitosas and not faltantes:
-        return
+        return False
     destinatario = cfg.correo_reporte
     usuario = cfg.usuario
     password = cfg.password
     if not destinatario or not usuario or not password:
         logger.warning('Datos de correo incompletos, no se enviará reporte')
-        return
+        return False
     mensaje = EmailMessage()
     mensaje['Subject'] = 'Reporte de órdenes descargadas'
     mensaje['From'] = usuario
@@ -40,6 +40,8 @@ def enviar_reporte(exitosas, faltantes, cfg: Config):
             smtp.login(usuario, password)
             smtp.send_message(mensaje)
         logger.info('Reporte enviado')
+        return True
     except Exception as e:
         logger.error('No se pudo enviar reporte: %s', e)
+        return False
 
