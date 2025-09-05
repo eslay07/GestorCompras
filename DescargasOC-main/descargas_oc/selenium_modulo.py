@@ -51,6 +51,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     options = webdriver.ChromeOptions()
     prefs = {"download.default_directory": str(download_dir)}
     options.add_experimental_option("prefs", prefs)
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
     driver = webdriver.Chrome(options=options)
 
     elements = {
@@ -219,12 +221,6 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
 
     if errores:
         _notify("Descarga incompleta", "\n".join(errores))
-    else:
-        _notify(
-            "Prueba Selenium",
-            "✅ Script automático de Selenium terminó",
-            kind="info",
-        )
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes = mover_oc(cfg, numeros)

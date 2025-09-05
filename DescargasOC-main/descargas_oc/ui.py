@@ -2,6 +2,7 @@ import tkinter as tk
 import threading
 import logging
 from datetime import datetime
+from tkinter import messagebox
 
 try:  # allow running as script
     from .configurador import configurar
@@ -57,7 +58,9 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
-        enviar_reporte(exitosas, faltantes, cfg)
+        enviado = enviar_reporte(exitosas, faltantes, cfg)
+        if enviado:
+            text_widget.after(0, lambda: messagebox.showinfo("Información", "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"))
         append("Proceso finalizado\n")
         lbl_last.config(
             text=f"Último UIDL: {cargar_ultimo_uidl()} - {datetime.now:%H:%M:%S}"

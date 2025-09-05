@@ -147,27 +147,10 @@ def wait_clickable_or_error(driver, locator, parent, description, timeout=30):
     try:
         return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
     except Exception as e:
-        driver.quit()
         messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
         raise Exception(f"Elemento faltante: {description}") from e
 
-def process_task(task, email_session, parent_window):
-    service = Service(ChromeDriverManager().install())
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    prefs = {"profile.managed_default_content_settings.images": 2}
-    chrome_options.add_experimental_option("prefs", prefs)
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    
-    telcos_username = email_session["address"].split("@")[0]
-    telcos_password = email_session["password"]
-    
-    login_telcos(driver, telcos_username, telcos_password)
-    
+def process_task(driver, task, parent_window):
     task_number = task["task_number"]
     dept = task["reasignacion"].strip().upper()
     assignments = db.get_assignment_config()
@@ -196,7 +179,6 @@ def process_task(task, email_session, parent_window):
             'el botón para abrir la tarea'
         ).click()
     except Exception:
-        driver.quit()
         # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
         raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
     
@@ -278,7 +260,6 @@ def process_task(task, email_session, parent_window):
     try:
         WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "modalReasignarTarea")))
     except Exception as e:
-        driver.quit()
         messagebox.showerror("Error", "No se abrió la ventana de reasignación.", parent=parent_window)
         raise Exception("Ventana de reasignación no visible") from e
     boton = wait_clickable_or_error(
@@ -295,8 +276,6 @@ def process_task(task, email_session, parent_window):
     )
     final_confirm_button.click()
     time.sleep(2)
-    
-    driver.quit()
 
 def open_reasignacion(master, email_session):
     window = tk.Toplevel(master)
@@ -423,14 +402,32 @@ def open_reasignacion(master, email_session):
         tasks_in_db = db.get_tasks_temp()
         tasks_dict = {t["id"]: t for t in tasks_in_db}
 
-        for t_id, (var, _) in task_vars.items():
-            if var.get():
-                task = tasks_dict[t_id]
-                try:
-                    process_task(task, email_session, window)
-                    db.delete_task_temp(t_id)
-                except Exception as e:
-                    errors.append(str(e))
+        service = Service(ChromeDriverManager().install())
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        prefs = {"profile.managed_default_content_settings.images": 2}
+        chrome_options.add_experimental_option("prefs", prefs)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+
+        telcos_username = email_session["address"].split("@")[0]
+        telcos_password = email_session["password"]
+        login_telcos(driver, telcos_username, telcos_password)
+
+        try:
+            for t_id, (var, _) in task_vars.items():
+                if var.get():
+                    task = tasks_dict[t_id]
+                    try:
+                        process_task(driver, task, window)
+                        db.delete_task_temp(t_id)
+                    except Exception as e:
+                        errors.append(str(e))
+        finally:
+            driver.quit()
 
         if errors:
             error_message = "Algunas tareas no fueron reasignadas:\n" + "\n".join(errors) + \
