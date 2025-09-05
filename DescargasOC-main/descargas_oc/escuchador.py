@@ -17,6 +17,7 @@ logger = get_logger(__name__)
 DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
 PROCESADOS_FILE = DATA_DIR / 'procesados.txt'
 LAST_UIDL_FILE = DATA_DIR / 'last_uidl.txt'
+REMITENTES_VALIDOS = {'jotoapanta@telconet.ec', 'naf@telconet.ec'}
 
 
 def cargar_procesados() -> set[str]:
@@ -147,7 +148,7 @@ def buscar_ocs(cfg: Config) -> list[dict]:
                     cuerpo = mensaje.get_payload(decode=True).decode(charset, errors='replace')
                 numero, fecha_aut, fecha_orden, proveedor = extraer_datos(asunto, cuerpo)
                 asunto_ok = re.search(r'SISTEMA\s+NAF:.*AUTORIZACI', asunto or '', re.IGNORECASE)
-                remitente_ok = 'jotoapanta@telconet.ec' in remitente.lower()
+                remitente_ok = any(r in remitente.lower() for r in REMITENTES_VALIDOS)
                 if remitente_ok and asunto_ok and numero:
                     ordenes.append({'numero': numero, 'fecha_aut': fecha_aut, 'fecha_orden': fecha_orden, 'proveedor': proveedor})
                 guardar_procesado(uidl_res)
