@@ -9,25 +9,4 @@ gspread
 google-auth
 
 
-:: arregla/activa pip
-python -m ensurepip --upgrade
-
-:: crea venv local (no pide admin)
-python -m venv .venv
-.\.venv\Scripts\activate
-
-:: instaladores al día
-python -m pip install --upgrade pip setuptools wheel
-
-:: instala tus paquetes
-python -m pip install jinja2 pdfplumber pandas openpyxl selenium webdriver-manager gspread google-auth
-
-:: prueba
-python - <<PY
-import jinja2, pdfplumber, pandas, openpyxl, selenium, gspread
-from webdriver_manager.chrome import ChromeDriverManager
-from google.oauth2 import service_account
-print("Todo OK ✔")
-PY
-
 
