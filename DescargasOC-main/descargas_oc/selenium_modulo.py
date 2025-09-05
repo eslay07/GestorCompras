@@ -49,11 +49,28 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     pwd = password if password is not None else cfg.password
 
     options = webdriver.ChromeOptions()
-    prefs = {"download.default_directory": str(download_dir)}
+    prefs = {
+        "download.default_directory": str(download_dir),
+        "download.prompt_for_download": False,
+        "plugins.always_open_pdf_externally": True,
+    }
     options.add_experimental_option("prefs", prefs)
-    options.add_argument("--headless")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(options=options)
+    try:
+        driver.execute_cdp_cmd(
+            "Page.setDownloadBehavior",
+            {"behavior": "allow", "downloadPath": str(download_dir)},
+        )
+    except Exception:  # pragma: no cover - depends on Chrome implementation
+        pass
 
     elements = {
         "usuario": (By.ID, "username"),
@@ -105,6 +122,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "//mat-icon[normalize-space()='save_alt']",
         ),
         "toast": (By.CSS_SELECTOR, "div.toast-container"),
+        "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
 
     def _notify(title: str, msg: str, kind: str = "error") -> None:
@@ -146,7 +164,22 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "iniciar_sesion",
             EC.element_to_be_clickable(elements["iniciar_sesion"]),
         ).click()
-
+        WebDriverWait(driver, 60).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        # Si la interfaz cambia a modo móvil, abrir el menú hamburguesa
+        try:
+            driver.find_element(*elements["lista_accesos"])
+        except Exception:
+            try:
+                _find(
+                    "menu_hamburguesa",
+                    EC.element_to_be_clickable(elements["menu_hamburguesa"]),
+                    timeout=10,
+                ).click()
+                time.sleep(1)
+            except Exception:
+                pass
         _find(
             "lista_accesos", EC.element_to_be_clickable(elements["lista_accesos"])
         ).click()
