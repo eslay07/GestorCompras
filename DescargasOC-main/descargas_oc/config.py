@@ -31,6 +31,9 @@ class Config:
         self.data['usuario'] = os.getenv('USUARIO_OC', self.data.get('usuario'))
         self.data['password'] = os.getenv('PASSWORD_OC', self.data.get('password'))
         self.data['pop_server'] = os.getenv('POP_SERVER', self.data.get('pop_server'))
+        self.data['remitente_adicional'] = os.getenv(
+            'REMITENTE_ADICIONAL', self.data.get('remitente_adicional')
+        )
         pop_port = os.getenv('POP_PORT', self.data.get('pop_port', 995))
         try:
             self.data['pop_port'] = int(pop_port)
@@ -58,6 +61,7 @@ class Config:
         self.data.setdefault('seafile_repo_id', 'c0de837d-2c58-4f58-802d-aa513aaad8b2')
         self.data.setdefault('seafile_subfolder', '/prueba')
         self.data.setdefault('correo_reporte', 'jotoapanta@telconet.ec')
+        self.data.setdefault('remitente_adicional', 'naf@telconet.ec')
         self.data.setdefault('compra_bienes', False)
 
         return self
