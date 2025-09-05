@@ -9,8 +9,6 @@ gspread
 google-auth
 
 
-cd /d %USERPROFILE%\dev\proyecto
-
 :: arregla/activa pip
 python -m ensurepip --upgrade
 
@@ -31,4 +29,5 @@ from webdriver_manager.chrome import ChromeDriverManager
 from google.oauth2 import service_account
 print("Todo OK ✔")
 PY
+
 
