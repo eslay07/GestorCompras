@@ -252,9 +252,9 @@ def process_task(task, email_session, parent_window):
     department_input.send_keys(dept_name)
     time.sleep(1)
     #elemento para pruebas compras
-    #department_input.send_keys(Keys.UP, Keys.RETURN)
+    department_input.send_keys(Keys.UP, Keys.RETURN)
     #////////////elementopara produccion bodega
-    department_input.send_keys(Keys.DOWN, Keys.RETURN)
+    #department_input.send_keys(Keys.DOWN, Keys.RETURN)
     time.sleep(2)
     department_input.send_keys(Keys.TAB)
     time.sleep(2)
