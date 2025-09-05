@@ -60,7 +60,10 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"❌ OC {num} faltante\n")
         enviado = enviar_reporte(exitosas, faltantes, cfg)
         if enviado:
+#codex/adjust-folder-configurations-and-integrate-scripts
+
             registrar_procesados([o['uidl'] for o in ordenes], ultimo)
+# master
             text_widget.after(0, lambda: messagebox.showinfo("Información", "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"))
         append("Proceso finalizado\n")
         lbl_last.config(
