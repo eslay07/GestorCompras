@@ -114,12 +114,20 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         getattr(messagebox, f"show{kind}")(title, msg)
         root.destroy()
 
-    def _find(name: str, condition, timeout: int = 40):
-        try:
-            return WebDriverWait(driver, timeout).until(condition)
-        except Exception as exc:  # pragma: no cover - interface errors
-            _notify("Error Selenium", f"Fallo al localizar '{name}'")
-            raise RuntimeError(f"Fallo al localizar '{name}'") from exc
+    def _find(name: str, condition, timeout: int = 40, retries: int = 3):
+        """Ubica un elemento esperando a que sea válido.
+
+        Algunos componentes tardan en renderizarse; este auxiliar reintenta la
+        búsqueda varias veces antes de reportar un fallo definitivo.
+        """
+        for intento in range(retries):
+            try:
+                return WebDriverWait(driver, timeout).until(condition)
+            except Exception as exc:  # pragma: no cover - interface errors
+                if intento == retries - 1:
+                    _notify("Error Selenium", f"Fallo al localizar '{name}'")
+                    raise RuntimeError(f"Fallo al localizar '{name}'") from exc
+                time.sleep(2)
 
     errores: list[str] = []
     try:

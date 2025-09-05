@@ -143,12 +143,25 @@ def login_telcos(driver, username, password):
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
 
 
+#<<<<<<< codex/adjust-folder-configurations-and-integrate-scripts
 def wait_clickable_or_error(driver, locator, parent, description, timeout=30):
     try:
         return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
         raise Exception(f"Elemento faltante: {description}") from e
+
+def wait_clickable_or_error(driver, locator, parent, description, timeout=30, retries=3):
+    """Espera que un elemento sea clickeable reintentando varias veces."""
+    for intento in range(retries):
+        try:
+            return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
+        except Exception as e:
+            if intento == retries - 1:
+                messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
+                raise Exception(f"Elemento faltante: {description}") from e
+            time.sleep(1)
+#>>>>>>> master
 
 def process_task(driver, task, parent_window):
     task_number = task["task_number"]

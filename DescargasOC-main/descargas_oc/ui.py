@@ -6,14 +6,14 @@ from tkinter import messagebox
 
 try:  # allow running as script
     from .configurador import configurar
-    from .escuchador import buscar_ocs, cargar_ultimo_uidl
+    from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from .selenium_modulo import descargar_oc
     from .reporter import enviar_reporte
     from .config import Config
     from .logger import get_logger
 except ImportError:  # pragma: no cover
     from configurador import configurar
-    from escuchador import buscar_ocs, cargar_ultimo_uidl
+    from escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from selenium_modulo import descargar_oc
     from reporter import enviar_reporte
     from config import Config
@@ -46,7 +46,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
             text_widget.after(0, lambda m=msg: (text_widget.insert(tk.END, m), text_widget.see(tk.END)))
 
         append("Buscando órdenes...\n")
-        ordenes = buscar_ocs(cfg)
+        ordenes, ultimo = buscar_ocs(cfg)
         exitosas: list[str] = []
         faltantes: list[str] = []
         if ordenes:
@@ -60,6 +60,10 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"❌ OC {num} faltante\n")
         enviado = enviar_reporte(exitosas, faltantes, cfg)
         if enviado:
+#codex/adjust-folder-configurations-and-integrate-scripts
+
+            registrar_procesados([o['uidl'] for o in ordenes], ultimo)
+# master
             text_widget.after(0, lambda: messagebox.showinfo("Información", "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"))
         append("Proceso finalizado\n")
         lbl_last.config(
