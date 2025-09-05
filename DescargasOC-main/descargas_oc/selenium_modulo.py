@@ -94,6 +94,10 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             By.XPATH,
             "//button[.//span[text()='Aplicar filtros']]",
         ),
+        "btnbuscarorden": (
+            By.XPATH,
+            "//button[.//span[text()='Aplicar filtros']]",
+        ),
         "descargar_orden": (
             By.XPATH,
             "//mat-icon[normalize-space()='save_alt']",
