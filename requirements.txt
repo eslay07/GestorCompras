@@ -9,7 +9,6 @@ gspread
 google-auth
 
 
-mkdir %USERPROFILE%\dev\proyecto 2>nul
 cd /d %USERPROFILE%\dev\proyecto
 
 :: arregla/activa pip
@@ -32,3 +31,4 @@ from webdriver_manager.chrome import ChromeDriverManager
 from google.oauth2 import service_account
 print("Todo OK ✔")
 PY
+
