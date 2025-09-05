@@ -2,17 +2,18 @@ import tkinter as tk
 import threading
 import logging
 from datetime import datetime
+from tkinter import messagebox
 
 try:  # allow running as script
     from .configurador import configurar
-    from .escuchador import buscar_ocs, cargar_ultimo_uidl
+    from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from .selenium_modulo import descargar_oc
     from .reporter import enviar_reporte
     from .config import Config
     from .logger import get_logger
 except ImportError:  # pragma: no cover
     from configurador import configurar
-    from escuchador import buscar_ocs, cargar_ultimo_uidl
+    from escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from selenium_modulo import descargar_oc
     from reporter import enviar_reporte
     from config import Config
@@ -45,7 +46,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
             text_widget.after(0, lambda m=msg: (text_widget.insert(tk.END, m), text_widget.see(tk.END)))
 
         append("Buscando órdenes...\n")
-        ordenes = buscar_ocs(cfg)
+        ordenes, ultimo = buscar_ocs(cfg)
         exitosas: list[str] = []
         faltantes: list[str] = []
         if ordenes:
@@ -57,7 +58,10 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
-        enviar_reporte(exitosas, faltantes, cfg)
+        enviado = enviar_reporte(exitosas, faltantes, cfg)
+        if enviado:
+            registrar_procesados([o['uidl'] for o in ordenes], ultimo)
+            text_widget.after(0, lambda: messagebox.showinfo("Información", "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"))
         append("Proceso finalizado\n")
         lbl_last.config(
             text=f"Último UIDL: {cargar_ultimo_uidl()} - {datetime.now:%H:%M:%S}"
@@ -133,6 +137,14 @@ def main():
 
     btn_config = tk.Button(frame, text="Configuración", command=configurar)
     btn_config.pack(side=tk.LEFT, padx=5)
+
+    var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
+    def actualizar_bienes():
+        cfg.data['compra_bienes'] = var_bienes.get()
+        cfg.save()
+    chk_bienes = tk.Checkbutton(frame, text="Compra Bienes", variable=var_bienes,
+                                command=actualizar_bienes)
+    chk_bienes.pack(side=tk.LEFT, padx=5)
 
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
     entry_interval = tk.Entry(frame, width=5)

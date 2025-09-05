@@ -17,7 +17,7 @@ def configurar():
     cfg = Config()
 
     def seleccionar_carpeta(entry):
-        carpeta = filedialog.askdirectory()
+        carpeta = filedialog.askdirectory(initialdir=entry.get() or os.getcwd())
         if carpeta:
             entry.delete(0, tk.END)
             entry.insert(0, carpeta)
@@ -34,6 +34,7 @@ def configurar():
             'seafile_repo_id': entry_repo.get(),
             'seafile_subfolder': entry_sub.get(),
             'correo_reporte': entry_correo.get(),
+            'remitente_adicional': entry_remitente.get(),
         })
         try:
             cfg.validate()
@@ -122,6 +123,11 @@ def configurar():
     entry_correo = tk.Entry(ventana, width=50)
     entry_correo.pack()
     entry_correo.insert(0, cfg.correo_reporte or '')
+
+    tk.Label(ventana, text='Remitente adicional:').pack()
+    entry_remitente = tk.Entry(ventana, width=50)
+    entry_remitente.pack()
+    entry_remitente.insert(0, cfg.remitente_adicional or '')
 
     estado_txt = 'Generado' if os.path.exists(PROCESADOS_FILE) else 'Pendiente'
     frame_proc = tk.Frame(ventana)
