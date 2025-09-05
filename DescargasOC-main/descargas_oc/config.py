@@ -48,6 +48,18 @@ class Config:
             val = 300
         self.data['scan_interval'] = val
 
+        # default values when config file is empty
+        self.data.setdefault('pop_server', 'pop.telconet.ec')
+        self.data.setdefault('pop_port', 995)
+        self.data.setdefault('usuario', 'jotoapanta@telconet.ec')
+        self.data.setdefault('carpeta_destino_local', r'E:\Seadrive\jotoapan_1\Shared with me\BD_TELCO\BIENES')
+        self.data.setdefault('carpeta_analizar', r'E:\Seadrive\jotoapan_1\Shared with me\BD_TELCO\BIENES')
+        self.data.setdefault('seafile_url', 'https://telcodrive.telconet.net')
+        self.data.setdefault('seafile_repo_id', 'c0de837d-2c58-4f58-802d-aa513aaad8b2')
+        self.data.setdefault('seafile_subfolder', '/prueba')
+        self.data.setdefault('correo_reporte', 'jotoapanta@telconet.ec')
+        self.data.setdefault('compra_bienes', False)
+
         return self
 
     def save(self):

@@ -21,9 +21,11 @@ from tkinter import Tk, messagebox
 try:  # allow running as script
     from .config import Config
     from .mover_pdf import mover_oc
+    from .organizador_bienes import organizar as organizar_bienes
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
+    from organizador_bienes import organizar as organizar_bienes
 
 
 def descargar_oc(ordenes, username: str | None = None, password: str | None = None):
@@ -38,10 +40,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ordenes = [ordenes]
 
     cfg = Config()
-    download_dir = Path.home() / "Documentos"
+    download_dir = Path(cfg.carpeta_destino_local or Path.home() / "Documentos")
     download_dir.mkdir(parents=True, exist_ok=True)
-    cfg.data["carpeta_destino_local"] = str(download_dir)
-    cfg.data["carpeta_analizar"] = str(download_dir)
 
     user = username if username is not None else cfg.usuario
     if user:
@@ -228,6 +228,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes = mover_oc(cfg, numeros)
+    if getattr(cfg, "compra_bienes", False):
+        organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
     return subidos, faltantes
 

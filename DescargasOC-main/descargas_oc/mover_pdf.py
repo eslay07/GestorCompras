@@ -1,4 +1,5 @@
 import os
+import shutil
 import PyPDF2
 
 try:  # allow running as script
@@ -16,7 +17,8 @@ logger = get_logger(__name__)
 def mover_oc(config: Config, numeros_oc=None):
     if numeros_oc is None:
         numeros_oc = []
-    carpeta_origen = config.carpeta_analizar
+    carpeta_origen = config.carpeta_destino_local
+    carpeta_destino = config.carpeta_analizar
     repo_id = config.seafile_repo_id
     subfolder = config.seafile_subfolder or '/'
     if not carpeta_origen or not repo_id:
@@ -55,7 +57,8 @@ def mover_oc(config: Config, numeros_oc=None):
             continue
         try:
             cliente.upload_file(repo_id, ruta, parent_dir=subfolder)
-            os.remove(ruta)
+            os.makedirs(carpeta_destino, exist_ok=True)
+            shutil.move(ruta, os.path.join(carpeta_destino, os.path.basename(ruta)))
             subidos.append(numero)
             logger.info('Subido %s', os.path.basename(ruta))
         except Exception as e:

@@ -134,6 +134,14 @@ def main():
     btn_config = tk.Button(frame, text="Configuración", command=configurar)
     btn_config.pack(side=tk.LEFT, padx=5)
 
+    var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
+    def actualizar_bienes():
+        cfg.data['compra_bienes'] = var_bienes.get()
+        cfg.save()
+    chk_bienes = tk.Checkbutton(frame, text="Compra Bienes", variable=var_bienes,
+                                command=actualizar_bienes)
+    chk_bienes.pack(side=tk.LEFT, padx=5)
+
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
     entry_interval = tk.Entry(frame, width=5)
     entry_interval.insert(0, str(cfg.scan_interval))

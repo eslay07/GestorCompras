@@ -17,7 +17,7 @@ def configurar():
     cfg = Config()
 
     def seleccionar_carpeta(entry):
-        carpeta = filedialog.askdirectory()
+        carpeta = filedialog.askdirectory(initialdir=entry.get() or os.getcwd())
         if carpeta:
             entry.delete(0, tk.END)
             entry.insert(0, carpeta)
