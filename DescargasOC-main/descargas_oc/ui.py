@@ -59,7 +59,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
-        enviado = enviar_reporte(exitosas, faltantes, cfg)
+        enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)
         if enviado:
             registrar_procesados([o['uidl'] for o in ordenes], ultimo)
         summary = (
