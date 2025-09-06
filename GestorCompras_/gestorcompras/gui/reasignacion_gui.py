@@ -143,25 +143,17 @@ def login_telcos(driver, username, password):
     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
 
 
-#<<<<<<< codex/adjust-folder-configurations-and-integrate-scripts
-def wait_clickable_or_error(driver, locator, parent, description, timeout=30):
-    try:
-        return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
-    except Exception as e:
-        messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
-        raise Exception(f"Elemento faltante: {description}") from e
-
 def wait_clickable_or_error(driver, locator, parent, description, timeout=30, retries=3):
     """Espera que un elemento sea clickeable reintentando varias veces."""
     for intento in range(retries):
         try:
-            return WebDriverWait(driver, timeout).until(EC.element_to_be_clickable(locator))
+            return WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable(locator)
+            )
         except Exception as e:
             if intento == retries - 1:
-                messagebox.showerror("Error", f"No se pudo encontrar {description}.", parent=parent)
-                raise Exception(f"Elemento faltante: {description}") from e
+                raise Exception(f"No se pudo encontrar {description}") from e
             time.sleep(1)
-#>>>>>>> master
 
 def process_task(driver, task, parent_window):
     task_number = task["task_number"]
@@ -271,10 +263,11 @@ def process_task(driver, task, parent_window):
     )
     observation_textarea.send_keys('TRABAJO REALIZADO')
     try:
-        WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.ID, "modalReasignarTarea")))
+        WebDriverWait(driver, 20).until(
+            EC.visibility_of_element_located((By.ID, "modalReasignarTarea"))
+        )
     except Exception as e:
-        messagebox.showerror("Error", "No se abrió la ventana de reasignación.", parent=parent_window)
-        raise Exception("Ventana de reasignación no visible") from e
+        raise Exception("No se abrió la ventana de reasignación") from e
     boton = wait_clickable_or_error(
         driver,
         (By.ID, "btnGrabarReasignaTarea"),
@@ -405,13 +398,15 @@ def open_reasignacion(master, email_session):
 
     def process_tasks():
         if not any(var.get() for var, _ in task_vars.values()):
-            messagebox.showwarning("Advertencia", "No se ha seleccionado ninguna tarea.", parent=window)
+            messagebox.showinfo(
+                "Resultado", "No se ha seleccionado ninguna tarea.", parent=window
+            )
             return
 
         process_btn.config(state="disabled", text="Procesando...")
         window.update()
 
-        errors = []
+        errors: list[str] = []
         tasks_in_db = db.get_tasks_temp()
         tasks_dict = {t["id"]: t for t in tasks_in_db}
 
@@ -443,11 +438,10 @@ def open_reasignacion(master, email_session):
             driver.quit()
 
         if errors:
-            error_message = "Algunas tareas no fueron reasignadas:\n" + "\n".join(errors) + \
-                            "\n\nPor favor revisar las tareas mencionadas"
-            confirm = messagebox.askokcancel("Errores encontrados", error_message, parent=window)
+            summary = "Algunas tareas no fueron reasignadas:\n" + "\n".join(errors)
         else:
-            messagebox.showinfo("Éxito", "Tareas procesadas exitosamente.", parent=window)
+            summary = "Tareas procesadas exitosamente."
+        messagebox.showinfo("Resultado", summary, parent=window)
 
         process_btn.config(state="normal", text="Reasignar Tareas")
         actualizar_tareas()

@@ -16,7 +16,6 @@ from selenium.common.exceptions import ElementClickInterceptedException, Timeout
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from tkinter import Tk, messagebox
 
 try:  # allow running as script
     from .config import Config
@@ -128,12 +127,6 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
 
-    def _notify(title: str, msg: str, kind: str = "error") -> None:
-        root = Tk()
-        root.withdraw()
-        getattr(messagebox, f"show{kind}")(title, msg)
-        root.destroy()
-
     def _find(name: str, condition, timeout: int = 40, retries: int = 3):
         """Ubica un elemento esperando a que sea válido.
 
@@ -145,7 +138,6 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                 return WebDriverWait(driver, timeout).until(condition)
             except Exception as exc:  # pragma: no cover - interface errors
                 if intento == retries - 1:
-                    _notify("Error Selenium", f"Fallo al localizar '{name}'")
                     raise RuntimeError(f"Fallo al localizar '{name}'") from exc
                 time.sleep(2)
 
@@ -261,19 +253,15 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                     archivo.rename(nuevo_nombre)
             except Exception as exc:  # pragma: no cover - runtime issues
                 errores.append(f"OC {numero}: {exc}")
-                _notify("Error OC", f"OC {numero}: {exc}")
     finally:
         driver.quit()
-
-    if errores:
-        _notify("Descarga incompleta", "\n".join(errores))
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes = mover_oc(cfg, numeros)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
-    return subidos, faltantes
+    return subidos, faltantes, errores
 
 
 if __name__ == "__main__":  # pragma: no cover
