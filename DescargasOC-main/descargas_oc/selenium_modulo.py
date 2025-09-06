@@ -55,7 +55,9 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         "plugins.always_open_pdf_externally": True,
     }
     options.add_experimental_option("prefs", prefs)
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option(
+        "excludeSwitches", ["enable-automation", "enable-logging"]
+    )
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--headless=new")
@@ -63,6 +65,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--log-level=3")
     driver = webdriver.Chrome(options=options)
     try:
         driver.execute_cdp_cmd(
@@ -164,13 +167,16 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "iniciar_sesion",
             EC.element_to_be_clickable(elements["iniciar_sesion"]),
         ).click()
+        WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
         WebDriverWait(driver, 60).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
         )
-        # Si la interfaz cambia a modo móvil, abrir el menú hamburguesa
+        # Abrir menú lateral si no está visible (modo móvil)
         try:
-            driver.find_element(*elements["lista_accesos"])
-        except Exception:
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(elements["lista_accesos"])
+            )
+        except TimeoutException:
             try:
                 _find(
                     "menu_hamburguesa",
