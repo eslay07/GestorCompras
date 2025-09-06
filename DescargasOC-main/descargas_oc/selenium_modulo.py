@@ -130,7 +130,6 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
 
     def _notify(title: str, msg: str, kind: str = "error") -> None:
         root = Tk()
-        root.attributes("-topmost", True)
         root.withdraw()
         getattr(messagebox, f"show{kind}")(title, msg)
         root.destroy()

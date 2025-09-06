@@ -76,8 +76,6 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 def main():
     root = tk.Tk()
     root.title("Descargas OC")
-    root.lift()
-    root.attributes('-topmost', True)
 
     frame = tk.Frame(root)
     frame.pack(padx=10, pady=10)

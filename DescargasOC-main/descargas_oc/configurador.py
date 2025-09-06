@@ -1,4 +1,5 @@
 import os
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import poplib
@@ -46,31 +47,62 @@ def configurar():
             cli.upload_file(cfg.seafile_repo_id, archivo, parent_dir=cfg.seafile_subfolder)
             messagebox.showinfo('OK', 'Archivo subido correctamente')
             cfg.save()
+            try:
+                ventana.grab_release()
+            except Exception:  # pragma: no cover - grab may not be set
+                pass
             ventana.destroy()
         except Exception as e:
             messagebox.showerror('Error', str(e))
 
     def generar_procesados():
-        messagebox.showinfo('Espere', 'Esto puede demorar. Escaneando correos...')
-        try:
-            conn = poplib.POP3_SSL(entry_pop_server.get(), int(entry_pop_port.get() or 995))
-            conn.user(entry_usuario.get())
-            conn.pass_(entry_password.get())
-            count = len(conn.list()[1])
-            with open(PROCESADOS_FILE, 'w') as f:
-                for i in range(count):
-                    uidl = conn.uidl(i + 1).decode().split()[2]
-                    f.write(uidl + '\n')
-            conn.quit()
-            messagebox.showinfo('OK', 'Archivo creado correctamente')
-            lbl_estado.config(text='Generado')
-        except Exception as e:
-            messagebox.showerror('Error', str(e))
+        btn_gen_proc.config(state=tk.DISABLED)
+        popup = tk.Toplevel(ventana)
+        popup.transient(ventana)
+        popup.grab_set()
+        lbl_msg = tk.Label(popup, text='Esto puede demorar. Escaneando correos...')
+        lbl_msg.pack(padx=20, pady=10)
+        btn_ok = tk.Button(
+            popup, text='Aceptar', state=tk.DISABLED,
+            command=lambda: (popup.grab_release(), popup.destroy())
+        )
+        btn_ok.pack(pady=(0, 10))
 
-    ventana = tk.Tk()
+        def tarea():
+            try:
+                conn = poplib.POP3_SSL(
+                    entry_pop_server.get(), int(entry_pop_port.get() or 995)
+                )
+                conn.user(entry_usuario.get())
+                conn.pass_(entry_password.get())
+                count = len(conn.list()[1])
+                with open(PROCESADOS_FILE, 'w') as f:
+                    for i in range(count):
+                        uidl = conn.uidl(i + 1).decode().split()[2]
+                        f.write(uidl + '\n')
+                conn.quit()
+                estado, msg = 'Generado', 'Archivo creado correctamente'
+            except Exception as e:  # pragma: no cover - network errors
+                estado, msg = lbl_estado.cget('text'), f'Error: {e}'
+
+            def finalizar():
+                lbl_estado.config(text=estado)
+                lbl_msg.config(text=msg)
+                btn_ok.config(state=tk.NORMAL)
+                btn_gen_proc.config(state=tk.NORMAL)
+
+            popup.after(0, finalizar)
+
+        threading.Thread(target=tarea, daemon=True).start()
+
+    parent = tk._get_default_root()
+    if parent is None:
+        ventana = tk.Tk()
+    else:
+        ventana = tk.Toplevel(parent)
+        ventana.transient(parent)
+        ventana.grab_set()
     ventana.title('Configuración')
-    ventana.lift()
-    ventana.attributes('-topmost', True)
 
     tk.Label(ventana, text='Servidor POP3:').pack()
     entry_pop_server = tk.Entry(ventana, width=50)
@@ -132,7 +164,8 @@ def configurar():
     estado_txt = 'Generado' if os.path.exists(PROCESADOS_FILE) else 'Pendiente'
     frame_proc = tk.Frame(ventana)
     frame_proc.pack(pady=5)
-    tk.Button(frame_proc, text='Generar procesados', command=generar_procesados).pack(side=tk.LEFT)
+    btn_gen_proc = tk.Button(frame_proc, text='Generar procesados', command=generar_procesados)
+    btn_gen_proc.pack(side=tk.LEFT)
     lbl_estado = tk.Label(frame_proc, text=estado_txt)
     lbl_estado.pack(side=tk.LEFT, padx=5)
 
