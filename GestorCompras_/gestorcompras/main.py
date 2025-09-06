@@ -84,20 +84,25 @@ def init_styles():
     style.map("MyVertical.TScrollbar", background=[("active", color_hover)], arrowcolor=[("active", color_blanco)])
     style.configure("MyLabelFrame.TLabelframe", background=bg_frame, relief="groove")
     style.configure("MyLabelFrame.TLabelframe.Label", background=bg_frame, foreground=color_texto, font=fuente_bold)
+    style.configure("Banner.TLabel", background=bg_frame, foreground=color_titulos, font=fuente_banner)
 
 class LoginScreen(tk.Frame):
     def __init__(self, master, on_success):
         super().__init__(master)
         self.on_success = on_success
+        self._banner_text = "COMPRAS TELCONET S.A"
+        self._banner_index = 0
+        self._banner_colors = [color_primario, color_hover]
+        self._color_index = 0
         self.create_widgets()
+        self.animate_banner()
     
     def create_widgets(self):
         container = ttk.Frame(self, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
-        
-        banner = ttk.Label(container, text="Sistema de automatización - compras")
-        banner.configure(font=fuente_banner, foreground=color_titulos)
-        banner.pack(pady=(20,10))
+
+        self.banner = ttk.Label(container, text="", style="Banner.TLabel")
+        self.banner.pack(pady=(20,10))
         
         login_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
         login_frame.place(relx=0.5, rely=0.5, anchor="center")
@@ -123,6 +128,16 @@ class LoginScreen(tk.Frame):
         
         btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
         btn_login.grid(row=5, column=0, pady=15)
+
+    def animate_banner(self):
+        text = self._banner_text[:self._banner_index]
+        color = self._banner_colors[self._color_index]
+        self.banner.config(text=text, foreground=color)
+        self._banner_index += 1
+        if self._banner_index > len(self._banner_text):
+            self._banner_index = 0
+            self._color_index = (self._color_index + 1) % len(self._banner_colors)
+        self.after(150, self.animate_banner)
     
     def attempt_login(self):
         username = self.user_entry.get().strip()

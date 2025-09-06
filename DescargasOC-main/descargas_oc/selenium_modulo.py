@@ -16,7 +16,6 @@ from selenium.common.exceptions import ElementClickInterceptedException, Timeout
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-from tkinter import Tk, messagebox
 
 try:  # allow running as script
     from .config import Config
@@ -49,11 +48,31 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     pwd = password if password is not None else cfg.password
 
     options = webdriver.ChromeOptions()
-    prefs = {"download.default_directory": str(download_dir)}
+    prefs = {
+        "download.default_directory": str(download_dir),
+        "download.prompt_for_download": False,
+        "plugins.always_open_pdf_externally": True,
+    }
     options.add_experimental_option("prefs", prefs)
-    options.add_argument("--headless")
+    options.add_experimental_option(
+        "excludeSwitches", ["enable-automation", "enable-logging"]
+    )
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--log-level=3")
     driver = webdriver.Chrome(options=options)
+    try:
+        driver.execute_cdp_cmd(
+            "Page.setDownloadBehavior",
+            {"behavior": "allow", "downloadPath": str(download_dir)},
+        )
+    except Exception:  # pragma: no cover - depends on Chrome implementation
+        pass
 
     elements = {
         "usuario": (By.ID, "username"),
@@ -105,14 +124,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "//mat-icon[normalize-space()='save_alt']",
         ),
         "toast": (By.CSS_SELECTOR, "div.toast-container"),
+        "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
-
-    def _notify(title: str, msg: str, kind: str = "error") -> None:
-        root = Tk()
-        root.attributes("-topmost", True)
-        root.withdraw()
-        getattr(messagebox, f"show{kind}")(title, msg)
-        root.destroy()
 
     def _find(name: str, condition, timeout: int = 40, retries: int = 3):
         """Ubica un elemento esperando a que sea válido.
@@ -125,7 +138,6 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                 return WebDriverWait(driver, timeout).until(condition)
             except Exception as exc:  # pragma: no cover - interface errors
                 if intento == retries - 1:
-                    _notify("Error Selenium", f"Fallo al localizar '{name}'")
                     raise RuntimeError(f"Fallo al localizar '{name}'") from exc
                 time.sleep(2)
 
@@ -146,7 +158,25 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "iniciar_sesion",
             EC.element_to_be_clickable(elements["iniciar_sesion"]),
         ).click()
-
+        WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
+        WebDriverWait(driver, 60).until(
+            lambda d: d.execute_script("return document.readyState") == "complete"
+        )
+        # Abrir menú lateral si no está visible (modo móvil)
+        try:
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(elements["lista_accesos"])
+            )
+        except TimeoutException:
+            try:
+                _find(
+                    "menu_hamburguesa",
+                    EC.element_to_be_clickable(elements["menu_hamburguesa"]),
+                    timeout=10,
+                ).click()
+                time.sleep(1)
+            except Exception:
+                pass
         _find(
             "lista_accesos", EC.element_to_be_clickable(elements["lista_accesos"])
         ).click()
@@ -223,19 +253,15 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                     archivo.rename(nuevo_nombre)
             except Exception as exc:  # pragma: no cover - runtime issues
                 errores.append(f"OC {numero}: {exc}")
-                _notify("Error OC", f"OC {numero}: {exc}")
     finally:
         driver.quit()
-
-    if errores:
-        _notify("Descarga incompleta", "\n".join(errores))
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes = mover_oc(cfg, numeros)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
-    return subidos, faltantes
+    return subidos, faltantes, errores
 
 
 if __name__ == "__main__":  # pragma: no cover

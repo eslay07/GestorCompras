@@ -49,9 +49,10 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         ordenes, ultimo = buscar_ocs(cfg)
         exitosas: list[str] = []
         faltantes: list[str] = []
+        errores: list[str] = []
         if ordenes:
             append(f"Procesando {len(ordenes)} OC(s)\n")
-            subidos, no_encontrados = descargar_oc(ordenes)
+            subidos, no_encontrados, errores = descargar_oc(ordenes)
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
             for num in subidos:
@@ -60,11 +61,15 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"❌ OC {num} faltante\n")
         enviado = enviar_reporte(exitosas, faltantes, cfg)
         if enviado:
-#codex/adjust-folder-configurations-and-integrate-scripts
-
             registrar_procesados([o['uidl'] for o in ordenes], ultimo)
-# master
-            text_widget.after(0, lambda: messagebox.showinfo("Información", "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"))
+        summary = (
+            "Errores durante la descarga:\n" + "\n".join(errores)
+            if errores
+            else "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"
+        )
+        text_widget.after(
+            0, lambda: messagebox.showinfo("Resultado", summary)
+        )
         append("Proceso finalizado\n")
         lbl_last.config(
             text=f"Último UIDL: {cargar_ultimo_uidl()} - {datetime.now:%H:%M:%S}"
@@ -76,8 +81,6 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 def main():
     root = tk.Tk()
     root.title("Descargas OC")
-    root.lift()
-    root.attributes('-topmost', True)
 
     frame = tk.Frame(root)
     frame.pack(padx=10, pady=10)
