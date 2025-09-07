@@ -192,10 +192,7 @@ def main():
         configurar()
         cfg.load()
         var_bienes.set(bool(cfg.compra_bienes))
-        var_headless.set(bool(cfg.headless))
-        txt_headless.set(
-            "Descarga invisible" if var_headless.get() else "Descarga visible"
-        )
+        var_visible.set(not bool(cfg.headless))
         entry_interval.delete(0, tk.END)
         entry_interval.insert(0, str(cfg.scan_interval))
 
@@ -217,26 +214,20 @@ def main():
     )
     chk_bienes.pack(side=tk.LEFT, padx=5)
 
-    var_headless = tk.BooleanVar(value=bool(cfg.headless))
-    txt_headless = tk.StringVar(
-        value="Descarga invisible" if var_headless.get() else "Descarga visible"
-    )
+    var_visible = tk.BooleanVar(value=not bool(cfg.headless))
 
-    def actualizar_headless():
+    def actualizar_visible():
         cfg.load()
-        cfg.data['headless'] = var_headless.get()
+        cfg.data['headless'] = not var_visible.get()
         cfg.save()
-        txt_headless.set(
-            "Descarga invisible" if var_headless.get() else "Descarga visible"
-        )
 
-    chk_headless = tk.Checkbutton(
+    chk_visible = tk.Checkbutton(
         frame,
-        textvariable=txt_headless,
-        variable=var_headless,
-        command=actualizar_headless,
+        text="Descarga visible",
+        variable=var_visible,
+        command=actualizar_visible,
     )
-    chk_headless.pack(side=tk.LEFT, padx=5)
+    chk_visible.pack(side=tk.LEFT, padx=5)
 
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
     entry_interval = tk.Entry(frame, width=5)
