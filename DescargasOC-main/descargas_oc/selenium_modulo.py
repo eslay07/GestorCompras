@@ -139,7 +139,7 @@ def descargar_oc(
         "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
 
-    def _find(name: str, condition, timeout: int = 40, retries: int = 3):
+    def _find(name: str, condition, timeout: int = 40, retries: int = 5):
         """Ubica un elemento esperando a que sea válido.
 
         Algunos componentes tardan en renderizarse; este auxiliar reintenta la
@@ -170,16 +170,10 @@ def descargar_oc(
             "iniciar_sesion",
             EC.element_to_be_clickable(elements["iniciar_sesion"]),
         ).click()
-        WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
-        WebDriverWait(driver, 60).until(
-            lambda d: d.execute_script("return document.readyState") == "complete"
-        )
-        # Abrir menú lateral si no está visible (modo móvil)
+        time.sleep(5)
         try:
-            WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(elements["lista_accesos"])
-            )
-        except TimeoutException:
+            driver.find_element(*elements["lista_accesos"])
+        except Exception:
             try:
                 _find(
                     "menu_hamburguesa",
