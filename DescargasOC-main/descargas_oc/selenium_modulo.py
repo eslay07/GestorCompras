@@ -27,7 +27,12 @@ except ImportError:  # pragma: no cover
     from organizador_bienes import organizar as organizar_bienes
 
 
-def descargar_oc(ordenes, username: str | None = None, password: str | None = None):
+def descargar_oc(
+    ordenes,
+    username: str | None = None,
+    password: str | None = None,
+    headless: bool = False,
+):
     """Descarga una o varias órdenes de compra.
 
     ``ordenes`` es una lista de diccionarios con las claves ``numero`` y
@@ -59,7 +64,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     )
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--headless=new")
+    if headless:
+        options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--no-sandbox")
@@ -83,29 +89,29 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
         "lista_accesos": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Accesos']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Accesos')]",
         ),
         "seleccion_compania": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Selección de Compañía']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Selección de Compañía')]",
         ),
         "lista_companias": (By.CSS_SELECTOR, "input[aria-autocomplete='list']"),
         "telconet_sa": (
             By.XPATH,
             "//div[contains(@class,'ng-star-inserted') and contains(.,'TELCONET S.A.')]",
         ),
-        "boton_elegir": (By.XPATH, "//span[text()='Elegir']"),
+        "boton_elegir": (By.XPATH, "//span[contains(text(),'Elegir')]"),
         "companias_boton_ok": (
             By.CSS_SELECTOR,
             "button.swal2-confirm.swal2-styled",
         ),
         "lista_consultas": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Consultas']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Consultas')]",
         ),
         "consulta_ordenes": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Consulta de Órdenes de Compra']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Consulta de Órdenes de Compra')]",
         ),
         "digitar_oc": (
             By.CSS_SELECTOR,
@@ -113,11 +119,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
         "btnbuscarorden": (
             By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]",
-        ),
-        "btnbuscarorden": (
-            By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]",
+            "//button[.//span[contains(text(),'Aplicar filtros')]]",
         ),
         "descargar_orden": (
             By.XPATH,
@@ -127,13 +129,30 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
 
-    def _find(name: str, condition, timeout: int = 40, retries: int = 3):
+    def _handle_overlays():
+        """Cierra posibles ventanas emergentes y vuelve al contexto principal."""
+        try:
+            driver.switch_to.default_content()
+        except Exception:
+            pass
+        for sel in [
+            (By.CSS_SELECTOR, "button.swal2-confirm"),
+            (By.CSS_SELECTOR, "button.swal2-cancel"),
+        ]:
+            try:
+                driver.find_element(*sel).click()
+                time.sleep(1)
+            except Exception:
+                continue
+
+    def _find(name: str, condition, timeout: int = 40, retries: int = 5):
         """Ubica un elemento esperando a que sea válido.
 
         Algunos componentes tardan en renderizarse; este auxiliar reintenta la
         búsqueda varias veces antes de reportar un fallo definitivo.
         """
         for intento in range(retries):
+            _handle_overlays()
             try:
                 return WebDriverWait(driver, timeout).until(condition)
             except Exception as exc:  # pragma: no cover - interface errors
