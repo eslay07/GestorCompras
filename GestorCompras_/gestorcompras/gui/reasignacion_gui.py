@@ -22,6 +22,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 
+
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
 def process_body(body):
     task_pattern = r'Tarea:\s+(\d+)\s+Reasignación a:\s+(.*?)\s+Datos relacionados:(.*?)\n(?=Tarea:|\Z)'
     tasks = re.findall(task_pattern, body, re.DOTALL)
@@ -289,6 +298,7 @@ def open_reasignacion(master, email_session):
     window.geometry("820x650")
     window.transient(master)
     window.grab_set()
+    center_window(window)
 
     def on_close():
         db.clear_tasks_temp()

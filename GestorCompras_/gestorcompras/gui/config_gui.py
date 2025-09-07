@@ -7,6 +7,14 @@ from html import escape
 from gestorcompras.services import db
 from gestorcompras.gui.html_editor import HtmlEditor
 
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
 class ConfigGUI(tk.Toplevel):
     def __init__(self, master=None):
         super().__init__(master)
@@ -16,6 +24,7 @@ class ConfigGUI(tk.Toplevel):
         self.title("Configuración")
         self.geometry("800x600")
         self.create_widgets()
+        center_window(self)
     
     def create_widgets(self):
         self.notebook = ttk.Notebook(self, style="MyNotebook.TNotebook")
@@ -413,6 +422,7 @@ class TemplateForm(tk.Toplevel):
         self.refresh_callback = refresh_callback
         self.template_data = template_data
         self.create_widgets()
+        center_window(self)
 
     def create_widgets(self):
         container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
@@ -478,6 +488,7 @@ class SupplierForm(tk.Toplevel):
         self.refresh_callback = refresh_callback
         self.supplier_data = supplier_data
         self.create_widgets()
+        center_window(self)
     
     def create_widgets(self):
         container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
@@ -537,6 +548,7 @@ class AssignmentForm(tk.Toplevel):
         self.refresh_callback = refresh_callback
         self.data = data
         self.create_widgets()
+        center_window(self)
 
     def create_widgets(self):
         container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)

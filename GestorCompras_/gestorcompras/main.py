@@ -27,6 +27,15 @@ fuente_entry = ("Segoe UI", 14)
 
 email_session = {}
 
+
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
 def test_email_connection(email_address, email_password):
     try:
         with smtplib.SMTP("smtp.telconet.ec", 587) as server:
@@ -229,6 +238,7 @@ def main():
     root = tk.Tk()
     root.title("Sistema de Automatización")
     root.geometry("800x600")
+    center_window(root)
     
     init_styles()
     

@@ -257,7 +257,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         driver.quit()
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes = mover_oc(cfg, numeros)
+    subidos, faltantes = mover_oc(cfg, ordenes)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))

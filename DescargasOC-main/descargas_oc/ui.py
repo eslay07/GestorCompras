@@ -24,6 +24,32 @@ logger = get_logger(__name__)
 scanning_lock = threading.Lock()
 
 
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
+
+def config_completa(cfg: Config) -> bool:
+    try:
+        cfg.validate()
+    except Exception:
+        return False
+    requeridos = [
+        cfg.usuario,
+        cfg.password,
+        cfg.carpeta_destino_local,
+        cfg.carpeta_analizar,
+        cfg.seafile_url,
+        cfg.seafile_repo_id,
+        cfg.correo_reporte,
+    ]
+    return all(requeridos)
+
+
 class TextHandler(logging.Handler):
     def __init__(self, widget: tk.Text):
         super().__init__()
@@ -41,6 +67,11 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         return
     try:
         cfg = Config()
+        if not config_completa(cfg):
+            messagebox.showerror(
+                "Error", "Configuración incompleta o por favor configurar correctamente"
+            )
+            return
 
         def append(msg: str):
             text_widget.after(0, lambda m=msg: (text_widget.insert(tk.END, m), text_widget.see(tk.END)))
@@ -118,6 +149,12 @@ def main():
             estado["activo"] = False
             btn_toggle.config(text="Activar escuchador")
         else:
+            if not config_completa(cfg):
+                messagebox.showerror(
+                    "Error",
+                    "Configuración incompleta o por favor configurar correctamente",
+                )
+                return
             estado["activo"] = True
             estado["contador"] = cfg.scan_interval
             btn_toggle.config(text="Detener escuchador")
@@ -161,6 +198,7 @@ def main():
     btn_interval = tk.Button(frame, text="Guardar", command=actualizar_intervalo)
     btn_interval.pack(side=tk.LEFT, padx=5)
 
+    center_window(root)
     root.mainloop()
 
 

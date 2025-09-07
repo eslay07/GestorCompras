@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import PyPDF2
 
@@ -14,9 +15,16 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
-def mover_oc(config: Config, numeros_oc=None):
-    if numeros_oc is None:
-        numeros_oc = []
+def mover_oc(config: Config, ordenes=None):
+    """Sube y mueve los PDF de las órdenes descargadas.
+
+    ``ordenes`` debe ser una lista de diccionarios con al menos la clave
+    ``numero`` y opcionalmente ``proveedor``.
+    """
+    ordenes = ordenes or []
+    numeros_oc = [o.get("numero") for o in ordenes]
+    proveedores = {o.get("numero"): o.get("proveedor") for o in ordenes}
+
     carpeta_origen = config.carpeta_destino_local
     carpeta_destino = config.carpeta_analizar
     repo_id = config.seafile_repo_id
@@ -44,7 +52,7 @@ def mover_oc(config: Config, numeros_oc=None):
         if 'ORDEN DE COMPRA' not in texto.upper():
             continue
         for numero in numeros_oc:
-            if numero in texto:
+            if numero and numero in texto:
                 encontrados[numero] = ruta
                 break
 
@@ -55,6 +63,17 @@ def mover_oc(config: Config, numeros_oc=None):
         if not ruta:
             faltantes.append(numero)
             continue
+
+        prov = proveedores.get(numero)
+        if prov:
+            prov_clean = re.sub(r"[^\w\- ]", "_", prov)
+            nuevo_nombre = os.path.join(carpeta_origen, f"{numero} - {prov_clean}.pdf")
+            try:
+                os.rename(ruta, nuevo_nombre)
+                ruta = nuevo_nombre
+            except Exception as e:
+                logger.warning('No se pudo renombrar %s: %s', ruta, e)
+
         try:
             cliente.upload_file(repo_id, ruta, parent_dir=subfolder)
             os.makedirs(carpeta_destino, exist_ok=True)
