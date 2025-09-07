@@ -192,6 +192,10 @@ def main():
         configurar()
         cfg.load()
         var_bienes.set(bool(cfg.compra_bienes))
+        var_headless.set(bool(cfg.headless))
+        txt_headless.set(
+            "Descarga invisible" if var_headless.get() else "Descarga visible"
+        )
         entry_interval.delete(0, tk.END)
         entry_interval.insert(0, str(cfg.scan_interval))
 
@@ -214,15 +218,21 @@ def main():
     chk_bienes.pack(side=tk.LEFT, padx=5)
 
     var_headless = tk.BooleanVar(value=bool(cfg.headless))
+    txt_headless = tk.StringVar(
+        value="Descarga invisible" if var_headless.get() else "Descarga visible"
+    )
 
     def actualizar_headless():
         cfg.load()
         cfg.data['headless'] = var_headless.get()
         cfg.save()
+        txt_headless.set(
+            "Descarga invisible" if var_headless.get() else "Descarga visible"
+        )
 
     chk_headless = tk.Checkbutton(
         frame,
-        text="Headless",
+        textvariable=txt_headless,
         variable=var_headless,
         command=actualizar_headless,
     )

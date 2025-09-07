@@ -236,9 +236,18 @@ def configurar():
     entry_remitente.insert(0, cfg.remitente_adicional or '')
 
     var_headless = tk.BooleanVar(value=bool(cfg.headless))
+    txt_headless = tk.StringVar()
+
+    def _actualizar_headless(*_):  # pragma: no cover - UI binding
+        txt_headless.set(
+            'Descarga invisible' if var_headless.get() else 'Descarga visible'
+        )
+
+    _actualizar_headless()
+    var_headless.trace_add('write', _actualizar_headless)
     chk_headless = tk.Checkbutton(
         ventana,
-        text='Modo headless para descargas',
+        textvariable=txt_headless,
         variable=var_headless,
     )
     chk_headless.pack(pady=5)

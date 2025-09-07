@@ -158,17 +158,28 @@ def descargar_oc(
     def _find(name: str, condition, timeout: int = 40, retries: int = 5):
         """Ubica un elemento esperando a que sea válido.
 
-        Algunos componentes tardan en renderizarse; este auxiliar reintenta la
-        búsqueda varias veces antes de reportar un fallo definitivo.
+        Se recorre el documento principal y cualquier iframe visible antes de
+        desistir. Entre cada intento se deja un respiro de 2 segundos.
         """
         for intento in range(retries):
             _handle_overlays()
+            contexts = [None]
             try:
-                return WebDriverWait(driver, timeout).until(condition)
-            except Exception as exc:  # pragma: no cover - interface errors
-                if intento == retries - 1:
-                    raise RuntimeError(f"Fallo al localizar '{name}'") from exc
-                time.sleep(2)
+                contexts += driver.find_elements(By.TAG_NAME, "iframe")
+            except Exception:  # pragma: no cover - iframes not accessible
+                pass
+            for ctx in contexts:
+                if ctx is not None:
+                    driver.switch_to.frame(ctx)
+                try:
+                    return WebDriverWait(driver, timeout).until(condition)
+                except Exception:  # pragma: no cover - transient UI errors
+                    if ctx is not None:
+                        driver.switch_to.default_content()
+                    continue
+            if intento == retries - 1:
+                raise RuntimeError(f"Fallo al localizar '{name}'")
+            time.sleep(2)
 
     def _click(name: str, locator, timeout: int = 40, retries: int = 5):
         """Encuentra un elemento y hace clic con reintentos."""
