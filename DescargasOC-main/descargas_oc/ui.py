@@ -84,11 +84,13 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         if ordenes:
             append(f"Procesando {len(ordenes)} OC(s)\n")
             try:
-                subidos, no_encontrados, errores = descargar_oc(ordenes, headless=cfg.headless)
+                subidos, no_encontrados, errores = descargar_oc(
+                    ordenes, headless=cfg.headless
+                )
             except Exception as exc:  # pragma: no cover - runtime safety
                 logger.exception("Fallo al descargar OC")
                 errores = [str(exc)]
-                subidos, no_encontrados = [], [o["num"] for o in ordenes]
+                subidos, no_encontrados = [], [o.get("numero") for o in ordenes]
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
             for num in subidos:
