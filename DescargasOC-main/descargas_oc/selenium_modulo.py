@@ -16,6 +16,7 @@ from pathlib import Path
 from selenium import webdriver
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 
 try:  # allow running as script
     from .config import Config
@@ -193,9 +194,21 @@ def descargar_oc(
         )
 
         time.sleep(2)
-        _find("usuario", elements["usuario"]).send_keys(user or "")
-        _find("contrasena", elements["contrasena"]).send_keys(pwd or "")
-        _click("iniciar_sesion", elements["iniciar_sesion"])
+        user_el = _find("usuario", elements["usuario"])
+        pass_el = _find("contrasena", elements["contrasena"])
+        user_el.send_keys(user or "")
+        pass_el.send_keys(pwd or "")
+        try:
+            _click("iniciar_sesion", elements["iniciar_sesion"])
+        except RuntimeError:
+            # si no se encuentra el botón, intentar enviar Enter o usar submit
+            try:
+                pass_el.send_keys(Keys.RETURN)
+            except Exception:
+                try:
+                    driver.execute_script("document.querySelector('form').submit();")
+                except Exception:
+                    raise
         time.sleep(5)
         if not driver.find_elements(*elements["lista_accesos"]):
             try:
