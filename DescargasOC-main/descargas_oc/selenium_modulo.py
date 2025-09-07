@@ -14,10 +14,8 @@ import time
 from pathlib import Path
 
 from selenium import webdriver
-from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
+from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
 
 try:  # allow running as script
     from .config import Config
@@ -155,12 +153,8 @@ def descargar_oc(
             except Exception:
                 continue
 
-    def _find(name: str, condition, timeout: int = 40, retries: int = 5):
-        """Ubica un elemento esperando a que sea válido.
-
-        Se recorre el documento principal y cualquier iframe visible antes de
-        desistir. Entre cada intento se deja un respiro de 2 segundos.
-        """
+    def _find(name: str, locator, retries: int = 5):
+        """Localiza un elemento usando solo reintentos y pausas."""
         for intento in range(retries):
             _handle_overlays()
             contexts = [None]
@@ -172,8 +166,8 @@ def descargar_oc(
                 if ctx is not None:
                     driver.switch_to.frame(ctx)
                 try:
-                    return WebDriverWait(driver, timeout).until(condition)
-                except Exception:  # pragma: no cover - transient UI errors
+                    return driver.find_element(*locator)
+                except Exception:
                     if ctx is not None:
                         driver.switch_to.default_content()
                     continue
@@ -181,11 +175,11 @@ def descargar_oc(
                 raise RuntimeError(f"Fallo al localizar '{name}'")
             time.sleep(2)
 
-    def _click(name: str, locator, timeout: int = 40, retries: int = 5):
+    def _click(name: str, locator, retries: int = 5):
         """Encuentra un elemento y hace clic con reintentos."""
         for intento in range(retries):
             try:
-                elem = _find(name, EC.element_to_be_clickable(locator), timeout)
+                elem = _find(name, locator)
                 try:
                     elem.click()
                 except ElementClickInterceptedException:
@@ -203,35 +197,24 @@ def descargar_oc(
             "https://sites.telconet.ec/naf/compras/sso/check"
         )
 
-        _find("usuario", EC.presence_of_element_located(elements["usuario"])).send_keys(
-            user or "",
-        )
-        _find(
-            "contrasena", EC.presence_of_element_located(elements["contrasena"])
-        ).send_keys(pwd or "")
+        _find("usuario", elements["usuario"]).send_keys(user or "")
+        _find("contrasena", elements["contrasena"]).send_keys(pwd or "")
         _click("iniciar_sesion", elements["iniciar_sesion"])
-        WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
-        WebDriverWait(driver, 60).until(
-            lambda d: d.execute_script("return document.readyState") == "complete"
-        )
+        time.sleep(5)
         # Abrir menú lateral si no está visible (modo móvil)
         try:
-            WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(elements["lista_accesos"])
-            )
-        except TimeoutException:
+            _find("lista_accesos", elements["lista_accesos"])
+        except Exception:
             try:
-                _click(
-                    "menu_hamburguesa", elements["menu_hamburguesa"], timeout=10
-                )
+                _click("menu_hamburguesa", elements["menu_hamburguesa"], retries=2)
                 time.sleep(1)
             except Exception:
                 pass
         _click("lista_accesos", elements["lista_accesos"])
         _click("seleccion_compania", elements["seleccion_compania"])
-        _find(
-            "lista_companias", EC.presence_of_element_located(elements["lista_companias"])
-        ).send_keys("TELCONET S.A.")
+        _find("lista_companias", elements["lista_companias"]).send_keys(
+            "TELCONET S.A."
+        )
         _click("telconet_sa", elements["telconet_sa"])
         _click("boton_elegir", elements["boton_elegir"])
         _click("companias_boton_ok", elements["companias_boton_ok"])
@@ -242,27 +225,14 @@ def descargar_oc(
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
             try:
-                campo = _find(
-                    "digitar_oc", EC.presence_of_element_located(elements["digitar_oc"])
-                )
+                campo = _find("digitar_oc", elements["digitar_oc"])
                 campo.clear()
                 campo.send_keys(numero)
                 time.sleep(3)
                 _click("btnbuscarorden", elements["btnbuscarorden"])
-
-                # Esperar a que desaparezca cualquier notificación tipo toast
-                try:  # pragma: no cover - depende del front-end
-                    WebDriverWait(driver, 10).until(
-                        EC.invisibility_of_element_located(elements["toast"])
-                    )
-                except TimeoutException:
-                    pass
-                _find(
-                    "descargar_orden",
-                    EC.presence_of_element_located(elements["descargar_orden"]),
-                    timeout=60,
-                )
-                _click("descargar_orden", elements["descargar_orden"], timeout=60)
+                time.sleep(2)
+                _find("descargar_orden", elements["descargar_orden"], retries=30)
+                _click("descargar_orden", elements["descargar_orden"], retries=30)
 
                 antes = set(download_dir.glob("*.pdf"))
                 for _ in range(120):  # esperar hasta 60 s
