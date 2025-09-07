@@ -72,6 +72,16 @@ una automatización básica con Selenium. Al finalizar, ejecuta
 python -m descargas_oc.selenium_modulo
 ```
 
+### scripts/seadrive_autoresync.py
+
+Antes de iniciar la automatización con Selenium, el módulo ejecuta
+`scripts/seadrive_autoresync.py` para forzar la sincronización de SeaDrive en
+Windows. El script también puede ejecutarse de forma independiente:
+
+```bash
+python scripts/seadrive_autoresync.py
+```
+
 ---
 Para todos los scripts se asume que `config.json` ya ha sido creado mediante el
 `descargas_oc.configurador`.

@@ -8,6 +8,8 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -42,6 +44,14 @@ def descargar_oc(
 
     if isinstance(ordenes, dict):
         ordenes = [ordenes]
+
+    # Asegurar sincronización de SeaDrive antes de iniciar Selenium
+    script = Path(__file__).resolve().parents[1] / "scripts" / "seadrive_autoresync.py"
+    if script.exists():  # pragma: no cover - depende del entorno Windows
+        try:
+            subprocess.run([sys.executable, str(script)], check=False)
+        except Exception:
+            pass
 
     cfg = Config()
     download_dir = Path(cfg.carpeta_destino_local or Path.home() / "Documentos")
