@@ -22,7 +22,8 @@ def mover_oc(config: Config, ordenes=None):
     ``numero`` y opcionalmente ``proveedor``.
     """
     ordenes = ordenes or []
-    numeros_oc = [o.get("numero") for o in ordenes]
+    # evitar números repetidos para no procesar la misma OC varias veces
+    numeros_oc = list(dict.fromkeys(o.get("numero") for o in ordenes))
     proveedores = {o.get("numero"): o.get("proveedor") for o in ordenes}
 
     carpeta_origen = config.carpeta_destino_local
@@ -75,11 +76,15 @@ def mover_oc(config: Config, ordenes=None):
                 logger.warning('No se pudo renombrar %s: %s', ruta, e)
 
         try:
+            # Subir primero y luego copiar manualmente para evitar archivos corruptos
             cliente.upload_file(repo_id, ruta, parent_dir=subfolder)
             os.makedirs(carpeta_destino, exist_ok=True)
-            shutil.move(ruta, os.path.join(carpeta_destino, os.path.basename(ruta)))
+            destino_final = os.path.join(carpeta_destino, os.path.basename(ruta))
+            with open(ruta, "rb") as src, open(destino_final, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            os.remove(ruta)
             subidos.append(numero)
-            logger.info('Subido %s', os.path.basename(ruta))
+            logger.info('Subido %s', os.path.basename(destino_final))
         except Exception as e:
             logger.error('Error subiendo %s: %s', ruta, e)
     return subidos, faltantes
