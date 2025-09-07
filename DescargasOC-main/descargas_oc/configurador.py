@@ -82,6 +82,7 @@ def configurar():
             'seafile_subfolder': entry_sub.get(),
             'correo_reporte': entry_correo.get(),
             'remitente_adicional': entry_remitente.get(),
+            'headless': var_headless.get(),
         })
         try:
             cfg.validate()
@@ -233,6 +234,14 @@ def configurar():
     entry_remitente = tk.Entry(ventana, width=50)
     entry_remitente.pack()
     entry_remitente.insert(0, cfg.remitente_adicional or '')
+
+    var_headless = tk.BooleanVar(value=bool(cfg.headless))
+    chk_headless = tk.Checkbutton(
+        ventana,
+        text='Modo headless para descargas',
+        variable=var_headless,
+    )
+    chk_headless.pack(pady=5)
 
     estado_txt = 'Generado' if os.path.exists(PROCESADOS_FILE) else 'Pendiente'
     frame_proc = tk.Frame(ventana)

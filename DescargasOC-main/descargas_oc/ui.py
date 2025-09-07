@@ -84,7 +84,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         if ordenes:
             append(f"Procesando {len(ordenes)} OC(s)\n")
             try:
-                subidos, no_encontrados, errores = descargar_oc(ordenes)
+                subidos, no_encontrados, errores = descargar_oc(ordenes, headless=cfg.headless)
             except Exception as exc:  # pragma: no cover - runtime safety
                 logger.exception("Fallo al descargar OC")
                 errores = [str(exc)]
@@ -212,6 +212,21 @@ def main():
         command=actualizar_bienes,
     )
     chk_bienes.pack(side=tk.LEFT, padx=5)
+
+    var_headless = tk.BooleanVar(value=bool(cfg.headless))
+
+    def actualizar_headless():
+        cfg.load()
+        cfg.data['headless'] = var_headless.get()
+        cfg.save()
+
+    chk_headless = tk.Checkbutton(
+        frame,
+        text="Headless",
+        variable=var_headless,
+        command=actualizar_headless,
+    )
+    chk_headless.pack(side=tk.LEFT, padx=5)
 
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
     entry_interval = tk.Entry(frame, width=5)

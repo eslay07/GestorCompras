@@ -170,6 +170,21 @@ def descargar_oc(
                     raise RuntimeError(f"Fallo al localizar '{name}'") from exc
                 time.sleep(2)
 
+    def _click(name: str, locator, timeout: int = 40, retries: int = 5):
+        """Encuentra un elemento y hace clic con reintentos."""
+        for intento in range(retries):
+            try:
+                elem = _find(name, EC.element_to_be_clickable(locator), timeout)
+                try:
+                    elem.click()
+                except ElementClickInterceptedException:
+                    driver.execute_script("arguments[0].click();", elem)
+                return elem
+            except Exception as exc:
+                if intento == retries - 1:
+                    raise RuntimeError(f"Fallo al hacer clic '{name}'") from exc
+                time.sleep(2)
+
     errores: list[str] = []
     try:
         driver.get(
@@ -183,10 +198,7 @@ def descargar_oc(
         _find(
             "contrasena", EC.presence_of_element_located(elements["contrasena"])
         ).send_keys(pwd or "")
-        _find(
-            "iniciar_sesion",
-            EC.element_to_be_clickable(elements["iniciar_sesion"]),
-        ).click()
+        _click("iniciar_sesion", elements["iniciar_sesion"])
         WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
         WebDriverWait(driver, 60).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
@@ -198,36 +210,22 @@ def descargar_oc(
             )
         except TimeoutException:
             try:
-                _find(
-                    "menu_hamburguesa",
-                    EC.element_to_be_clickable(elements["menu_hamburguesa"]),
-                    timeout=10,
-                ).click()
+                _click(
+                    "menu_hamburguesa", elements["menu_hamburguesa"], timeout=10
+                )
                 time.sleep(1)
             except Exception:
                 pass
-        _find(
-            "lista_accesos", EC.element_to_be_clickable(elements["lista_accesos"])
-        ).click()
-        _find(
-            "seleccion_compania",
-            EC.element_to_be_clickable(elements["seleccion_compania"]),
-        ).click()
+        _click("lista_accesos", elements["lista_accesos"])
+        _click("seleccion_compania", elements["seleccion_compania"])
         _find(
             "lista_companias", EC.presence_of_element_located(elements["lista_companias"])
         ).send_keys("TELCONET S.A.")
-        _find("telconet_sa", EC.element_to_be_clickable(elements["telconet_sa"])).click()
-        _find("boton_elegir", EC.element_to_be_clickable(elements["boton_elegir"])).click()
-        _find(
-            "companias_boton_ok",
-            EC.element_to_be_clickable(elements["companias_boton_ok"]),
-        ).click()
-        _find(
-            "lista_consultas", EC.element_to_be_clickable(elements["lista_consultas"])
-        ).click()
-        _find(
-            "consulta_ordenes", EC.element_to_be_clickable(elements["consulta_ordenes"])
-        ).click()
+        _click("telconet_sa", elements["telconet_sa"])
+        _click("boton_elegir", elements["boton_elegir"])
+        _click("companias_boton_ok", elements["companias_boton_ok"])
+        _click("lista_consultas", elements["lista_consultas"])
+        _click("consulta_ordenes", elements["consulta_ordenes"])
 
         for oc in ordenes:
             numero = oc.get("numero")
@@ -239,10 +237,7 @@ def descargar_oc(
                 campo.clear()
                 campo.send_keys(numero)
                 time.sleep(3)
-                _find(
-                    "btnbuscarorden",
-                    EC.element_to_be_clickable(elements["btnbuscarorden"]),
-                ).click()
+                _click("btnbuscarorden", elements["btnbuscarorden"])
 
                 # Esperar a que desaparezca cualquier notificación tipo toast
                 try:  # pragma: no cover - depende del front-end
@@ -256,15 +251,7 @@ def descargar_oc(
                     EC.presence_of_element_located(elements["descargar_orden"]),
                     timeout=60,
                 )
-                boton_descarga = _find(
-                    "descargar_orden",
-                    EC.element_to_be_clickable(elements["descargar_orden"]),
-                    timeout=60,
-                )
-                try:
-                    boton_descarga.click()
-                except ElementClickInterceptedException:
-                    driver.execute_script("arguments[0].click();", boton_descarga)
+                _click("descargar_orden", elements["descargar_orden"], timeout=60)
 
                 antes = set(download_dir.glob("*.pdf"))
                 for _ in range(120):  # esperar hasta 60 s
