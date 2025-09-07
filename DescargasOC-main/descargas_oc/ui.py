@@ -168,6 +168,7 @@ def main():
         try:
             val = int(entry_interval.get())
             if val >= 300:
+                cfg.load()
                 cfg.data['scan_interval'] = val
                 cfg.save()
                 estado['contador'] = val
@@ -180,15 +181,29 @@ def main():
     btn_escanear = tk.Button(frame, text="Escanear ahora", command=escanear_ahora)
     btn_escanear.pack(side=tk.LEFT, padx=5)
 
-    btn_config = tk.Button(frame, text="Configuración", command=configurar)
+    def abrir_config():
+        configurar()
+        cfg.load()
+        var_bienes.set(bool(cfg.compra_bienes))
+        entry_interval.delete(0, tk.END)
+        entry_interval.insert(0, str(cfg.scan_interval))
+
+    btn_config = tk.Button(frame, text="Configuración", command=abrir_config)
     btn_config.pack(side=tk.LEFT, padx=5)
 
     var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
+
     def actualizar_bienes():
+        cfg.load()
         cfg.data['compra_bienes'] = var_bienes.get()
         cfg.save()
-    chk_bienes = tk.Checkbutton(frame, text="Compra Bienes", variable=var_bienes,
-                                command=actualizar_bienes)
+
+    chk_bienes = tk.Checkbutton(
+        frame,
+        text="Compra Bienes",
+        variable=var_bienes,
+        command=actualizar_bienes,
+    )
     chk_bienes.pack(side=tk.LEFT, padx=5)
 
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
