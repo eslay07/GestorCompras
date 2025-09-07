@@ -83,7 +83,12 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         errores: list[str] = []
         if ordenes:
             append(f"Procesando {len(ordenes)} OC(s)\n")
-            subidos, no_encontrados, errores = descargar_oc(ordenes)
+            try:
+                subidos, no_encontrados, errores = descargar_oc(ordenes)
+            except Exception as exc:  # pragma: no cover - runtime safety
+                logger.exception("Fallo al descargar OC")
+                errores = [str(exc)]
+                subidos, no_encontrados = [], [o["num"] for o in ordenes]
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
             for num in subidos:
@@ -105,7 +110,9 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
             text_widget.after(0, lambda: messagebox.showinfo("Resultado", summary))
         append("Proceso finalizado\n")
         lbl_last.config(
-            text=f"Último UIDL: {cargar_ultimo_uidl()} - {datetime.now:%H:%M:%S}"
+            text="Último UIDL: {} - {}".format(
+                cargar_ultimo_uidl(), datetime.now().strftime("%H:%M:%S")
+            )
         )
     finally:
         scanning_lock.release()
