@@ -63,8 +63,9 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     cuerpo = 'Órdenes subidas correctamente:\n'
     filas_ok: list[tuple[str, str, str]] = []
     for num in exitosas_uniq:
-        prov = info.get(num, {}).get('proveedor') or '-'    
-        tarea = _buscar_tarea(num, cfg) or '-'
+        data = info.get(num, {})
+        prov = data.get('proveedor') or '-'
+        tarea = data.get('tarea') or _buscar_tarea(num, cfg) or '-'
         filas_ok.append((num, tarea, prov))
     if filas_ok:
         cuerpo += _formatear_tabla(filas_ok) + '\n'
@@ -72,8 +73,10 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
         cuerpo += '\nNo se encontraron archivos para las siguientes OC:\n'
         filas_bad: list[tuple[str, str, str]] = []
         for num in faltantes_uniq:
-            prov = info.get(num, {}).get('proveedor') or '-'
-            filas_bad.append((num, '-', prov))
+            data = info.get(num, {})
+            prov = data.get('proveedor') or '-'
+            tarea = data.get('tarea') or '-'
+            filas_bad.append((num, tarea, prov))
         cuerpo += _formatear_tabla(filas_bad) + '\n'
     mensaje.set_content(cuerpo)
     try:
