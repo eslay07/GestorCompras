@@ -40,8 +40,20 @@ def mover_oc(config: Config, ordenes=None):
     cliente = SeafileClient(config.seafile_url, config.usuario, config.password)
 
     archivos = [f for f in os.listdir(carpeta_origen) if f.lower().endswith('.pdf')]
-    encontrados = {}
+    encontrados: dict[str, str] = {}
+
+    # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for archivo in archivos:
+        ruta = os.path.join(carpeta_origen, archivo)
+        m = re.match(r"^(\d+)", archivo)
+        if m:
+            num = m.group(1)
+            if num in numeros_oc and num not in encontrados:
+                encontrados[num] = ruta
+
+    # para los que no se encontraron, buscar dentro del contenido del PDF
+    restantes = [a for a in archivos if os.path.join(carpeta_origen, a) not in encontrados.values()]
+    for archivo in restantes:
         ruta = os.path.join(carpeta_origen, archivo)
         try:
             with open(ruta, 'rb') as f:
@@ -50,9 +62,9 @@ def mover_oc(config: Config, ordenes=None):
         except Exception as e:
             logger.warning('Error leyendo %s: %s', archivo, e)
             continue
-        if 'ORDEN DE COMPRA' not in texto.upper():
-            continue
         for numero in numeros_oc:
+            if numero in encontrados:
+                continue
             if numero and numero in texto:
                 encontrados[numero] = ruta
                 break

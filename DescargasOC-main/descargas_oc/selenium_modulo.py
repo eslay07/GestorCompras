@@ -261,6 +261,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
+    # evitar números repetidos al reportar faltantes
+    faltantes = list(dict.fromkeys(faltantes))
     return subidos, faltantes, errores
 
 
