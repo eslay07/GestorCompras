@@ -59,17 +59,19 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
+        else:
+            append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)
         if enviado:
             registrar_procesados([o['uidl'] for o in ordenes], ultimo)
-        summary = (
-            "Errores durante la descarga:\n" + "\n".join(errores)
-            if errores
-            else "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"
-        )
-        text_widget.after(
-            0, lambda: messagebox.showinfo("Resultado", summary)
-        )
+        if ordenes:
+            if errores:
+                summary = "Errores durante la descarga:\n" + "\n".join(errores)
+            elif enviado:
+                summary = "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"
+            else:
+                summary = "No se pudo enviar el reporte"
+            text_widget.after(0, lambda: messagebox.showinfo("Resultado", summary))
         append("Proceso finalizado\n")
         lbl_last.config(
             text=f"Último UIDL: {cargar_ultimo_uidl()} - {datetime.now:%H:%M:%S}"
