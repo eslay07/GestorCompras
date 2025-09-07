@@ -11,11 +11,19 @@ try:  # allow running as script
 except ImportError:  # pragma: no cover
     from config import Config
     from seafile_client import SeafileClient
-    from escuchador import PROCESADOS_FILE
+from escuchador import PROCESADOS_FILE
 
 
 def configurar():
     cfg = Config()
+
+    def center_window(win: tk.Tk | tk.Toplevel):
+        win.update_idletasks()
+        w = win.winfo_width()
+        h = win.winfo_height()
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
 
     def seleccionar_carpeta(entry):
         carpeta = filedialog.askdirectory(initialdir=entry.get() or os.getcwd())
@@ -39,6 +47,7 @@ def configurar():
         })
         try:
             cfg.validate()
+            cfg.save()
             archivo = filedialog.askopenfilename(title='Archivo de prueba')
             if not archivo:
                 messagebox.showwarning('Prueba', 'Debes seleccionar un archivo de prueba')
@@ -46,7 +55,6 @@ def configurar():
             cli = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
             cli.upload_file(cfg.seafile_repo_id, archivo, parent_dir=cfg.seafile_subfolder)
             messagebox.showinfo('OK', 'Archivo subido correctamente')
-            cfg.save()
             try:
                 ventana.grab_release()
             except Exception:  # pragma: no cover - grab may not be set
@@ -67,6 +75,7 @@ def configurar():
             command=lambda: (popup.grab_release(), popup.destroy())
         )
         btn_ok.pack(pady=(0, 10))
+        center_window(popup)
 
         def tarea():
             try:
@@ -170,7 +179,7 @@ def configurar():
     lbl_estado.pack(side=tk.LEFT, padx=5)
 
     tk.Button(ventana, text='Guardar', command=guardar).pack(pady=10)
-
+    center_window(ventana)
     ventana.mainloop()
 
 if __name__ == '__main__':

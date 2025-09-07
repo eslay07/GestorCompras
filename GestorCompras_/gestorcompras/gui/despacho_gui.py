@@ -6,12 +6,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from gestorcompras.logic import despacho_logic
 from gestorcompras.services import db
 
+
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
 def open_despacho(master, email_session):
     window = tk.Toplevel(master)
     window.title("Solicitud de Despachos")
     window.geometry("600x450")
     window.transient(master)
     window.grab_set()
+    center_window(window)
     
     main_frame = ttk.Frame(window, style="MyFrame.TFrame", padding=10)
     main_frame.pack(fill="both", expand=True)

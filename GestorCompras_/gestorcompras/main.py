@@ -27,6 +27,15 @@ fuente_entry = ("Segoe UI", 14)
 
 email_session = {}
 
+
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
 def test_email_connection(email_address, email_password):
     try:
         with smtplib.SMTP("smtp.telconet.ec", 587) as server:
@@ -157,15 +166,28 @@ class LoginScreen(tk.Frame):
 class MainMenu(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
+        self._banner_colors = [color_primario, color_hover]
+        self._color_index = 0
+        self._buttons = [
+            ("Reasignación de Tareas", self.open_reasignacion),
+            ("Solicitud de Despachos", self.open_despacho),
+            ("Seguimientos", self.open_seguimientos),
+            ("Descargas OC", self.open_descargas_oc),
+            ("Cotizador", self.open_cotizador),
+            ("Configuración", self.open_config),
+            ("Salir", self.master.quit),
+        ]
+        self._button_widgets: list[ttk.Button] = []
         self.create_widgets()
     
     def create_widgets(self):
         container = ttk.Frame(self, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
         
-        banner = ttk.Label(container, text="Sistema de automatización - compras")
-        banner.configure(font=fuente_banner, foreground=color_titulos)
-        banner.pack(pady=(20,10))
+        self.banner = ttk.Label(container, text="Sistema de automatización - compras")
+        self.banner.configure(font=fuente_banner, foreground=color_titulos)
+        self.banner.pack(pady=(20,10))
+        self.animate_banner()
         
         menu_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
         menu_frame.place(relx=0.5, rely=0.5, anchor="center")
@@ -174,19 +196,23 @@ class MainMenu(tk.Frame):
         lbl_title.configure(font=fuente_bold, foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15, sticky="n")
         
-        # Lista de botones
-        buttons = [
-            ("Reasignación de Tareas", self.open_reasignacion),
-            ("Solicitud de Despachos", self.open_despacho),
-            ("Seguimientos", self.open_seguimientos),
-            ("Descargas OC", self.open_descargas_oc),
-            ("Cotizador", self.open_cotizador),
-            ("Configuración", self.open_config),
-            ("Salir", self.master.quit)
-        ]
-        for idx, (text, cmd) in enumerate(buttons, start=1):
-            btn = ttk.Button(menu_frame, text=text, style="MyButton.TButton", command=cmd)
-            btn.grid(row=idx, column=0, padx=20, pady=5, sticky="ew")
+        self.menu_frame = menu_frame
+        self.show_button(0)
+
+    def animate_banner(self):
+        color = self._banner_colors[self._color_index]
+        self.banner.configure(foreground=color)
+        self._color_index = (self._color_index + 1) % len(self._banner_colors)
+        self.after(800, self.animate_banner)
+
+    def show_button(self, index: int):
+        if index >= len(self._buttons):
+            return
+        text, cmd = self._buttons[index]
+        btn = ttk.Button(self.menu_frame, text=text, style="MyButton.TButton", command=cmd)
+        btn.grid(row=index + 1, column=0, padx=20, pady=5, sticky="ew")
+        self._button_widgets.append(btn)
+        self.after(120, self.show_button, index + 1)
     
     def open_reasignacion(self):
         reasignacion_gui.open_reasignacion(self.master, email_session)
@@ -212,6 +238,7 @@ def main():
     root = tk.Tk()
     root.title("Sistema de Automatización")
     root.geometry("800x600")
+    center_window(root)
     
     init_styles()
     

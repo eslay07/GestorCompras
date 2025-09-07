@@ -7,12 +7,22 @@ from gestorcompras.services import google_sheets
 from gestorcompras.logic import despacho_logic
 
 
+def center_window(win: tk.Tk | tk.Toplevel):
+    win.update_idletasks()
+    w = win.winfo_width()
+    h = win.winfo_height()
+    x = (win.winfo_screenwidth() // 2) - (w // 2)
+    y = (win.winfo_screenheight() // 2) - (h // 2)
+    win.geometry(f"{w}x{h}+{x}+{y}")
+
+
 def open_seguimientos(master, email_session):
     window = tk.Toplevel(master)
     window.title("Seguimientos desde Sheet")
     window.geometry("700x500")
     window.transient(master)
     window.grab_set()
+    center_window(window)
 
     frame = ttk.Frame(window, padding=10, style="MyFrame.TFrame")
     frame.pack(fill="both", expand=True)
