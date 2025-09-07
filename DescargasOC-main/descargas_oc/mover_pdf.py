@@ -76,6 +76,7 @@ def mover_oc(config: Config, ordenes=None):
 
     faltantes = []
     subidos = []
+    es_bienes = bool(getattr(config, "compra_bienes", False))
     for numero in numeros_oc:
         ruta = encontrados.get(numero)
         if not ruta:
@@ -83,7 +84,7 @@ def mover_oc(config: Config, ordenes=None):
             continue
 
         prov = proveedores.get(numero)
-        if prov:
+        if es_bienes and prov:
             prov_clean = re.sub(r"[^\w\- ]", "_", prov)
             nuevo_nombre = os.path.join(carpeta_origen, f"{numero} - {prov_clean}.pdf")
             if ruta != nuevo_nombre:
@@ -93,12 +94,14 @@ def mover_oc(config: Config, ordenes=None):
                 except Exception as e:
                     logger.warning('No se pudo renombrar %s: %s', ruta, e)
 
-        # extraer número de tarea para organizar y para el reporte
-        tarea = extraer_numero_tarea_desde_pdf(ruta)
-        if indice_ordenes.get(numero) is not None:
-            indice_ordenes[numero]["tarea"] = tarea
+        tarea = None
+        if es_bienes:
+            # extraer número de tarea para organizar y para el reporte
+            tarea = extraer_numero_tarea_desde_pdf(ruta)
+            if indice_ordenes.get(numero) is not None:
+                indice_ordenes[numero]["tarea"] = tarea
 
-        if tarea:
+        if es_bienes and tarea:
             # buscar carpeta existente que comience con el número de tarea
             destino = None
             for root, dirs, _files in os.walk(carpeta_destino):

@@ -63,7 +63,8 @@ class Config:
         self.data.setdefault('correo_reporte', 'jotoapanta@telconet.ec')
         self.data.setdefault('remitente_adicional', 'naf@telconet.ec')
         self.data.setdefault('compra_bienes', False)
-
+        # persist values so configuration survives between executions
+        self.save()
         return self
 
     def save(self):

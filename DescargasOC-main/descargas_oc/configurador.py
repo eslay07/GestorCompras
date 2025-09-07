@@ -47,6 +47,7 @@ def configurar():
         })
         try:
             cfg.validate()
+            cfg.save()
             archivo = filedialog.askopenfilename(title='Archivo de prueba')
             if not archivo:
                 messagebox.showwarning('Prueba', 'Debes seleccionar un archivo de prueba')
@@ -54,7 +55,6 @@ def configurar():
             cli = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
             cli.upload_file(cfg.seafile_repo_id, archivo, parent_dir=cfg.seafile_subfolder)
             messagebox.showinfo('OK', 'Archivo subido correctamente')
-            cfg.save()
             try:
                 ventana.grab_release()
             except Exception:  # pragma: no cover - grab may not be set
