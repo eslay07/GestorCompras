@@ -210,12 +210,22 @@ def descargar_oc(
                 except Exception:
                     raise
         time.sleep(5)
-        if not driver.find_elements(*elements["lista_accesos"]):
+        for _ in range(5):
             try:
-                _click("menu_hamburguesa", elements["menu_hamburguesa"])
-                time.sleep(1)
+                driver.switch_to.window(driver.window_handles[-1])
             except Exception:
                 pass
+            if driver.find_elements(*elements["lista_accesos"]):
+                break
+            try:
+                menu = driver.find_elements(*elements["menu_hamburguesa"])
+                if menu:
+                    menu[0].click()
+            except Exception:
+                pass
+            time.sleep(2)
+        else:
+            raise RuntimeError("Fallo al localizar 'lista_accesos'")
         _click("lista_accesos", elements["lista_accesos"])
         _click("seleccion_compania", elements["seleccion_compania"])
         _find("lista_companias", elements["lista_companias"]).send_keys("TELCONET S.A.")
