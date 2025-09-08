@@ -94,7 +94,7 @@ def descargar_oc(
         "contrasena": (By.ID, "password"),
         "iniciar_sesion": (
             By.CSS_SELECTOR,
-            "input[name='submit'], button[name='submit']",
+            "button[type='submit'], input[type='submit']",
         ),
         "lista_accesos": (
             By.XPATH,
@@ -203,12 +203,19 @@ def descargar_oc(
         except RuntimeError:
             # si no se encuentra el botón, intentar enviar Enter o usar submit
             try:
-                pass_el.send_keys(Keys.RETURN)
-            except Exception:
+                pass_el = _find("contrasena", elements["contrasena"])
                 try:
-                    driver.execute_script("document.querySelector('form').submit();")
+                    pass_el.send_keys(Keys.RETURN)
                 except Exception:
-                    raise
+                    pass
+            except Exception:
+                pass
+            try:
+                driver.execute_script(
+                    "const f=document.querySelector('form'); if(f) f.submit();"
+                )
+            except Exception:
+                pass
         time.sleep(5)
         for _ in range(5):
             try:
