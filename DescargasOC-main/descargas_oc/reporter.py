@@ -3,6 +3,7 @@ import poplib
 import json
 from email.message import EmailMessage
 from pathlib import Path
+from html import escape
 
 try:  # allow running as script
     from .config import Config
@@ -38,28 +39,104 @@ def _buscar_tarea(numero: str, cfg: Config) -> str | None:
 
 
 def _formatear_tabla(filas: list[tuple[str, str, str]]) -> str:
-    """Genera una tabla simple alineada por columnas."""
+    """Tabla de texto con bordes y columnas alineadas. Usa box-drawing."""
+    if not filas:
+        return "─ Sin datos ─"
+
     headers = ("Orden", "Tarea", "Proveedor")
-    filas_completas = [headers] + filas
-    anchos = [max(len(str(f[i])) for f in filas_completas) for i in range(3)]
-    linea_sep = " | ".join("-" * a for a in anchos)
-    lines = [
-        " | ".join(str(f[i]).ljust(anchos[i]) for i in range(3)) for f in filas_completas
-    ]
-    return "\n".join([lines[0], linea_sep] + lines[1:])
+
+    # Límite de ancho por columna para que no se rompa la vista en correos
+    MAXW = (16, 18, 40)  # ajusta a tu gusto
+
+    def _clip(x: str, w: int) -> str:
+        s = str(x).replace("\n", " ").strip()
+        return (s[: w - 1] + "…") if len(s) > w else s
+
+    # Aplica clipping a todas las filas
+    filas_clip = [tuple(_clip(c, MAXW[i]) for i, c in enumerate(row)) for row in ([headers] + filas)]
+
+    # Calcula anchos reales
+    anchos = [max(len(r[i]) for r in filas_clip) for i in range(3)]
+
+    # Helpers de bordes
+    top    = "┌" + "┬".join("─" * (a + 2) for a in anchos) + "┐"
+    mid    = "├" + "┼".join("─" * (a + 2) for a in anchos) + "┤"
+    bottom = "└" + "┴".join("─" * (a + 2) for a in anchos) + "┘"
+
+    def _fmt_row(row: tuple[str, str, str]) -> str:
+        return "│ " + " │ ".join(row[i].ljust(anchos[i]) for i in range(3)) + " │"
+
+    # Construye líneas
+    lines = [top, _fmt_row(filas_clip[0]), mid]
+    for row in filas_clip[1:]:
+        lines.append(_fmt_row(row))
+    lines.append(bottom)
+    return "\n".join(lines)
 
 
 def _tabla_html(filas: list[tuple[str, str, str]]) -> str:
-    """Genera una tabla HTML sencilla."""
+    """Tabla HTML con bordes, padding, zebra y ajuste de ancho. Seguro con escape()."""
     if not filas:
-        return "<p>-</p>"
-    filas_html = "".join(
-        f"<tr><td>{o}</td><td>{t}</td><td>{p}</td></tr>" for o, t, p in filas
+        return "<p style='font-family:Segoe UI, Arial, sans-serif;font-size:13px;'>– Sin datos –</p>"
+
+    # Definición de estilos inline para que Outlook/cliente no los ignore
+    table_style = (
+        "border-collapse:collapse;"
+        "border:1px solid #d0d7de;"
+        "width:100%;"
+        "font-family:Segoe UI, Arial, sans-serif;"
+        "font-size:13px;"
+        "table-layout:fixed;"
+        "word-wrap:break-word;"
+        "line-height:1.35;"
     )
+    th_style = (
+        "text-align:left;"
+        "padding:8px 10px;"
+        "border:1px solid #d0d7de;"
+        "background:#f6f8fa;"
+        "font-weight:600;"
+        "white-space:nowrap;"
+    )
+    td_style = (
+        "padding:6px 10px;"
+        "border:1px solid #d0d7de;"
+        "vertical-align:top;"
+        "word-break:break-word;"
+    )
+
+    # Colgroup para controlar anchos relativos/por ch (caracteres)
+    colgroup = (
+        "<colgroup>"
+        "<col style='width:16ch'>"
+        "<col style='width:20ch'>"
+        "<col style='width:auto'>"
+        "</colgroup>"
+    )
+
+    # Construye filas con zebra
+    filas_html = []
+    for i, (o, t, p) in enumerate(filas):
+        bg = "#ffffff" if i % 2 == 0 else "#fafbfc"
+        filas_html.append(
+            f"<tr style='background:{bg};'>"
+            f"<td style='{td_style}'>{escape(str(o))}</td>"
+            f"<td style='{td_style}'>{escape(str(t))}</td>"
+            f"<td style='{td_style}'>{escape(str(p))}</td>"
+            "</tr>"
+        )
+    rows = "".join(filas_html)
+
     return (
-        "<table style='border-collapse:collapse'>"
-        "<tr><th>Orden</th><th>Tarea</th><th>Proveedor</th></tr>"
-        f"{filas_html}</table>"
+        f"<table style='{table_style}'>"
+        f"{colgroup}"
+        "<thead>"
+        f"<tr><th style='{th_style}'>Orden</th>"
+        f"<th style='{th_style}'>Tarea</th>"
+        f"<th style='{th_style}'>Proveedor</th></tr>"
+        "</thead>"
+        f"<tbody>{rows}</tbody>"
+        "</table>"
     )
 
 
