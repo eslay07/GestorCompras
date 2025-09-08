@@ -7,6 +7,7 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import time
@@ -278,6 +279,14 @@ def descargar_oc(
                         break
                 else:
                     raise RuntimeError("No se descargó archivo")
+                if not getattr(cfg, "compra_bienes", False) and proveedor:
+                    prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    try:
+                        archivo.rename(nuevo_nombre)
+                        archivo = nuevo_nombre
+                    except Exception:
+                        pass
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder

@@ -81,7 +81,10 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     mensaje.set_content(cuerpo)
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
-            smtp.login(usuario, password)
+            try:
+                smtp.login(usuario, password)
+            except smtplib.SMTPAuthenticationError:
+                smtp.login(usuario.split('@')[0], password)
             smtp.send_message(mensaje)
         logger.info('Reporte enviado')
         return True
