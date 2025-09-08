@@ -1,4 +1,5 @@
 import smtplib
+import poplib
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -14,7 +15,8 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 SMTP_SERVER = "smtp.telconet.ec"
-SMTP_PORT = 465
+SMTP_PORT = 587
+SMTP_SSL_PORT = 465
 
 
 def _buscar_tarea(numero: str, cfg: Config) -> str | None:
@@ -70,6 +72,15 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     if not destinatario or not usuario or not password:
         logger.warning('Datos de correo incompletos, no se enviará reporte')
         return False
+
+    # Algunos servidores requieren autenticarse vía POP3 antes de enviar SMTP
+    try:
+        pop = poplib.POP3_SSL(cfg.pop_server, cfg.pop_port)
+        pop.user(usuario)
+        pop.pass_(password)
+        pop.quit()
+    except Exception as exc:  # pragma: no cover - la ausencia de POP no debe abortar
+        logger.warning("Autenticación POP fallida: %s", exc)
     mensaje = EmailMessage()
     mensaje['Subject'] = 'Reporte de órdenes descargadas'
     mensaje['From'] = usuario
@@ -121,13 +132,15 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
             logger.error('No se pudo enviar reporte: %s', e)
             return False
 
-    if _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)):
-        return True
-
-    def _smtp_starttls():
-        s = smtplib.SMTP(SMTP_SERVER, 587)
+    def _smtp_tls():
+        s = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        s.ehlo()
         s.starttls()
+        s.ehlo()
         return s
 
-    return _intentar_envio(_smtp_starttls)
+    if _intentar_envio(_smtp_tls):
+        return True
+
+    return _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_SSL_PORT))
 
