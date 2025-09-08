@@ -8,14 +8,20 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 import time
 from pathlib import Path
 
 from selenium import webdriver
-from selenium.common.exceptions import ElementClickInterceptedException, TimeoutException
+from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.keys import Keys
+
+try:  # allow running as script
+    from .seafile_client import SeafileClient
+except ImportError:  # pragma: no cover
+    from seafile_client import SeafileClient
 
 try:  # allow running as script
     from .config import Config
@@ -27,7 +33,12 @@ except ImportError:  # pragma: no cover
     from organizador_bienes import organizar as organizar_bienes
 
 
-def descargar_oc(ordenes, username: str | None = None, password: str | None = None):
+def descargar_oc(
+    ordenes,
+    username: str | None = None,
+    password: str | None = None,
+    headless: bool = False,
+):
     """Descarga una o varias órdenes de compra.
 
     ``ordenes`` es una lista de diccionarios con las claves ``numero`` y
@@ -38,6 +49,14 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     if isinstance(ordenes, dict):
         ordenes = [ordenes]
 
+    # Asegurar sincronización de SeaDrive antes de iniciar Selenium
+    script = Path(__file__).resolve().parents[1] / "scripts" / "seadrive_autoresync.py"
+    if script.exists():  # pragma: no cover - depende del entorno Windows
+        try:
+            subprocess.run([sys.executable, str(script)], check=False)
+        except Exception:
+            pass
+
     cfg = Config()
     download_dir = Path(cfg.carpeta_destino_local or Path.home() / "Documentos")
     download_dir.mkdir(parents=True, exist_ok=True)
@@ -46,6 +65,10 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     if user:
         user = user.split("@")[0]
     pwd = password if password is not None else cfg.password
+
+    cliente = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
+    repo_id = cfg.seafile_repo_id
+    subfolder = cfg.seafile_subfolder or "/"
 
     options = webdriver.ChromeOptions()
     prefs = {
@@ -59,7 +82,8 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
     )
     options.add_experimental_option("useAutomationExtension", False)
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--headless=new")
+    if headless:
+        options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     options.add_argument("--no-sandbox")
@@ -79,33 +103,33 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         "contrasena": (By.ID, "password"),
         "iniciar_sesion": (
             By.CSS_SELECTOR,
-            "input.btn.btn-block.btn-submit[name='submit']",
+            "button[type='submit'], input[type='submit']",
         ),
         "lista_accesos": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Accesos']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Accesos')]",
         ),
         "seleccion_compania": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Selección de Compañía']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Selección de Compañía')]",
         ),
         "lista_companias": (By.CSS_SELECTOR, "input[aria-autocomplete='list']"),
         "telconet_sa": (
             By.XPATH,
             "//div[contains(@class,'ng-star-inserted') and contains(.,'TELCONET S.A.')]",
         ),
-        "boton_elegir": (By.XPATH, "//span[text()='Elegir']"),
+        "boton_elegir": (By.XPATH, "//span[contains(text(),'Elegir')]"),
         "companias_boton_ok": (
             By.CSS_SELECTOR,
             "button.swal2-confirm.swal2-styled",
         ),
         "lista_consultas": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Consultas']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Consultas')]",
         ),
         "consulta_ordenes": (
             By.XPATH,
-            "//span[contains(@class,'simple-sidenav__text') and text()='Consulta de Órdenes de Compra']",
+            "//span[contains(@class,'simple-sidenav__text') and contains(text(),'Consulta de Órdenes de Compra')]",
         ),
         "digitar_oc": (
             By.CSS_SELECTOR,
@@ -113,11 +137,7 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         ),
         "btnbuscarorden": (
             By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]",
-        ),
-        "btnbuscarorden": (
-            By.XPATH,
-            "//button[.//span[text()='Aplicar filtros']]",
+            "//button[.//span[contains(text(),'Aplicar filtros')]]",
         ),
         "descargar_orden": (
             By.XPATH,
@@ -127,19 +147,52 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
         "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
     }
 
-    def _find(name: str, condition, timeout: int = 40, retries: int = 3):
-        """Ubica un elemento esperando a que sea válido.
+    def _find(name: str, locator, retries: int = 5, delay: float = 2.0):
+        """Busca un elemento realizando varios intentos."""
 
-        Algunos componentes tardan en renderizarse; este auxiliar reintenta la
-        búsqueda varias veces antes de reportar un fallo definitivo.
-        """
-        for intento in range(retries):
+        def search(loc):
             try:
-                return WebDriverWait(driver, timeout).until(condition)
-            except Exception as exc:  # pragma: no cover - interface errors
-                if intento == retries - 1:
-                    raise RuntimeError(f"Fallo al localizar '{name}'") from exc
+                elems = driver.find_elements(*loc)
+                if elems:
+                    return elems[0]
+            except Exception:
+                return None
+
+        for _ in range(retries):
+            for handle in driver.window_handles:
+                try:
+                    driver.switch_to.window(handle)
+                except Exception:
+                    continue
+                driver.switch_to.default_content()
+                elem = search(locator)
+                if elem:
+                    return elem
+                frames = driver.find_elements(By.TAG_NAME, "iframe")
+                for frame in frames:
+                    try:
+                        driver.switch_to.frame(frame)
+                        elem = search(locator)
+                        if elem:
+                            return elem
+                    except Exception:
+                        pass
+                driver.switch_to.default_content()
+            time.sleep(delay)
+        raise RuntimeError(f"Fallo al localizar '{name}'")
+
+    def _click(name: str, locator):
+        for _ in range(3):
+            elem = _find(name, locator)
+            try:
+                elem.click()
+                return
+            except ElementClickInterceptedException:
+                driver.execute_script("arguments[0].click();", elem)
+                return
+            except Exception:
                 time.sleep(2)
+        raise RuntimeError(f"No se pudo hacer click en '{name}'")
 
     errores: list[str] = []
     try:
@@ -148,90 +201,70 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
             "https://sites.telconet.ec/naf/compras/sso/check"
         )
 
-        _find("usuario", EC.presence_of_element_located(elements["usuario"])).send_keys(
-            user or "",
-        )
-        _find(
-            "contrasena", EC.presence_of_element_located(elements["contrasena"])
-        ).send_keys(pwd or "")
-        _find(
-            "iniciar_sesion",
-            EC.element_to_be_clickable(elements["iniciar_sesion"]),
-        ).click()
-        WebDriverWait(driver, 60).until(EC.url_contains("/naf/compras"))
-        WebDriverWait(driver, 60).until(
-            lambda d: d.execute_script("return document.readyState") == "complete"
-        )
-        # Abrir menú lateral si no está visible (modo móvil)
+        time.sleep(2)
+        user_el = _find("usuario", elements["usuario"])
+        pass_el = _find("contrasena", elements["contrasena"])
+        user_el.send_keys(user or "")
+        pass_el.send_keys(pwd or "")
         try:
-            WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located(elements["lista_accesos"])
-            )
-        except TimeoutException:
+            _click("iniciar_sesion", elements["iniciar_sesion"])
+        except RuntimeError:
+            # si no se encuentra el botón, intentar enviar Enter o usar submit
             try:
-                _find(
-                    "menu_hamburguesa",
-                    EC.element_to_be_clickable(elements["menu_hamburguesa"]),
-                    timeout=10,
-                ).click()
-                time.sleep(1)
+                pass_el = _find("contrasena", elements["contrasena"])
+                try:
+                    pass_el.send_keys(Keys.RETURN)
+                except Exception:
+                    pass
             except Exception:
                 pass
-        _find(
-            "lista_accesos", EC.element_to_be_clickable(elements["lista_accesos"])
-        ).click()
-        _find(
-            "seleccion_compania",
-            EC.element_to_be_clickable(elements["seleccion_compania"]),
-        ).click()
-        _find(
-            "lista_companias", EC.presence_of_element_located(elements["lista_companias"])
-        ).send_keys("TELCONET S.A.")
-        _find("telconet_sa", EC.element_to_be_clickable(elements["telconet_sa"])).click()
-        _find("boton_elegir", EC.element_to_be_clickable(elements["boton_elegir"])).click()
-        _find(
-            "companias_boton_ok",
-            EC.element_to_be_clickable(elements["companias_boton_ok"]),
-        ).click()
-        _find(
-            "lista_consultas", EC.element_to_be_clickable(elements["lista_consultas"])
-        ).click()
-        _find(
-            "consulta_ordenes", EC.element_to_be_clickable(elements["consulta_ordenes"])
-        ).click()
+            try:
+                driver.execute_script(
+                    "const f=document.querySelector('form'); if(f) f.submit();"
+                )
+            except Exception:
+                pass
+        time.sleep(2)
+        for _ in range(3):
+            try:
+                driver.switch_to.window(driver.window_handles[-1])
+            except Exception:
+                pass
+            if driver.find_elements(*elements["lista_accesos"]):
+                break
+            try:
+                menu = driver.find_elements(*elements["menu_hamburguesa"])
+                if menu:
+                    menu[0].click()
+            except Exception:
+                pass
+            time.sleep(2)
+        else:
+            raise RuntimeError("Fallo al localizar 'lista_accesos'")
+        _click("lista_accesos", elements["lista_accesos"])
+        _click("seleccion_compania", elements["seleccion_compania"])
+        _find("lista_companias", elements["lista_companias"]).send_keys("TELCONET S.A.")
+        _click("telconet_sa", elements["telconet_sa"])
+        _click("boton_elegir", elements["boton_elegir"])
+        _click("companias_boton_ok", elements["companias_boton_ok"])
+        _click("lista_consultas", elements["lista_consultas"])
+        _click("consulta_ordenes", elements["consulta_ordenes"])
 
         for oc in ordenes:
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
             try:
-                campo = _find(
-                    "digitar_oc", EC.presence_of_element_located(elements["digitar_oc"])
-                )
+                campo = _find("digitar_oc", elements["digitar_oc"])
                 campo.clear()
                 campo.send_keys(numero)
-                time.sleep(3)
-                _find(
-                    "btnbuscarorden",
-                    EC.element_to_be_clickable(elements["btnbuscarorden"]),
-                ).click()
+                time.sleep(2)
+                _click("btnbuscarorden", elements["btnbuscarorden"])
 
-                # Esperar a que desaparezca cualquier notificación tipo toast
-                try:  # pragma: no cover - depende del front-end
-                    WebDriverWait(driver, 10).until(
-                        EC.invisibility_of_element_located(elements["toast"])
-                    )
-                except TimeoutException:
-                    pass
-                _find(
-                    "descargar_orden",
-                    EC.presence_of_element_located(elements["descargar_orden"]),
-                    timeout=60,
-                )
-                boton_descarga = _find(
-                    "descargar_orden",
-                    EC.element_to_be_clickable(elements["descargar_orden"]),
-                    timeout=60,
-                )
+                for _ in range(5):
+                    if not driver.find_elements(*elements["toast"]):
+                        break
+                    time.sleep(2)
+                boton_descarga = _find("descargar_orden", elements["descargar_orden"])
                 try:
                     boton_descarga.click()
                 except ElementClickInterceptedException:
@@ -246,11 +279,20 @@ def descargar_oc(ordenes, username: str | None = None, password: str | None = No
                         break
                 else:
                     raise RuntimeError("No se descargó archivo")
-
-                if proveedor:
+                if not getattr(cfg, "compra_bienes", False) and proveedor:
                     prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
                     nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                    archivo.rename(nuevo_nombre)
+                    try:
+                        archivo.rename(nuevo_nombre)
+                        archivo = nuevo_nombre
+                    except Exception:
+                        pass
+                try:
+                    cliente.upload_file(
+                        repo_id, str(archivo), parent_dir=subfolder
+                    )
+                except Exception as e:
+                    errores.append(f"OC {numero}: fallo subida {e}")
             except Exception as exc:  # pragma: no cover - runtime issues
                 errores.append(f"OC {numero}: {exc}")
     finally:

@@ -84,11 +84,13 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         if ordenes:
             append(f"Procesando {len(ordenes)} OC(s)\n")
             try:
-                subidos, no_encontrados, errores = descargar_oc(ordenes)
+                subidos, no_encontrados, errores = descargar_oc(
+                    ordenes, headless=cfg.headless
+                )
             except Exception as exc:  # pragma: no cover - runtime safety
                 logger.exception("Fallo al descargar OC")
                 errores = [str(exc)]
-                subidos, no_encontrados = [], [o["num"] for o in ordenes]
+                subidos, no_encontrados = [], [o.get("numero") for o in ordenes]
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
             for num in subidos:
@@ -192,6 +194,7 @@ def main():
         configurar()
         cfg.load()
         var_bienes.set(bool(cfg.compra_bienes))
+        var_visible.set(not bool(cfg.headless))
         entry_interval.delete(0, tk.END)
         entry_interval.insert(0, str(cfg.scan_interval))
 
@@ -212,6 +215,21 @@ def main():
         command=actualizar_bienes,
     )
     chk_bienes.pack(side=tk.LEFT, padx=5)
+
+    var_visible = tk.BooleanVar(value=not bool(cfg.headless))
+
+    def actualizar_visible():
+        cfg.load()
+        cfg.data['headless'] = not var_visible.get()
+        cfg.save()
+
+    chk_visible = tk.Checkbutton(
+        frame,
+        text="Descarga visible",
+        variable=var_visible,
+        command=actualizar_visible,
+    )
+    chk_visible.pack(side=tk.LEFT, padx=5)
 
     tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
     entry_interval = tk.Entry(frame, width=5)

@@ -14,6 +14,44 @@ except ImportError:  # pragma: no cover
 from escuchador import PROCESADOS_FILE
 
 
+class ToolTip:
+    def __init__(self, widget: tk.Widget, text: str):
+        self.widget = widget
+        self.text = text
+        self.tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self.show)
+        widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):  # pragma: no cover - UI helper
+        if self.tip:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 1
+        self.tip = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(
+            tw,
+            text=self.text,
+            justify=tk.LEFT,
+            background="#ffffe0",
+            relief=tk.SOLID,
+            borderwidth=1,
+            font=("tahoma", "8", "normal"),
+        )
+        label.pack(ipadx=1)
+
+    def hide(self, event=None):  # pragma: no cover - UI helper
+        tw = self.tip
+        self.tip = None
+        if tw:
+            tw.destroy()
+
+
+def add_tooltip(widget: tk.Widget, text: str) -> None:
+    ToolTip(widget, text)
+
+
 def configurar():
     cfg = Config()
 
@@ -112,6 +150,7 @@ def configurar():
         ventana.transient(parent)
         ventana.grab_set()
     ventana.title('Configuración')
+    ventana.geometry('600x700')
 
     tk.Label(ventana, text='Servidor POP3:').pack()
     entry_pop_server = tk.Entry(ventana, width=50)
@@ -133,29 +172,54 @@ def configurar():
     entry_password.pack()
     entry_password.insert(0, cfg.password or '')
 
-    tk.Label(ventana, text='Carpeta destino local:').pack()
+    lbl_destino = tk.Label(ventana, text='Carpeta de descarga principal:')
+    lbl_destino.pack()
+    add_tooltip(
+        lbl_destino,
+        'Esta carpeta es la ubicacion de destino de las ordenes de compra que se descargaran directamente del naf web',
+    )
     entry_destino = tk.Entry(ventana, width=50)
     entry_destino.pack()
     entry_destino.insert(0, cfg.carpeta_destino_local or '')
     tk.Button(ventana, text='Seleccionar', command=lambda: seleccionar_carpeta(entry_destino)).pack()
 
-    tk.Label(ventana, text='Carpeta a analizar:').pack()
+    lbl_analizar = tk.Label(ventana, text='Carpeta de tareas Bienes:')
+    lbl_analizar.pack()
+    add_tooltip(
+        lbl_analizar,
+        'Esta carpeta es en donde el programa buscara una carpeta con el numero de tarea similar al que tiene la orden de compra y a donde se movera dicho archivo, esta configuracion es para compras bienes, si usted es de servicios, coloque cualquier ubicacion del seadrive.',
+    )
     entry_analizar = tk.Entry(ventana, width=50)
     entry_analizar.pack()
     entry_analizar.insert(0, cfg.carpeta_analizar or '')
     tk.Button(ventana, text='Seleccionar', command=lambda: seleccionar_carpeta(entry_analizar)).pack()
 
-    tk.Label(ventana, text='Seafile URL:').pack()
+    lbl_url = tk.Label(ventana, text='URL principal de Telcodrive:')
+    lbl_url.pack()
+    add_tooltip(
+        lbl_url,
+        'aqui va el enlace principal de telcodrive, ejemplo: https://telcodrive.telconet.net/',
+    )
     entry_url = tk.Entry(ventana, width=50)
     entry_url.pack()
     entry_url.insert(0, cfg.seafile_url or '')
 
-    tk.Label(ventana, text='Seafile Repo ID:').pack()
+    lbl_repo = tk.Label(ventana, text='ID de la carpeta principal:')
+    lbl_repo.pack()
+    add_tooltip(
+        lbl_repo,
+        'este id es un codigo que se encuentra en la url de su carpeta personal en telcodrive entre https://telcodrive.telconet.net/library/   y /nombre de la carpeta principal/nombre de la subcarpeta  y su formato es similar a este ede837d2-5de8-45f8-802d-aa513aaad8b2',
+    )
     entry_repo = tk.Entry(ventana, width=50)
     entry_repo.pack()
     entry_repo.insert(0, cfg.seafile_repo_id or '')
 
-    tk.Label(ventana, text='Seafile Subfolder:').pack()
+    lbl_sub = tk.Label(ventana, text='Carpeta Personal Telcodrive:')
+    lbl_sub.pack()
+    add_tooltip(
+        lbl_sub,
+        'esta carpeta no es la carpeta compartida es una carpeta personal creada en telcodrive a donde siempre se subiran ordenes de compra como un respaldo principal',
+    )
     entry_sub = tk.Entry(ventana, width=50)
     entry_sub.pack()
     entry_sub.insert(0, cfg.seafile_subfolder or '/')
@@ -165,7 +229,7 @@ def configurar():
     entry_correo.pack()
     entry_correo.insert(0, cfg.correo_reporte or '')
 
-    tk.Label(ventana, text='Remitente adicional:').pack()
+    tk.Label(ventana, text='Remitente principal de órdenes autorizadas:').pack()
     entry_remitente = tk.Entry(ventana, width=50)
     entry_remitente.pack()
     entry_remitente.insert(0, cfg.remitente_adicional or '')
