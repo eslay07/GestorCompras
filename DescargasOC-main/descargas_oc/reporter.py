@@ -96,16 +96,38 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
         html += '<h3>No se encontraron archivos para las siguientes OC:</h3>' + _tabla_html(filas_bad)
     mensaje.set_content(texto)
     mensaje.add_alternative(html, subtype='html')
-    try:
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
-            try:
-                smtp.login(usuario, password)
-            except smtplib.SMTPAuthenticationError:
-                smtp.login(usuario.split('@')[0], password)
-            smtp.send_message(mensaje)
-        logger.info('Reporte enviado')
+    usernames = [usuario]
+    if "@" in usuario:
+        base = usuario.split("@")[0]
+        usernames.append(base)
+        dominio = usuario.split("@")[1].split(".")[0].upper()
+        usernames.append(f"{dominio}\\{base}")
+
+    def _intentar_envio(factory):
+        try:
+            with factory() as smtp:
+                for u in usernames:
+                    try:
+                        smtp.login(u, password)
+                        break
+                    except smtplib.SMTPAuthenticationError:
+                        logger.warning("Fallo de autenticación con '%s'", u)
+                else:
+                    raise smtplib.SMTPAuthenticationError(535, b"Authentication failed")
+                smtp.send_message(mensaje)
+            logger.info('Reporte enviado')
+            return True
+        except Exception as e:
+            logger.error('No se pudo enviar reporte: %s', e)
+            return False
+
+    if _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)):
         return True
-    except Exception as e:
-        logger.error('No se pudo enviar reporte: %s', e)
-        return False
+
+    def _smtp_starttls():
+        s = smtplib.SMTP(SMTP_SERVER, 587)
+        s.starttls()
+        return s
+
+    return _intentar_envio(_smtp_starttls)
 
