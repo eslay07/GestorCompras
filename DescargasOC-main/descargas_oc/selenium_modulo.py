@@ -139,12 +139,7 @@ def descargar_oc(
     }
 
     def _find(name: str, locator, retries: int = 5, delay: float = 2.0):
-        """Busca un elemento realizando varios intentos.
-
-        Recorre el documento principal y cualquier iframe visible. Espera
-        ``delay`` segundos entre intentos. Si tras ``retries`` intentos no se
-        encuentra el elemento, lanza ``RuntimeError``.
-        """
+        """Busca un elemento realizando varios intentos."""
 
         def search(loc):
             try:
@@ -155,27 +150,31 @@ def descargar_oc(
                 return None
 
         for _ in range(retries):
-            driver.switch_to.default_content()
-            elem = search(locator)
-            if elem:
-                return elem
-            frames = driver.find_elements(By.TAG_NAME, "iframe")
-            for frame in frames:
+            for handle in driver.window_handles:
                 try:
-                    driver.switch_to.frame(frame)
-                    elem = search(locator)
-                    if elem:
-                        return elem
+                    driver.switch_to.window(handle)
                 except Exception:
-                    pass
-                finally:
-                    driver.switch_to.default_content()
+                    continue
+                driver.switch_to.default_content()
+                elem = search(locator)
+                if elem:
+                    return elem
+                frames = driver.find_elements(By.TAG_NAME, "iframe")
+                for frame in frames:
+                    try:
+                        driver.switch_to.frame(frame)
+                        elem = search(locator)
+                        if elem:
+                            return elem
+                    except Exception:
+                        pass
+                driver.switch_to.default_content()
             time.sleep(delay)
         raise RuntimeError(f"Fallo al localizar '{name}'")
 
     def _click(name: str, locator):
-        elem = _find(name, locator)
-        for _ in range(3):
+        for _ in range(5):
+            elem = _find(name, locator)
             try:
                 elem.click()
                 return
@@ -183,7 +182,7 @@ def descargar_oc(
                 driver.execute_script("arguments[0].click();", elem)
                 return
             except Exception:
-                time.sleep(1)
+                time.sleep(2)
         raise RuntimeError(f"No se pudo hacer click en '{name}'")
 
     errores: list[str] = []
