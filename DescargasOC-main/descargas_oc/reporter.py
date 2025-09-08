@@ -42,6 +42,20 @@ def _formatear_tabla(filas: list[tuple[str, str, str]]) -> str:
     return "\n".join([lines[0], linea_sep] + lines[1:])
 
 
+def _tabla_html(filas: list[tuple[str, str, str]]) -> str:
+    """Genera una tabla HTML sencilla."""
+    if not filas:
+        return "<p>-</p>"
+    filas_html = "".join(
+        f"<tr><td>{o}</td><td>{t}</td><td>{p}</td></tr>" for o, t, p in filas
+    )
+    return (
+        "<table style='border-collapse:collapse'>"
+        "<tr><th>Orden</th><th>Tarea</th><th>Proveedor</th></tr>"
+        f"{filas_html}</table>"
+    )
+
+
 def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     if not exitosas and not faltantes:
         return False
@@ -60,25 +74,28 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     mensaje['Subject'] = 'Reporte de órdenes descargadas'
     mensaje['From'] = usuario
     mensaje['To'] = destinatario
-    cuerpo = 'Órdenes subidas correctamente:\n'
+    texto = 'Órdenes subidas correctamente:\n'
     filas_ok: list[tuple[str, str, str]] = []
     for num in exitosas_uniq:
         data = info.get(num, {})
         prov = data.get('proveedor') or '-'
         tarea = data.get('tarea') or _buscar_tarea(num, cfg) or '-'
         filas_ok.append((num, tarea, prov))
+    html = '<h3>Órdenes subidas correctamente:</h3>' + _tabla_html(filas_ok)
     if filas_ok:
-        cuerpo += _formatear_tabla(filas_ok) + '\n'
+        texto += _formatear_tabla(filas_ok) + '\n'
     if faltantes_uniq:
-        cuerpo += '\nNo se encontraron archivos para las siguientes OC:\n'
+        texto += '\nNo se encontraron archivos para las siguientes OC:\n'
         filas_bad: list[tuple[str, str, str]] = []
         for num in faltantes_uniq:
             data = info.get(num, {})
             prov = data.get('proveedor') or '-'
             tarea = data.get('tarea') or '-'
             filas_bad.append((num, tarea, prov))
-        cuerpo += _formatear_tabla(filas_bad) + '\n'
-    mensaje.set_content(cuerpo)
+        texto += _formatear_tabla(filas_bad) + '\n'
+        html += '<h3>No se encontraron archivos para las siguientes OC:</h3>' + _tabla_html(filas_bad)
+    mensaje.set_content(texto)
+    mensaje.add_alternative(html, subtype='html')
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
             try:
