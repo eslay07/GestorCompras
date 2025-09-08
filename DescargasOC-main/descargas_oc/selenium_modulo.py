@@ -7,7 +7,6 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 import time
@@ -17,6 +16,11 @@ from selenium import webdriver
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+
+try:  # allow running as script
+    from .seafile_client import SeafileClient
+except ImportError:  # pragma: no cover
+    from seafile_client import SeafileClient
 
 try:  # allow running as script
     from .config import Config
@@ -60,6 +64,10 @@ def descargar_oc(
     if user:
         user = user.split("@")[0]
     pwd = password if password is not None else cfg.password
+
+    cliente = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
+    repo_id = cfg.seafile_repo_id
+    subfolder = cfg.seafile_subfolder or "/"
 
     options = webdriver.ChromeOptions()
     prefs = {
@@ -270,11 +278,12 @@ def descargar_oc(
                         break
                 else:
                     raise RuntimeError("No se descargó archivo")
-
-                if proveedor:
-                    prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                    archivo.rename(nuevo_nombre)
+                try:
+                    cliente.upload_file(
+                        repo_id, str(archivo), parent_dir=subfolder
+                    )
+                except Exception as e:
+                    errores.append(f"OC {numero}: fallo subida {e}")
             except Exception as exc:  # pragma: no cover - runtime issues
                 errores.append(f"OC {numero}: {exc}")
     finally:
