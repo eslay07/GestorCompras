@@ -173,7 +173,7 @@ def descargar_oc(
         raise RuntimeError(f"Fallo al localizar '{name}'")
 
     def _click(name: str, locator):
-        for _ in range(5):
+        for _ in range(3):
             elem = _find(name, locator)
             try:
                 elem.click()
@@ -215,8 +215,8 @@ def descargar_oc(
                 )
             except Exception:
                 pass
-        time.sleep(5)
-        for _ in range(5):
+        time.sleep(2)
+        for _ in range(3):
             try:
                 driver.switch_to.window(driver.window_handles[-1])
             except Exception:
@@ -248,7 +248,7 @@ def descargar_oc(
                 campo = _find("digitar_oc", elements["digitar_oc"])
                 campo.clear()
                 campo.send_keys(numero)
-                time.sleep(3)
+                time.sleep(2)
                 _click("btnbuscarorden", elements["btnbuscarorden"])
 
                 for _ in range(5):
@@ -281,7 +281,7 @@ def descargar_oc(
         driver.quit()
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes = mover_oc(cfg, numeros)
+    subidos, faltantes = mover_oc(cfg, ordenes)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
