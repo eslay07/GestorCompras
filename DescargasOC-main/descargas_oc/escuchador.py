@@ -1,6 +1,7 @@
 import poplib
 from email import parser as email_parser
 from email.header import decode_header, make_header
+import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,6 +18,7 @@ logger = get_logger(__name__)
 DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
 PROCESADOS_FILE = DATA_DIR / 'procesados.txt'
 LAST_UIDL_FILE = DATA_DIR / 'last_uidl.txt'
+ORDENES_TMP = DATA_DIR / 'ordenes_tmp.json'
 REMITENTE_BASE = 'jotoapanta@telconet.ec'
 
 
@@ -57,11 +59,12 @@ def registrar_procesados(uidls: list[str], ultimo: str | None):
 
 
 def extraer_datos(asunto: str, cuerpo: str):
-    """Extrae número de OC, fechas y proveedor del asunto/cuerpo."""
+    """Extrae número de OC, fechas, proveedor y tarea del asunto/cuerpo."""
     numero = None
     fecha_aut = None
     fecha_orden = None
     proveedor = None
+    tarea = None
 
     if asunto:
         patt = r"SISTEMA\s+NAF:.*?ORDEN\s+COMPRA\s+(?:NO|N[°º])\.?\s*(\d+)"
@@ -83,8 +86,11 @@ def extraer_datos(asunto: str, cuerpo: str):
         m = re.search(r"proveedor\s+([^\n]+?)(?:\s+con\s+Fecha|\n|$)", cuerpo, re.IGNORECASE)
         if m:
             proveedor = m.group(1).strip()
+        m = re.search(r"#(\d+)\s*//", cuerpo)
+        if m:
+            tarea = m.group(1)
 
-    return numero, fecha_aut, fecha_orden, proveedor
+    return numero, fecha_aut, fecha_orden, proveedor, tarea
 
 
 def _descargar_mensaje(num: int, cfg: Config) -> tuple[str, bytes]:
@@ -159,16 +165,22 @@ def buscar_ocs(cfg: Config) -> tuple[list[dict], str | None]:
                 else:
                     charset = mensaje.get_content_charset() or 'utf-8'
                     cuerpo = mensaje.get_payload(decode=True).decode(charset, errors='replace')
-                numero, fecha_aut, fecha_orden, proveedor = extraer_datos(asunto, cuerpo)
+                numero, fecha_aut, fecha_orden, proveedor, tarea = extraer_datos(asunto, cuerpo)
                 asunto_ok = re.search(r'SISTEMA\s+NAF:.*AUTORIZACI', asunto or '', re.IGNORECASE)
                 remitente_ok = any(r in remitente.lower() for r in remitentes_validos)
                 if remitente_ok and asunto_ok and numero:
-                    ordenes.append({'uidl': uidl_res, 'numero': numero, 'fecha_aut': fecha_aut, 'fecha_orden': fecha_orden, 'proveedor': proveedor})
+                    ordenes.append({'uidl': uidl_res, 'numero': numero, 'fecha_aut': fecha_aut, 'fecha_orden': fecha_orden, 'proveedor': proveedor, 'tarea': tarea})
                 else:
                     guardar_procesado(uidl_res)
             except Exception as e:
                 logger.error('Error procesando mensaje %s: %s', num, e)
 
     logger.info('Órdenes encontradas: %d', len(ordenes))
+    try:
+        ORDENES_TMP.parent.mkdir(parents=True, exist_ok=True)
+        with open(ORDENES_TMP, 'w', encoding='utf-8') as f:
+            json.dump(ordenes, f, ensure_ascii=False)
+    except Exception as exc:  # pragma: no cover
+        logger.warning('No se pudo guardar ordenes_tmp: %s', exc)
     return ordenes, nuevo_ultimo
 

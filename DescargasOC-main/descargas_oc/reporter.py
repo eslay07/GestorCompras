@@ -1,5 +1,6 @@
 import smtplib
 import poplib
+import json
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -17,6 +18,10 @@ logger = get_logger(__name__)
 SMTP_SERVER = "smtp.telconet.ec"
 SMTP_PORT = 587
 SMTP_SSL_PORT = 465
+SMTP_PLAIN_PORT = 25
+
+DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
+ORDENES_TMP = DATA_DIR / 'ordenes_tmp.json'
 
 
 def _buscar_tarea(numero: str, cfg: Config) -> str | None:
@@ -61,6 +66,12 @@ def _tabla_html(filas: list[tuple[str, str, str]]) -> str:
 def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     if not exitosas and not faltantes:
         return False
+    if not ordenes:
+        try:
+            with open(ORDENES_TMP, 'r', encoding='utf-8') as f:
+                ordenes = json.load(f)
+        except Exception:
+            ordenes = []
     # asegurarse de no repetir números
     exitosas_uniq = list(dict.fromkeys(exitosas))
     faltantes_uniq = list(dict.fromkeys(faltantes))
@@ -140,7 +151,25 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
         return s
 
     if _intentar_envio(_smtp_tls):
+        try:
+            ORDENES_TMP.unlink(missing_ok=True)
+        except Exception:
+            pass
         return True
 
-    return _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_SSL_PORT))
+    if _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_SSL_PORT)):
+        try:
+            ORDENES_TMP.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return True
+
+    if _intentar_envio(lambda: smtplib.SMTP(SMTP_SERVER, SMTP_PLAIN_PORT)):
+        try:
+            ORDENES_TMP.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return True
+
+    return False
 
