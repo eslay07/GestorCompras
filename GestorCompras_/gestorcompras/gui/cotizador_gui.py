@@ -103,3 +103,9 @@ class CotizadorGUI(tk.Toplevel):
         for desc, info in results.items():
             self.tree.insert("", "end", values=(desc, info["best_price"], info["best_source"]))
 
+def open_cotizador(master: tk.Misc):
+    """Abrir la ventana de comparación de cotizaciones."""
+    window = CotizadorGUI(master)
+    window.transient(master)
+    window.grab_set()
+    window.wait_window()

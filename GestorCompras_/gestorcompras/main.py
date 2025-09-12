@@ -9,6 +9,7 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
+from gestorcompras.gui import cotizador_gui
 
 # Palette
 bg_base = "#F0F4F8"
@@ -231,7 +232,7 @@ class MainMenu(tk.Frame):
         config_gui.open_config_gui(self.master)
     
     def open_cotizador(self):
-        messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo")
+        cotizador_gui.open_cotizador(self.master)
 
 def main():
     db.init_db()
