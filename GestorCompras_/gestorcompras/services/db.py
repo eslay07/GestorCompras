@@ -90,6 +90,17 @@ def init_db():
             signature_path TEXT
         )
     """)
+    # Registro de comparaciones de cotizaciones para auditoría
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS quote_comparison_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            item TEXT NOT NULL,
+            best_source TEXT,
+            best_price REAL,
+            details TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -342,6 +353,54 @@ def delete_email_template(template_id):
     cursor.execute("DELETE FROM email_templates WHERE id=?", (template_id,))
     conn.commit()
     conn.close()
+
+# ------------------ Registro de Comparaciones ------------------
+def log_quote_comparison(item: str, best_source: str | None, best_price: float | None, details: dict | None = None):
+    """Guarda un registro de comparación de cotizaciones.
+
+    Parameters
+    ----------
+    item: str
+        Descripción del ítem solicitado.
+    best_source: str | None
+        Origen del mejor precio encontrado.
+    best_price: float | None
+        Precio encontrado.
+    details: dict | None
+        Estructura libre con información adicional de la comparación.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    details_json = json.dumps(details or {})
+    cursor.execute(
+        "INSERT INTO quote_comparison_log (timestamp, item, best_source, best_price, details) "
+        "VALUES (datetime('now'), ?, ?, ?, ?)",
+        (item, best_source, best_price, details_json),
+    )
+    conn.commit()
+    conn.close()
+
+def get_quote_comparison_log(limit: int = 100):
+    """Obtiene los últimos registros de comparaciones."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT timestamp, item, best_source, best_price, details FROM quote_comparison_log "
+        "ORDER BY id DESC LIMIT ?",
+        (limit,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "timestamp": r[0],
+            "item": r[1],
+            "best_source": r[2],
+            "best_price": r[3],
+            "details": json.loads(r[4]) if r[4] else {},
+        }
+        for r in rows
+    ]
 
 # Inicializamos las tablas al importar el módulo para evitar
 # errores si otras partes del programa acceden a la base de datos
