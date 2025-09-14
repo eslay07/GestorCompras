@@ -31,10 +31,21 @@ def create_app() -> Flask:
             return redirect(url_for('login'))
         return render_template('menu.html')
 
-    @app.route('/despacho', methods=['GET', 'POST'])
-    def despacho():
+    def _ensure_login():
         if 'email' not in session:
             return redirect(url_for('login'))
+        return None
+
+    @app.route('/reasignacion')
+    def reasignacion():
+        if (r := _ensure_login()) is not None:
+            return r
+        return render_template('placeholder.html', title='Reasignación de Tareas')
+
+    @app.route('/despacho', methods=['GET', 'POST'])
+    def despacho():
+        if (r := _ensure_login()) is not None:
+            return r
         result = None
         if request.method == 'POST':
             orden = request.form.get('orden', '').strip()
@@ -43,6 +54,30 @@ def create_app() -> Flask:
             email_session = {'address': session['email'], 'password': session['password']}
             result = despacho_logic.process_order(email_session, orden, include_pdf, template)
         return render_template('despacho.html', result=result)
+
+    @app.route('/seguimientos')
+    def seguimientos():
+        if (r := _ensure_login()) is not None:
+            return r
+        return render_template('placeholder.html', title='Seguimientos')
+
+    @app.route('/descargas_oc')
+    def descargas_oc():
+        if (r := _ensure_login()) is not None:
+            return r
+        return render_template('placeholder.html', title='Descargas OC')
+
+    @app.route('/cotizador')
+    def cotizador():
+        if (r := _ensure_login()) is not None:
+            return r
+        return render_template('placeholder.html', title='Cotizador')
+
+    @app.route('/configuracion')
+    def configuracion():
+        if (r := _ensure_login()) is not None:
+            return r
+        return render_template('placeholder.html', title='Configuración')
 
     @app.route('/logout')
     def logout():

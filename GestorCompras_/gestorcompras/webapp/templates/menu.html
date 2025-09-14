@@ -2,6 +2,11 @@
 {% block content %}
 <h2>Menú principal</h2>
 <ul class="list-group">
+  <li class="list-group-item"><a href="{{ url_for('reasignacion') }}">Reasignación de Tareas</a></li>
   <li class="list-group-item"><a href="{{ url_for('despacho') }}">Solicitud de Despachos</a></li>
+  <li class="list-group-item"><a href="{{ url_for('seguimientos') }}">Seguimientos</a></li>
+  <li class="list-group-item"><a href="{{ url_for('descargas_oc') }}">Descargas OC</a></li>
+  <li class="list-group-item"><a href="{{ url_for('cotizador') }}">Cotizador</a></li>
+  <li class="list-group-item"><a href="{{ url_for('configuracion') }}">Configuración</a></li>
 </ul>
 {% endblock %}
