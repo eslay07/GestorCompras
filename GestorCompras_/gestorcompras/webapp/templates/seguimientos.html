@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Seguimientos</h2>
+{% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
+{% if orders %}
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Formato de correo</label>
+    <select name="template" class="form-select">
+      {% for t in templates %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-check mb-3">
+    <input class="form-check-input" type="checkbox" name="attach_pdf" id="attach_pdf" checked>
+    <label class="form-check-label" for="attach_pdf">Adjuntar PDF</label>
+  </div>
+  <table class="table table-striped">
+    <thead><tr><th></th><th>OC</th><th>Proveedor</th><th>Tarea</th></tr></thead>
+    <tbody>
+      {% for r in orders %}
+      <tr>
+        <td><input type="checkbox" name="orders" value="{{ r['Orden de Compra'] }}"></td>
+        <td>{{ r['Orden de Compra'] }}</td>
+        <td>{{ r['Proveedor'] }}</td>
+        <td>{{ r['Tarea'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button class="btn btn-primary" type="submit">Enviar Correos</button>
+</form>
+{% else %}
+<p>No se encontraron órdenes.</p>
+{% endif %}
+{% endblock %}

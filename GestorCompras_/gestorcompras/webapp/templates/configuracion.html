@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Configuración</h2>
+{% if message %}<div class="alert alert-info">{{ message }}</div>{% endif %}
+<div class="row">
+  <div class="col-md-6">
+    <h4>Proveedores</h4>
+    <form method="post" class="row g-2 mb-3">
+      <input type="hidden" name="add_supplier" value="1">
+      <div class="col-6"><input name="name" class="form-control" placeholder="Nombre"></div>
+      <div class="col-6"><input name="ruc" class="form-control" placeholder="RUC"></div>
+      <div class="col-6"><input name="email" class="form-control" placeholder="Correo"></div>
+      <div class="col-6"><input name="email_alt" class="form-control" placeholder="Correo alt"></div>
+      <div class="col-12"><button class="btn btn-sm btn-primary">Agregar</button></div>
+    </form>
+    <table class="table table-sm table-striped">
+      <thead><tr><th>Nombre</th><th>RUC</th><th>Email</th></tr></thead>
+      <tbody>
+      {% for s in suppliers %}
+        <tr><td>{{ s[1] }}</td><td>{{ s[2] }}</td><td>{{ s[3] }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-6">
+    <h4>Asignación</h4>
+    <form method="post" class="row g-2 mb-3">
+      <input type="hidden" name="add_assignment" value="1">
+      <div class="col-4"><input name="subdept" class="form-control" placeholder="Subdepto"></div>
+      <div class="col-4"><input name="dept" class="form-control" placeholder="Departamento"></div>
+      <div class="col-4"><input name="person" class="form-control" placeholder="Persona"></div>
+      <div class="col-12"><button class="btn btn-sm btn-primary">Guardar</button></div>
+    </form>
+    <table class="table table-sm table-striped">
+      <thead><tr><th>Subdepto</th><th>Departamento</th><th>Persona</th></tr></thead>
+      <tbody>
+      {% for a in assignments %}
+        <tr><td>{{ a[0] }}</td><td>{{ a[1] }}</td><td>{{ a[2] }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
