@@ -38,6 +38,7 @@ def center_window(win: tk.Tk | tk.Toplevel):
     x = (win.winfo_screenwidth() // 2) - (w // 2)
     y = (win.winfo_screenheight() // 2) - (h // 2)
     win.geometry(f"{w}x{h}+{x}+{y}")
+    win.configure(bg=bg_base)
 
 def test_email_connection(email_address, email_password):
     try:
@@ -344,7 +345,7 @@ def main():
         root.destroy()
     root.protocol("WM_DELETE_WINDOW", on_main_close)
     
-    container = tk.Frame(root)
+    container = ttk.Frame(root, style="MyFrame.TFrame")
     container.pack(fill="both", expand=True)
     
     def show_main_menu():

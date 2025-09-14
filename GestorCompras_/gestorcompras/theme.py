@@ -1,8 +1,8 @@
 # Centralized theme configuration for GestorCompras UI
 
 # Palette
-bg_base = "#F3F4F6"  # light gray for application background
-bg_frame = "#FFFFFF"  # white for frames
+bg_base = "#E5E7EB"  # soft gray for main window background
+bg_frame = "#F3F4F6"  # lighter gray for frames
 color_primario = "#3B82F6"  # vibrant blue
 color_hover = "#2563EB"     # darker blue for hover state
 color_acento = "#F59E0B"    # accent amber for highlights

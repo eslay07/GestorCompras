@@ -80,6 +80,7 @@ class HtmlEditor(ttk.Frame):
         self.text.tag_configure("align_left", justify="left")
         self.text.tag_configure("align_center", justify="center")
         self.text.tag_configure("align_right", justify="right")
+        self.text.tag_configure("list", lmargin1=20, lmargin2=40)
 
     def _apply_tag_to_sel(self, tag, toggle=False, **config):
         if config:
@@ -144,7 +145,11 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.add("strike")
 
     def _insert_bullet(self):
-        self.text.insert("insert", "\u2022 ")
+        line_start = self.text.index("insert linestart")
+        self.text.insert(line_start, "\u2022 ")
+        line_end = self.text.index(f"{line_start} lineend")
+        self.text.tag_add("list", line_start, f"{line_end}+1c")
+        self.text.mark_set("insert", f"{line_start}+2c")
 
     def _indent_line(self):
         index = self.text.index("insert")
@@ -306,6 +311,12 @@ class HtmlEditor(ttk.Frame):
                     self.tag_stack.append("strike")
                 elif tag == "br":
                     self.widget.insert(self.index, "\n")
+                elif tag == "li":
+                    self.tag_stack.append("list")
+                    self.widget.insert(self.index, "\u2022 ")
+                    start = self.index
+                    self.index = self.widget.index(f"{self.index}+2c")
+                    self.widget.tag_add("list", start, self.index)
                 elif tag in ("div", "p"):
                     style = dict(attrs).get("style", "")
                     if "text-align" in style:
@@ -355,6 +366,10 @@ class HtmlEditor(ttk.Frame):
                         tags = self.span_stack.pop()
                         for t in tags:
                             self._remove(t)
+                elif tag == "li":
+                    self._remove("list")
+                    self.widget.insert(self.index, "\n")
+                    self.index = self.widget.index(f"{self.index}+1c")
                 elif tag in ("div", "p"):
                     if self.tag_stack and self.tag_stack[-1].startswith("align_"):
                         self.tag_stack.pop()
@@ -394,6 +409,8 @@ class HtmlEditor(ttk.Frame):
         html_chunks = []
 
         def tag_priority(tag):
+            if tag == "list":
+                return 0
             if tag == "bold":
                 return 1
             if tag == "italic":
@@ -430,8 +447,11 @@ class HtmlEditor(ttk.Frame):
                     html_chunks.append("&nbsp;")
                 else:
                     html_chunks.append(" ")
+            elif char == "\n":
+                if "list" not in prev_tags and "list" not in curr_tags:
+                    html_chunks.append("<br>")
             else:
-                html_chunks.append(escape(char).replace("\n", "<br>"))
+                html_chunks.append(escape(char))
             prev_tags = curr_tags
             index = self.text.index(f"{index}+1c")
 
@@ -465,6 +485,11 @@ class HtmlEditor(ttk.Frame):
                     self.tag_stack.append("strike")
                 elif tag == "br":
                     self.widget.insert("end", "\n")
+                elif tag == "li":
+                    self.tag_stack.append("list")
+                    start = self.widget.index("end")
+                    self.widget.insert("end", "\u2022 ")
+                    self.widget.tag_add("list", start, "end")
                 elif tag in ("div", "p"):
                     style = dict(attrs).get("style", "")
                     if "text-align" in style:
@@ -514,6 +539,9 @@ class HtmlEditor(ttk.Frame):
                         tags = self.span_stack.pop()
                         for t in tags:
                             self._remove(t)
+                elif tag == "li":
+                    self._remove("list")
+                    self.widget.insert("end", "\n")
                 elif tag in ("div", "p"):
                     if self.tag_stack and self.tag_stack[-1].startswith("align_"):
                         self.tag_stack.pop()
@@ -563,6 +591,8 @@ class HtmlEditor(ttk.Frame):
         if tag.startswith("align_"):
             mode = tag.split("_", 1)[1]
             return f'<div style="text-align:{mode}">'
+        if tag == "list":
+            return '<div style="margin-left:20px;text-indent:-15px">'
         return ""
 
     @staticmethod
@@ -573,6 +603,8 @@ class HtmlEditor(ttk.Frame):
         if tag.startswith(("font_", "size_", "color_", "bg_")):
             return "</span>"
         if tag.startswith("align_"):
+            return "</div>"
+        if tag == "list":
             return "</div>"
         return ""
 
