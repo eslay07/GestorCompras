@@ -84,13 +84,24 @@ def image_to_data_uri(path):
     ext = os.path.splitext(path)[1].lower().strip(".") or "png"
     return f"data:image/{ext};base64,{data}"
 
-def send_email_custom(email_session, subject, html_template, context, attachment_path=None, signature_path=None, cc_key="EMAIL_CC_DESPACHO"):
+def send_email_custom(
+    email_session,
+    subject,
+    html_template,
+    context,
+    attachment_path=None,
+    attachment_paths=None,
+    signature_path=None,
+    cc_key="EMAIL_CC_DESPACHO",
+):
     """Envía un correo usando una plantilla HTML personalizada."""
     if signature_path:
         context = dict(context)
         context["signature_image"] = image_to_data_uri(signature_path)
 
     content_html = render_email_string(html_template, context)
+    if context.get("signature_image"):
+        content_html += f'<br><img src="{context["signature_image"]}" alt="Firma" />'
     content_text = re.sub(r"<[^>]+>", "", content_html)
 
     msg = EmailMessage()
@@ -104,15 +115,21 @@ def send_email_custom(email_session, subject, html_template, context, attachment
     msg.set_content(content_text)
     msg.add_alternative(content_html, subtype="html")
 
-    if attachment_path:
+    attachments = []
+    if attachment_paths:
+        attachments.extend(attachment_paths)
+    elif attachment_path:
+        attachments.append(attachment_path)
+
+    for path in attachments:
         try:
-            with open(attachment_path, "rb") as f:
+            with open(path, "rb") as f:
                 pdf_data = f.read()
             msg.add_attachment(
                 pdf_data,
                 maintype="application",
                 subtype="pdf",
-                filename=os.path.basename(attachment_path),
+                filename=os.path.basename(path),
             )
         except Exception as e:
             raise Exception(f"Error al adjuntar PDF: {str(e)}")

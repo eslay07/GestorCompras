@@ -42,7 +42,20 @@ def open_despacho(master, email_session):
     ttk.Label(main_frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
     formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
     formato_var = tk.StringVar(value="FORMATO")
-    ttk.Combobox(main_frame, textvariable=formato_var, values=formatos, state="readonly").grid(row=4, column=0, sticky="e", padx=(150,0))
+    ttk.Combobox(
+        main_frame,
+        textvariable=formato_var,
+        values=formatos,
+        state="readonly",
+    ).grid(row=4, column=0, sticky="e", padx=(150, 0))
+
+    adjuntar_var = tk.BooleanVar(value=False)
+    ttk.Checkbutton(
+        main_frame,
+        text="Adjuntar varias OC en un solo correo",
+        variable=adjuntar_var,
+        style="MyCheckbutton.TCheckbutton",
+    ).grid(row=5, column=0, sticky="w", pady=(5, 0))
     
     def log_func(message):
         log_box.configure(state="normal")
@@ -61,19 +74,25 @@ def open_despacho(master, email_session):
             return
 
         summaries = []
+        infos = {}
         for oc in orders:
             info, error = despacho_logic.obtener_resumen_orden(oc)
             if info:
                 emails = ", ".join(info["emails"]) if info["emails"] else ""
                 summaries.append(f"OC {oc} -> {emails}")
+                infos[oc] = info
             else:
                 summaries.append(f"OC {oc}: {error}")
         if not summaries:
             return
+        if adjuntar_var.get():
+            group_count = len({info["ruc"] for info in infos.values()})
+        else:
+            group_count = len(infos)
         confirm_msg = (
             "\n".join(summaries)
             + f"\n\nFormato: {formato_var.get()}"
-            + f"\n¿Enviar {len(orders)} correos?"
+            + f"\n¿Enviar {group_count} correos?"
         )
         if not messagebox.askyesno("Confirmar envíos", confirm_msg):
             return
@@ -83,31 +102,47 @@ def open_despacho(master, email_session):
 
         def process_all_orders():
             results = []
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [
-                    executor.submit(
-                        despacho_logic.process_order,
+            if adjuntar_var.get():
+                results.extend(
+                    despacho_logic.process_orders_grouped(
                         email_session,
-                        orden,
+                        list(infos.keys()),
                         True,
                         formato_var.get(),
                         "EMAIL_CC_DESPACHO",
                     )
-                    for orden in orders
-                ]
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                    except Exception as e:
-                        result = f"Error en el procesamiento: {str(e)}"
-                    results.append(result)
+                )
+                for result in results:
                     log_func(result)
+            else:
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    futures = [
+                        executor.submit(
+                            despacho_logic.process_order,
+                            email_session,
+                            orden,
+                            True,
+                            formato_var.get(),
+                            "EMAIL_CC_DESPACHO",
+                        )
+                        for orden in orders
+                    ]
+                    for future in as_completed(futures):
+                        try:
+                            result = future.result()
+                        except Exception as e:
+                            result = f"Error en el procesamiento: {str(e)}"
+                        results.append(result)
+                        log_func(result)
             messagebox.showinfo("Resultado", "\n".join(results))
             window.after(0, lambda: btn_procesar.configure(state="normal"))
 
         threading.Thread(target=process_all_orders).start()
 
-    btn_procesar = ttk.Button(main_frame, text="Procesar Despachos",
-                               style="MyButton.TButton",
-                               command=process_input_orders)
-    btn_procesar.grid(row=5, column=0, pady=10)
+    btn_procesar = ttk.Button(
+        main_frame,
+        text="Procesar Despachos",
+        style="MyButton.TButton",
+        command=process_input_orders,
+    )
+    btn_procesar.grid(row=6, column=0, pady=10)

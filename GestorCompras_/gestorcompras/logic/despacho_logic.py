@@ -79,6 +79,7 @@ def obtener_resumen_orden(orden):
         "folder_name": folder_name,
         "emails": emails,
         "pdf_path": pdf_path,
+        "ruc": ruc,
     }, None
 
 def process_order(email_session, orden, include_pdf=True, template_name=None, cc_key="EMAIL_CC_DESPACHO", provider_name=None):
@@ -125,4 +126,58 @@ def process_order(email_session, orden, include_pdf=True, template_name=None, cc
         return f"✅ Correo enviado a {context['email_to']} con la OC {orden}" + (f" (Tarea: {tarea})" if tarea else "")
     except Exception as e:
         return f"❌ Error al enviar el correo para OC {orden}: {str(e)}"
+
+
+def process_orders_grouped(email_session, orders, include_pdf=True, template_name=None, cc_key="EMAIL_CC_DESPACHO"):
+    grouped: dict[str, list[dict]] = {}
+    results: list[str] = []
+    for orden in orders:
+        info, error = obtener_resumen_orden(orden)
+        if info:
+            grouped.setdefault(info["ruc"], []).append(info)
+        else:
+            results.append(f"⚠ {error}")
+    formato = template_name or get_config("EMAIL_TEMPLATE", "FORMATO")
+    template_db = get_email_template_by_name(formato)
+    if not template_db or not template_db[2].strip():
+        results.append(f"⚠ Formato de correo '{formato}' no encontrado.")
+        return results
+    _, _name, html_content, signature_path = template_db
+    for infos in grouped.values():
+        ordenes = [i["orden"] for i in infos]
+        tareas = [i["tarea"] for i in infos if i["tarea"]]
+        folder_name = infos[0]["folder_name"] if infos else ""
+        emails = infos[0]["emails"] if infos else []
+        pdf_paths = [i["pdf_path"] for i in infos] if include_pdf else None
+        email_to = ", ".join(emails) if emails else ""
+        context = {
+            "orden": ", ".join(ordenes),
+            "tarea": ", ".join(tareas),
+            "folder_name": folder_name,
+            "email_to": email_to,
+        }
+        subject = (
+            "DESPACHO DE OC "
+            + ", ".join(ordenes)
+            + (f" TAREA {tareas[0]}" if tareas else "")
+            + f" - {folder_name}"
+        ).upper()
+        try:
+            send_email_custom(
+                email_session,
+                subject,
+                html_content,
+                context,
+                attachment_paths=pdf_paths,
+                signature_path=signature_path,
+                cc_key=cc_key,
+            )
+            results.append(
+                f"✅ Correo enviado a {email_to} con las OC {', '.join(ordenes)}"
+            )
+        except Exception as e:
+            results.append(
+                f"❌ Error al enviar el correo para OCs {', '.join(ordenes)}: {str(e)}"
+            )
+    return results
 

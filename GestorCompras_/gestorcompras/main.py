@@ -9,15 +9,18 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
+from gestorcompras import theme
 
-# Palette
-bg_base = "#F0F4F8"
-bg_frame = "#FFFFFF"
-color_primario = "#1E90FF"
-color_hover = "#155D91"
-color_texto = "#333333"
-color_titulos = "#212121"
-color_blanco = "#FFFFFF"
+# Palette (imported from theme for a cohesive modern look)
+bg_base = theme.bg_base
+bg_frame = theme.bg_frame
+color_primario = theme.color_primario
+color_hover = theme.color_hover
+color_acento = theme.color_acento
+color_texto = theme.color_texto
+color_titulos = theme.color_titulos
+color_blanco = theme.color_blanco
+color_borde = theme.color_borde
 
 # Fonts
 fuente_normal = ("Segoe UI", 11)
@@ -35,6 +38,7 @@ def center_window(win: tk.Tk | tk.Toplevel):
     x = (win.winfo_screenwidth() // 2) - (w // 2)
     y = (win.winfo_screenheight() // 2) - (h // 2)
     win.geometry(f"{w}x{h}+{x}+{y}")
+    win.configure(bg=bg_base)
 
 def test_email_connection(email_address, email_password):
     try:
@@ -44,6 +48,19 @@ def test_email_connection(email_address, email_password):
         return True
     except Exception:
         return False
+
+
+def add_hover_effect(btn: ttk.Button):
+    """Simple zoom-like hover animation for buttons."""
+
+    def on_enter(_):
+        btn.configure(style="MyButtonHover.TButton")
+
+    def on_leave(_):
+        btn.configure(style="MyButton.TButton")
+
+    btn.bind("<Enter>", on_enter)
+    btn.bind("<Leave>", on_leave)
 
 def init_styles():
     style = ttk.Style()
@@ -60,9 +77,19 @@ def init_styles():
         relief="raised",
         borderwidth=1,
     )
-    style.map("MyButton.TButton",
-              background=[("active", color_hover),
-                          ("disabled", "#CCCCCC")])
+    style.configure(
+        "MyButtonHover.TButton",
+        font=fuente_bold,
+        foreground=color_blanco,
+        background=color_hover,
+        padding=12,
+        relief="raised",
+        borderwidth=1,
+    )
+    style.map(
+        "MyButton.TButton",
+        background=[("active", color_hover), ("disabled", color_borde)],
+    )
     style.configure("MyCheckbutton.TCheckbutton", background=bg_frame, foreground=color_texto, font=fuente_normal)
     style.configure(
         "MyEntry.TEntry",
@@ -101,7 +128,7 @@ class LoginScreen(tk.Frame):
         self.on_success = on_success
         self._banner_text = "COMPRAS TELCONET S.A"
         self._banner_index = 0
-        self._banner_colors = [color_primario, color_hover]
+        self._banner_colors = [color_primario, color_acento]
         self._color_index = 0
         self.create_widgets()
         self.animate_banner()
@@ -134,9 +161,10 @@ class LoginScreen(tk.Frame):
         self.pass_entry.grid(row=4, column=0, pady=5)
         self.pass_entry.config(font=fuente_entry)
         self.pass_entry.bind("<Return>", lambda event: self.attempt_login())
-        
+
         btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
         btn_login.grid(row=5, column=0, pady=15)
+        add_hover_effect(btn_login)
 
     def animate_banner(self):
         text = self._banner_text[:self._banner_index]
@@ -166,7 +194,7 @@ class LoginScreen(tk.Frame):
 class MainMenu(tk.Frame):
     def __init__(self, master):
         super().__init__(master)
-        self._banner_colors = [color_primario, color_hover]
+        self._banner_colors = [color_primario, color_acento]
         self._color_index = 0
         self._buttons = [
             ("Reasignación de Tareas", self.open_reasignacion),
@@ -211,6 +239,7 @@ class MainMenu(tk.Frame):
         text, cmd = self._buttons[index]
         btn = ttk.Button(self.menu_frame, text=text, style="MyButton.TButton", command=cmd)
         btn.grid(row=index + 1, column=0, padx=20, pady=5, sticky="ew")
+        add_hover_effect(btn)
         self._button_widgets.append(btn)
         self.after(120, self.show_button, index + 1)
     
@@ -224,11 +253,77 @@ class MainMenu(tk.Frame):
         seguimientos_gui.open_seguimientos(self.master, email_session)
 
     def open_descargas_oc(self):
-        script = Path(__file__).resolve().parents[2] / "DescargasOC-main" / "descargas_oc" / "ui.py"
-        subprocess.Popen([sys.executable, str(script)])
+        def launch_normal():
+            script = (
+                Path(__file__).resolve().parents[2]
+                / "DescargasOC-main"
+                / "descargas_oc"
+                / "ui.py"
+            )
+            subprocess.Popen([sys.executable, str(script)])
+            option_win.destroy()
+
+        def open_abastecimiento():
+            option_win.destroy()
+            win = tk.Toplevel(self.master)
+            win.title("Descarga Abastecimiento")
+            win.transient(self.master)
+            win.grab_set()
+            center_window(win)
+
+            frame = ttk.Frame(win, style="MyFrame.TFrame", padding=10)
+            frame.pack(fill="both", expand=True)
+
+            ttk.Label(frame, text="Fecha inicio:", style="MyLabel.TLabel").grid(
+                row=0, column=0, sticky="e", pady=5
+            )
+            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=0, column=1, pady=5)
+            ttk.Label(frame, text="Fecha final:", style="MyLabel.TLabel").grid(
+                row=1, column=0, sticky="e", pady=5
+            )
+            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=1, column=1, pady=5)
+
+            btn_desc = ttk.Button(
+                frame,
+                text="Descargar",
+                style="MyButton.TButton",
+                command=lambda: messagebox.showinfo(
+                    "Información", "Funcionalidad en desarrollo"
+                ),
+            )
+            btn_desc.grid(row=2, column=0, columnspan=2, pady=10)
+            add_hover_effect(btn_desc)
+
+        option_win = tk.Toplevel(self.master)
+        option_win.title("Descargas OC")
+        option_win.transient(self.master)
+        option_win.grab_set()
+        center_window(option_win)
+
+        ttk.Label(
+            option_win,
+            text="Seleccione el tipo de descarga:",
+            style="MyLabel.TLabel",
+        ).pack(padx=10, pady=10)
+        btn_norm = ttk.Button(
+            option_win,
+            text="Descarga Normal",
+            style="MyButton.TButton",
+            command=launch_normal,
+        )
+        btn_norm.pack(padx=10, pady=5)
+        add_hover_effect(btn_norm)
+        btn_abast = ttk.Button(
+            option_win,
+            text="Abastecimiento",
+            style="MyButton.TButton",
+            command=open_abastecimiento,
+        )
+        btn_abast.pack(padx=10, pady=5)
+        add_hover_effect(btn_abast)
 
     def open_config(self):
-        config_gui.open_config_gui(self.master)
+        config_gui.open_config_gui(self.master, email_session)
     
     def open_cotizador(self):
         messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo")
@@ -250,7 +345,7 @@ def main():
         root.destroy()
     root.protocol("WM_DELETE_WINDOW", on_main_close)
     
-    container = tk.Frame(root)
+    container = ttk.Frame(root, style="MyFrame.TFrame")
     container.pack(fill="both", expand=True)
     
     def show_main_menu():
