@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
+from gestorcompras.theme import color_blanco, color_borde, color_titulos
 from gestorcompras.services import db
 import threading
 import time
@@ -306,7 +307,7 @@ def open_reasignacion(master, email_session):
     window.protocol("WM_DELETE_WINDOW", on_close)
 
     banner = ttk.Label(window, text="Sistema de automatización - compras")
-    banner.configure(font=("Helvetica", 24, "bold"), foreground="#222222")
+    banner.configure(font=("Helvetica", 24, "bold"), foreground=color_titulos)
     banner.pack(pady=(20,10))
 
     top_frame = ttk.Frame(window, style="MyFrame.TFrame", padding=5)
@@ -331,8 +332,12 @@ def open_reasignacion(master, email_session):
                              style="MyLabelFrame.TLabelframe", padding=5)
     task_lf.pack(fill="both", expand=True)
 
-    canvas = tk.Canvas(task_lf, background="#FFFFFF", highlightthickness=1,
-                       highlightbackground="#CCCCCC")
+    canvas = tk.Canvas(
+        task_lf,
+        background=color_blanco,
+        highlightthickness=1,
+        highlightbackground=color_borde,
+    )
     scrollbar = ttk.Scrollbar(task_lf, orient="vertical", command=canvas.yview)
     tasks_frame = ttk.Frame(canvas, style="MyFrame.TFrame")
 

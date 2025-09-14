@@ -5,6 +5,7 @@ from tkinter.scrolledtext import ScrolledText
 from gestorcompras.services import db
 from gestorcompras.services import google_sheets
 from gestorcompras.logic import despacho_logic
+from gestorcompras.theme import color_blanco, color_borde
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -41,7 +42,12 @@ def open_seguimientos(master, email_session):
     list_lf = ttk.LabelFrame(frame, text="Órdenes de Compra", style="MyLabelFrame.TLabelframe", padding=5)
     list_lf.grid(row=3, column=0, sticky="nsew", pady=5)
 
-    canvas = tk.Canvas(list_lf, background="#FFFFFF", highlightthickness=1, highlightbackground="#CCCCCC")
+    canvas = tk.Canvas(
+        list_lf,
+        background=color_blanco,
+        highlightthickness=1,
+        highlightbackground=color_borde,
+    )
     scrollbar = ttk.Scrollbar(list_lf, orient="vertical", command=canvas.yview)
     orders_frame = ttk.Frame(canvas, style="MyFrame.TFrame")
 
