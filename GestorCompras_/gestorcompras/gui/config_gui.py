@@ -431,30 +431,43 @@ class TemplateForm(tk.Toplevel):
         container = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
         container.pack(fill="both", expand=True)
 
+        container.columnconfigure(0, weight=1)
+
         self.name_var = tk.StringVar()
         self.signature_var = tk.StringVar()
 
-        ttk.Label(container, text="Nombre:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
-        ttk.Entry(container, textvariable=self.name_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
+        row = 0
+        ttk.Label(container, text="Nombre:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
+        row += 1
+        ttk.Entry(container, textvariable=self.name_var, style="MyEntry.TEntry").grid(row=row, column=0, sticky="ew", pady=5)
+        row += 1
 
-        ttk.Label(container, text="Imagen de firma:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        ttk.Label(container, text="Imagen de firma:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
+        row += 1
         frame_img = ttk.Frame(container, style="MyFrame.TFrame")
-        frame_img.pack(fill="x")
-        ttk.Entry(frame_img, textvariable=self.signature_var, style="MyEntry.TEntry").pack(side="left", fill="x", expand=True, pady=5)
-        ttk.Button(frame_img, text="Seleccionar", style="MyButton.TButton", command=self.select_image).pack(side="left", padx=5)
-        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).pack(pady=(5,10))
+        frame_img.grid(row=row, column=0, sticky="ew")
+        frame_img.columnconfigure(0, weight=1)
+        ttk.Entry(frame_img, textvariable=self.signature_var, style="MyEntry.TEntry").grid(row=0, column=0, sticky="ew", pady=5)
+        ttk.Button(frame_img, text="Seleccionar", style="MyButton.TButton", command=self.select_image).grid(row=0, column=1, padx=5)
+        row += 1
+        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).grid(row=row, column=0, pady=(5,10), sticky="w")
+        row += 1
 
-        ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
+        row += 1
         self.editor = HtmlEditor(container)
-        self.editor.pack(fill="both", expand=True, pady=5)
+        self.editor.grid(row=row, column=0, sticky="nsew", pady=5)
+        container.rowconfigure(row, weight=1)
+        row += 1
 
-        ttk.Label(container, text="Correo de prueba:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        ttk.Label(container, text="Correo de prueba:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
+        row += 1
         test_frame = ttk.Frame(container, style="MyFrame.TFrame")
-        test_frame.pack(fill="x")
+        test_frame.grid(row=row, column=0, sticky="ew")
+        test_frame.columnconfigure(0, weight=1)
         self.test_email_var = tk.StringVar()
-        ttk.Entry(test_frame, textvariable=self.test_email_var, style="MyEntry.TEntry").pack(side="left", fill="x", expand=True, pady=5)
-        ttk.Button(test_frame, text="Enviar prueba", style="MyButton.TButton", command=self.send_test_email).pack(side="left", padx=5)
-
+        ttk.Entry(test_frame, textvariable=self.test_email_var, style="MyEntry.TEntry").grid(row=0, column=0, sticky="ew", pady=5)
+        ttk.Button(test_frame, text="Enviar prueba", style="MyButton.TButton", command=self.send_test_email).grid(row=0, column=1, padx=5, pady=5)
 
         if self.template_data:
             self.name_var.set(self.template_data[1])
