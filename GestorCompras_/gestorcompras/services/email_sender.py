@@ -100,6 +100,8 @@ def send_email_custom(
         context["signature_image"] = image_to_data_uri(signature_path)
 
     content_html = render_email_string(html_template, context)
+    if context.get("signature_image"):
+        content_html += f'<br><img src="{context["signature_image"]}" alt="Firma" />'
     content_text = re.sub(r"<[^>]+>", "", content_html)
 
     msg = EmailMessage()

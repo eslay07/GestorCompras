@@ -72,16 +72,10 @@ class HtmlEditor(ttk.Frame):
         vbar.pack(side="right", fill="y")
 
     def _setup_tags(self):
-        base = tkfont.Font(font=self.text.cget("font"))
-        bold = base.copy(); bold.configure(weight="bold")
-        italic = base.copy(); italic.configure(slant="italic")
-        underline = base.copy(); underline.configure(underline=True)
-        strike = base.copy(); strike.configure(overstrike=True)
-
-        self.text.tag_configure("bold", font=bold)
-        self.text.tag_configure("italic", font=italic)
-        self.text.tag_configure("underline", font=underline)
-        self.text.tag_configure("strike", font=strike)
+        self.text.tag_configure("bold")
+        self.text.tag_configure("italic")
+        self.text.tag_configure("underline", underline=1)
+        self.text.tag_configure("strike", overstrike=1)
 
         self.text.tag_configure("align_left", justify="left")
         self.text.tag_configure("align_center", justify="center")
@@ -114,6 +108,10 @@ class HtmlEditor(ttk.Frame):
         return True
 
     def _make_bold(self):
+        font = tkfont.Font(family=self.current_font, size=int(self.current_size))
+        font.configure(weight="bold")
+        self.text.tag_configure("bold", font=font)
+        self.text.tag_raise("bold")
         if not self._apply_tag_to_sel("bold", toggle=True):
             if "bold" in self.active_tags:
                 self.active_tags.remove("bold")
@@ -121,6 +119,10 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.add("bold")
 
     def _make_italic(self):
+        font = tkfont.Font(family=self.current_font, size=int(self.current_size))
+        font.configure(slant="italic")
+        self.text.tag_configure("italic", font=font)
+        self.text.tag_raise("italic")
         if not self._apply_tag_to_sel("italic", toggle=True):
             if "italic" in self.active_tags:
                 self.active_tags.remove("italic")
@@ -166,6 +168,7 @@ class HtmlEditor(ttk.Frame):
         except tk.TclError:
             self.current_font = family
             return
+        self.current_font = family
         for t in self.text.tag_names():
             if t.startswith("font_"):
                 self.text.tag_remove(t, start, end)
@@ -181,6 +184,7 @@ class HtmlEditor(ttk.Frame):
         except tk.TclError:
             self.current_size = size
             return
+        self.current_size = size
         for t in self.text.tag_names():
             if t.startswith("size_"):
                 self.text.tag_remove(t, start, end)
@@ -239,7 +243,17 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("insert")
         except tk.TclError:
             return
-        for tag in self.active_tags:
+        if "bold" in self.active_tags:
+            font = tkfont.Font(family=self.current_font, size=int(self.current_size), weight="bold")
+            self.text.tag_configure("bold", font=font)
+            self.text.tag_raise("bold")
+            self.text.tag_add("bold", start, end)
+        if "italic" in self.active_tags:
+            font = tkfont.Font(family=self.current_font, size=int(self.current_size), slant="italic")
+            self.text.tag_configure("italic", font=font)
+            self.text.tag_raise("italic")
+            self.text.tag_add("italic", start, end)
+        for tag in self.active_tags - {"bold", "italic"}:
             self.text.tag_add(tag, start, end)
         if self.current_font:
             self.text.tag_add(f"font_{self.current_font.replace(' ', '_')}", start, end)
