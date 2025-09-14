@@ -14,6 +14,7 @@ class HtmlEditor(ttk.Frame):
         self.current_font = self.font_var.get()
         self.current_size = self.size_var.get()
         self.current_color = None
+        self.current_bg = None
         self.text.bind("<KeyRelease>", self._apply_active_tags)
         for seq in ("<<Paste>>", "<Control-v>", "<Command-v>"):
             self.text.bind(seq, self._handle_paste)
@@ -25,11 +26,17 @@ class HtmlEditor(ttk.Frame):
         ttk.Button(toolbar, text="B", width=2, command=self._make_bold).pack(side="left")
         ttk.Button(toolbar, text="I", width=2, command=self._make_italic).pack(side="left")
         ttk.Button(toolbar, text="U", width=2, command=self._make_underline).pack(side="left")
-        ttk.Button(toolbar, text="•", width=2, command=self._insert_bullet).pack(side="left", padx=2)
-        ttk.Button(toolbar, text="\u2192", width=2, command=self._indent_line).pack(side="left")
-        ttk.Button(toolbar, text="\u2190", width=2, command=self._dedent_line).pack(side="left")
+        ttk.Button(toolbar, text="S", width=2, command=self._make_strike).pack(side="left")
+        ttk.Button(toolbar, text="\u25A3", width=2, command=self._apply_bgcolor).pack(side="left")
+        ttk.Button(toolbar, text="A", width=2, command=self._apply_color).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="\u2022", width=2, command=self._insert_bullet).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="\u21E5", width=2, command=self._indent_line).pack(side="left")
+        ttk.Button(toolbar, text="\u21E4", width=2, command=self._dedent_line).pack(side="left")
+        ttk.Button(toolbar, text="L", width=2, command=lambda: self._set_align("left")).pack(side="left", padx=(5,0))
+        ttk.Button(toolbar, text="C", width=2, command=lambda: self._set_align("center")).pack(side="left")
+        ttk.Button(toolbar, text="R", width=2, command=lambda: self._set_align("right")).pack(side="left")
 
-        self.font_var = tk.StringVar(value="Helvetica")
+        self.font_var = tk.StringVar(value="Calibri")
         fonts = sorted(set(tkfont.families()))
         font_box = ttk.Combobox(
             toolbar,
@@ -42,8 +49,8 @@ class HtmlEditor(ttk.Frame):
         font_box.bind("<<ComboboxSelected>>", lambda e: self._apply_font())
         ttk.Button(toolbar, text="Font", command=self._apply_font).pack(side="left")
 
-        self.size_var = tk.StringVar(value="12")
-        sizes = ["10", "12", "14", "16", "18", "20", "24"]
+        self.size_var = tk.StringVar(value="11")
+        sizes = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24"]
         size_box = ttk.Combobox(
             toolbar,
             textvariable=self.size_var,
@@ -55,8 +62,6 @@ class HtmlEditor(ttk.Frame):
         size_box.bind("<<ComboboxSelected>>", lambda e: self._apply_size())
         ttk.Button(toolbar, text="Size", command=self._apply_size).pack(side="left")
 
-        ttk.Button(toolbar, text="Color", command=self._apply_color).pack(side="left", padx=5)
-
         text_frame = ttk.Frame(self)
         text_frame.pack(fill="both", expand=True)
 
@@ -67,9 +72,20 @@ class HtmlEditor(ttk.Frame):
         vbar.pack(side="right", fill="y")
 
     def _setup_tags(self):
-        self.text.tag_configure("bold", font=tkfont.Font(weight="bold"))
-        self.text.tag_configure("italic", font=tkfont.Font(slant="italic"))
-        self.text.tag_configure("underline", underline=True)
+        base = tkfont.Font(font=self.text.cget("font"))
+        bold = base.copy(); bold.configure(weight="bold")
+        italic = base.copy(); italic.configure(slant="italic")
+        underline = base.copy(); underline.configure(underline=True)
+        strike = base.copy(); strike.configure(overstrike=True)
+
+        self.text.tag_configure("bold", font=bold)
+        self.text.tag_configure("italic", font=italic)
+        self.text.tag_configure("underline", font=underline)
+        self.text.tag_configure("strike", font=strike)
+
+        self.text.tag_configure("align_left", justify="left")
+        self.text.tag_configure("align_center", justify="center")
+        self.text.tag_configure("align_right", justify="right")
 
     def _apply_tag_to_sel(self, tag, toggle=False, **config):
         if config:
@@ -118,6 +134,13 @@ class HtmlEditor(ttk.Frame):
             else:
                 self.active_tags.add("underline")
 
+    def _make_strike(self):
+        if not self._apply_tag_to_sel("strike", toggle=True):
+            if "strike" in self.active_tags:
+                self.active_tags.remove("strike")
+            else:
+                self.active_tags.add("strike")
+
     def _insert_bullet(self):
         self.text.insert("insert", "\u2022 ")
 
@@ -163,6 +186,19 @@ class HtmlEditor(ttk.Frame):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
 
+    def _set_align(self, mode):
+        tag = f"align_{mode}"
+        try:
+            start = self.text.index("sel.first linestart")
+            end = self.text.index("sel.last lineend")
+        except tk.TclError:
+            line = self.text.index("insert")
+            start = self.text.index(f"{line} linestart")
+            end = self.text.index(f"{line} lineend")
+        for t in ("align_left", "align_center", "align_right"):
+            self.text.tag_remove(t, start, end)
+        self.text.tag_add(tag, start, end)
+
     def _apply_color(self):
         color = colorchooser.askcolor()[1]
         if not color:
@@ -180,6 +216,23 @@ class HtmlEditor(ttk.Frame):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
 
+    def _apply_bgcolor(self):
+        color = colorchooser.askcolor()[1]
+        if not color:
+            return
+        tag = f"bg_{color.lstrip('#')}"
+        self.text.tag_configure(tag, background=color)
+        try:
+            start = self.text.index("sel.first")
+            end = self.text.index("sel.last")
+        except tk.TclError:
+            self.current_bg = color
+            return
+        for t in self.text.tag_names():
+            if t.startswith("bg_"):
+                self.text.tag_remove(t, start, end)
+        self._apply_tag_to_sel(tag)
+
     def _apply_active_tags(self, event=None):
         try:
             start = self.text.index("insert-1c")
@@ -194,6 +247,8 @@ class HtmlEditor(ttk.Frame):
             self.text.tag_add(f"size_{self.current_size}", start, end)
         if self.current_color:
             self.text.tag_add(f"color_{self.current_color.lstrip('#')}", start, end)
+        if getattr(self, "current_bg", None):
+            self.text.tag_add(f"bg_{self.current_bg.lstrip('#')}", start, end)
 
     def _handle_paste(self, event=None):
         try:
@@ -233,8 +288,15 @@ class HtmlEditor(ttk.Frame):
                     self.tag_stack.append("italic")
                 elif tag == "u":
                     self.tag_stack.append("underline")
+                elif tag in ("s", "strike"):
+                    self.tag_stack.append("strike")
                 elif tag == "br":
                     self.widget.insert(self.index, "\n")
+                elif tag in ("div", "p"):
+                    style = dict(attrs).get("style", "")
+                    if "text-align" in style:
+                        align = style.split("text-align:")[1].split(";")[0].strip()
+                        self.tag_stack.append(f"align_{align}")
                 elif tag == "span":
                     style = dict(attrs).get("style", "")
                     tags = []
@@ -257,6 +319,12 @@ class HtmlEditor(ttk.Frame):
                             self.widget.tag_configure(tag_name, foreground=color)
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
+                        elif "background-color" in part:
+                            color = part.split(":")[1].strip()
+                            tag_name = f"bg_{color.lstrip('#')}"
+                            self.widget.tag_configure(tag_name, background=color)
+                            self.tag_stack.append(tag_name)
+                            tags.append(tag_name)
                     self.span_stack.append(tags)
 
             def handle_endtag(self, tag):
@@ -266,11 +334,16 @@ class HtmlEditor(ttk.Frame):
                     self._remove("italic")
                 elif tag == "u":
                     self._remove("underline")
+                elif tag in ("s", "strike"):
+                    self._remove("strike")
                 elif tag == "span":
                     if self.span_stack:
                         tags = self.span_stack.pop()
                         for t in tags:
                             self._remove(t)
+                elif tag in ("div", "p"):
+                    if self.tag_stack and self.tag_stack[-1].startswith("align_"):
+                        self.tag_stack.pop()
 
             def _remove(self, target):
                 if target in self.tag_stack:
@@ -313,12 +386,18 @@ class HtmlEditor(ttk.Frame):
                 return 2
             if tag == "underline":
                 return 3
-            if tag.startswith("font_"):
+            if tag == "strike":
                 return 4
-            if tag.startswith("size_"):
+            if tag.startswith("font_"):
                 return 5
-            if tag.startswith("color_"):
+            if tag.startswith("size_"):
                 return 6
+            if tag.startswith("color_"):
+                return 7
+            if tag.startswith("bg_"):
+                return 8
+            if tag.startswith("align_"):
+                return 9
             return 99
 
         while self.text.compare(index, "<=", end_index):
@@ -368,8 +447,15 @@ class HtmlEditor(ttk.Frame):
                     self.tag_stack.append("italic")
                 elif tag == "u":
                     self.tag_stack.append("underline")
+                elif tag in ("s", "strike"):
+                    self.tag_stack.append("strike")
                 elif tag == "br":
                     self.widget.insert("end", "\n")
+                elif tag in ("div", "p"):
+                    style = dict(attrs).get("style", "")
+                    if "text-align" in style:
+                        align = style.split("text-align:")[1].split(";")[0].strip()
+                        self.tag_stack.append(f"align_{align}")
                 elif tag == "span":
                     style = dict(attrs).get("style", "")
                     tags = []
@@ -392,6 +478,12 @@ class HtmlEditor(ttk.Frame):
                             self.widget.tag_configure(tag_name, foreground=color)
                             self.tag_stack.append(tag_name)
                             tags.append(tag_name)
+                        elif "background-color" in part:
+                            color = part.split(":")[1].strip()
+                            tag_name = f"bg_{color.lstrip('#')}"
+                            self.widget.tag_configure(tag_name, background=color)
+                            self.tag_stack.append(tag_name)
+                            tags.append(tag_name)
                     self.span_stack.append(tags)
 
             def handle_endtag(self, tag):
@@ -401,11 +493,16 @@ class HtmlEditor(ttk.Frame):
                     self._remove("italic")
                 elif tag == "u":
                     self._remove("underline")
+                elif tag in ("s", "strike"):
+                    self._remove("strike")
                 elif tag == "span":
                     if self.span_stack:
                         tags = self.span_stack.pop()
                         for t in tags:
                             self._remove(t)
+                elif tag in ("div", "p"):
+                    if self.tag_stack and self.tag_stack[-1].startswith("align_"):
+                        self.tag_stack.pop()
 
             def _remove(self, target):
                 if target in self.tag_stack:
@@ -431,6 +528,8 @@ class HtmlEditor(ttk.Frame):
             return "<i>"
         if tag == "underline":
             return "<u>"
+        if tag == "strike":
+            return "<s>"
         if tag.startswith("font_"):
             family = tag.split("_", 1)[1].replace("_", " ")
             return f'<span style="font-family:{family}">'
@@ -442,14 +541,24 @@ class HtmlEditor(ttk.Frame):
             if not color.startswith("#"):
                 color = "#" + color
             return f'<span style="color:{color}">'
+        if tag.startswith("bg_"):
+            color = tag.split("_", 1)[1]
+            if not color.startswith("#"):
+                color = "#" + color
+            return f'<span style="background-color:{color}">'
+        if tag.startswith("align_"):
+            mode = tag.split("_", 1)[1]
+            return f'<div style="text-align:{mode}">'
         return ""
 
     @staticmethod
     def _tag_end_html(tag):
-        if tag in ("bold", "italic", "underline"):
-            mapping = {"bold": "b", "italic": "i", "underline": "u"}
+        if tag in ("bold", "italic", "underline", "strike"):
+            mapping = {"bold": "b", "italic": "i", "underline": "u", "strike": "s"}
             return f"</{mapping[tag]}>"
-        if tag.startswith(("font_", "size_", "color_")):
+        if tag.startswith(("font_", "size_", "color_", "bg_")):
             return "</span>"
+        if tag.startswith("align_"):
+            return "</div>"
         return ""
 

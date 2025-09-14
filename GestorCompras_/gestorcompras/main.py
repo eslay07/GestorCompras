@@ -288,7 +288,7 @@ class MainMenu(tk.Frame):
         ).pack(padx=10, pady=5)
 
     def open_config(self):
-        config_gui.open_config_gui(self.master)
+        config_gui.open_config_gui(self.master, email_session)
     
     def open_cotizador(self):
         messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo")

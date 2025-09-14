@@ -6,6 +6,7 @@ from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
 from gestorcompras.services import db
 from gestorcompras.gui.html_editor import HtmlEditor
+from gestorcompras.services.email_sender import send_email_custom
 
 def center_window(win: tk.Tk | tk.Toplevel):
     win.update_idletasks()
@@ -16,13 +17,14 @@ def center_window(win: tk.Tk | tk.Toplevel):
     win.geometry(f"{w}x{h}+{x}+{y}")
 
 class ConfigGUI(tk.Toplevel):
-    def __init__(self, master=None):
+    def __init__(self, master=None, email_session=None):
         super().__init__(master)
         # Ensure the database has all required tables even if this
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
         self.geometry("800x600")
+        self.email_session = email_session
         self.create_widgets()
         center_window(self)
     
@@ -389,7 +391,7 @@ class ConfigGUI(tk.Toplevel):
             self.email_template_var.set("FORMATO")
 
     def agregar_nuevo_formato(self):
-        TemplateForm(self, "Nuevo Formato", self.load_email_templates).wait_window()
+        TemplateForm(self, "Nuevo Formato", self.load_email_templates, email_session=self.email_session).wait_window()
 
     def editar_formato(self):
         selected = self.templates_list.selection()
@@ -398,7 +400,7 @@ class ConfigGUI(tk.Toplevel):
             return
         tpl_id = self.templates_list.item(selected[0])["values"][0]
         data = db.get_email_template(tpl_id)
-        TemplateForm(self, "Editar Formato", self.load_email_templates, data).wait_window()
+        TemplateForm(self, "Editar Formato", self.load_email_templates, data, email_session=self.email_session).wait_window()
 
     def eliminar_formato(self):
         selected = self.templates_list.selection()
@@ -412,7 +414,7 @@ class ConfigGUI(tk.Toplevel):
 
 
 class TemplateForm(tk.Toplevel):
-    def __init__(self, master, title, refresh_callback, template_data=None):
+    def __init__(self, master, title, refresh_callback, template_data=None, email_session=None):
         super().__init__(master)
         self.title(title)
         self.geometry("800x600")
@@ -421,6 +423,7 @@ class TemplateForm(tk.Toplevel):
         self.focus()
         self.refresh_callback = refresh_callback
         self.template_data = template_data
+        self.email_session = email_session
         self.create_widgets()
         center_window(self)
 
@@ -444,6 +447,13 @@ class TemplateForm(tk.Toplevel):
         ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
         self.editor = HtmlEditor(container)
         self.editor.pack(fill="both", expand=True, pady=5)
+
+        ttk.Label(container, text="Correo de prueba:", style="MyLabel.TLabel").pack(pady=5, anchor="w")
+        test_frame = ttk.Frame(container, style="MyFrame.TFrame")
+        test_frame.pack(fill="x")
+        self.test_email_var = tk.StringVar()
+        ttk.Entry(test_frame, textvariable=self.test_email_var, style="MyEntry.TEntry").pack(side="left", fill="x", expand=True, pady=5)
+        ttk.Button(test_frame, text="Enviar prueba", style="MyButton.TButton", command=self.send_test_email).pack(side="left", padx=5)
 
 
         if self.template_data:
@@ -479,6 +489,32 @@ class TemplateForm(tk.Toplevel):
             db.add_email_template(name, html, signature)
         self.refresh_callback()
         self.destroy()
+
+    def send_test_email(self):
+        email = self.test_email_var.get().strip()
+        if not email:
+            messagebox.showwarning("Advertencia", "Ingrese un correo para la prueba.")
+            return
+        if not self.email_session:
+            messagebox.showerror("Error", "No hay sesión de correo configurada.")
+            return
+        name = self.name_var.get().strip() or "Formato"
+        self.editor.text.tag_remove("sel", "1.0", "end")
+        raw_text = self.editor.text.get("1.0", "end-1c").strip()
+        html = self.editor.get_html().strip()
+        if not html and raw_text:
+            html = escape(raw_text).replace("\n", "<br>")
+        try:
+            send_email_custom(
+                self.email_session,
+                subject=f"Prueba {name}",
+                html_template=html,
+                context={"email_to": email},
+                signature_path=self.signature_var.get().strip() or None,
+            )
+            messagebox.showinfo("Información", "Correo de prueba enviado correctamente.")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo enviar el correo: {e}")
     
 
 class SupplierForm(tk.Toplevel):
@@ -587,8 +623,8 @@ class AssignmentForm(tk.Toplevel):
         self.refresh_callback()
         self.destroy()
 
-def open_config_gui(root):
-    config_window = ConfigGUI(root)
+def open_config_gui(root, email_session):
+    config_window = ConfigGUI(root, email_session)
     config_window.transient(root)
     config_window.grab_set()
     config_window.wait_window()
