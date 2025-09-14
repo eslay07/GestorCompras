@@ -224,8 +224,68 @@ class MainMenu(tk.Frame):
         seguimientos_gui.open_seguimientos(self.master, email_session)
 
     def open_descargas_oc(self):
-        script = Path(__file__).resolve().parents[2] / "DescargasOC-main" / "descargas_oc" / "ui.py"
-        subprocess.Popen([sys.executable, str(script)])
+        def launch_normal():
+            script = (
+                Path(__file__).resolve().parents[2]
+                / "DescargasOC-main"
+                / "descargas_oc"
+                / "ui.py"
+            )
+            subprocess.Popen([sys.executable, str(script)])
+            option_win.destroy()
+
+        def open_abastecimiento():
+            option_win.destroy()
+            win = tk.Toplevel(self.master)
+            win.title("Descarga Abastecimiento")
+            win.transient(self.master)
+            win.grab_set()
+            center_window(win)
+
+            frame = ttk.Frame(win, style="MyFrame.TFrame", padding=10)
+            frame.pack(fill="both", expand=True)
+
+            ttk.Label(frame, text="Fecha inicio:", style="MyLabel.TLabel").grid(
+                row=0, column=0, sticky="e", pady=5
+            )
+            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=0, column=1, pady=5)
+            ttk.Label(frame, text="Fecha final:", style="MyLabel.TLabel").grid(
+                row=1, column=0, sticky="e", pady=5
+            )
+            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=1, column=1, pady=5)
+
+            ttk.Button(
+                frame,
+                text="Descargar",
+                style="MyButton.TButton",
+                command=lambda: messagebox.showinfo(
+                    "Información", "Funcionalidad en desarrollo"
+                ),
+            ).grid(row=2, column=0, columnspan=2, pady=10)
+
+        option_win = tk.Toplevel(self.master)
+        option_win.title("Descargas OC")
+        option_win.transient(self.master)
+        option_win.grab_set()
+        center_window(option_win)
+
+        ttk.Label(
+            option_win,
+            text="Seleccione el tipo de descarga:",
+            style="MyLabel.TLabel",
+        ).pack(padx=10, pady=10)
+        ttk.Button(
+            option_win,
+            text="Descarga Normal",
+            style="MyButton.TButton",
+            command=launch_normal,
+        ).pack(padx=10, pady=5)
+        ttk.Button(
+            option_win,
+            text="Abastecimiento",
+            style="MyButton.TButton",
+            command=open_abastecimiento,
+        ).pack(padx=10, pady=5)
 
     def open_config(self):
         config_gui.open_config_gui(self.master)
