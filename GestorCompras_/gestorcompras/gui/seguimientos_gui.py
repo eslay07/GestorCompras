@@ -5,7 +5,7 @@ from tkinter.scrolledtext import ScrolledText
 from gestorcompras.services import db
 from gestorcompras.services import google_sheets
 from gestorcompras.logic import despacho_logic
-from gestorcompras.theme import color_blanco, color_borde
+from gestorcompras.theme import color_blanco, color_borde, color_texto, bg_frame
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -61,7 +61,7 @@ def open_seguimientos(master, email_session):
     scrollbar.pack(side="right", fill="y")
 
     ttk.Label(frame, text="Estado del Proceso:", style="MyLabel.TLabel").grid(row=5, column=0, sticky="w")
-    log_box = ScrolledText(frame, height=6, state="disabled")
+    log_box = ScrolledText(frame, height=6, state="disabled", bg=bg_frame, fg=color_texto)
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
 
     ttk.Label(frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")

@@ -9,6 +9,7 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
+from gestorcompras.gui.status_bar import ResourceStatusBar
 from gestorcompras import theme
 
 # Palette (imported from theme for a cohesive modern look)
@@ -19,7 +20,6 @@ color_hover = theme.color_hover
 color_acento = theme.color_acento
 color_texto = theme.color_texto
 color_titulos = theme.color_titulos
-color_blanco = theme.color_blanco
 color_borde = theme.color_borde
 
 # Fonts
@@ -71,7 +71,7 @@ def init_styles():
     style.configure(
         "MyButton.TButton",
         font=fuente_bold,
-        foreground=color_blanco,
+        foreground=color_texto,
         background=color_primario,
         padding=10,
         relief="raised",
@@ -80,7 +80,7 @@ def init_styles():
     style.configure(
         "MyButtonHover.TButton",
         font=fuente_bold,
-        foreground=color_blanco,
+        foreground=color_texto,
         background=color_hover,
         padding=12,
         relief="raised",
@@ -97,27 +97,38 @@ def init_styles():
         padding=5,
         relief="solid",
         borderwidth=1,
+        foreground=color_texto,
+        fieldbackground=bg_base,
+        background=bg_base,
+        insertcolor=color_texto,
+    )
+    style.configure(
+        "TCombobox",
+        foreground=color_texto,
+        fieldbackground=bg_base,
+        background=bg_base,
+        arrowcolor=color_texto,
     )
     style.configure("MyNotebook.TNotebook", background=bg_base, borderwidth=0)
     style.configure("MyNotebook.TNotebook.Tab", padding=[12, 8], font=fuente_bold)
     style.map("MyNotebook.TNotebook.Tab",
               background=[("selected", color_primario),
                           ("active", color_hover)],
-              foreground=[("selected", color_blanco),
-                          ("active", color_blanco)])
+              foreground=[("selected", color_texto),
+                          ("active", color_texto)])
     style.configure(
         "MyTreeview.Treeview",
-        background=color_blanco,
+        background=bg_frame,
         foreground=color_texto,
         rowheight=28,
-        fieldbackground="#F7F9FB",
+        fieldbackground=bg_frame,
         font=fuente_normal,
     )
-    style.configure("MyTreeview.Treeview.Heading", background=color_primario, foreground=color_blanco, font=fuente_bold)
+    style.configure("MyTreeview.Treeview.Heading", background=color_primario, foreground=color_titulos, font=fuente_bold)
     style.map("MyTreeview.Treeview.Heading", background=[("active", color_hover)])
     style.configure("MyVertical.TScrollbar", gripcount=0, background=color_primario, troughcolor=bg_frame,
-                    bordercolor=bg_frame, arrowcolor=color_blanco)
-    style.map("MyVertical.TScrollbar", background=[("active", color_hover)], arrowcolor=[("active", color_blanco)])
+                    bordercolor=bg_frame, arrowcolor=color_texto)
+    style.map("MyVertical.TScrollbar", background=[("active", color_hover)], arrowcolor=[("active", color_texto)])
     style.configure("MyLabelFrame.TLabelframe", background=bg_frame, relief="groove")
     style.configure("MyLabelFrame.TLabelframe.Label", background=bg_frame, foreground=color_texto, font=fuente_bold)
     style.configure("Banner.TLabel", background=bg_frame, foreground=color_titulos, font=fuente_banner)
@@ -347,6 +358,9 @@ def main():
     
     container = ttk.Frame(root, style="MyFrame.TFrame")
     container.pack(fill="both", expand=True)
+
+    status_bar = ResourceStatusBar(root)
+    status_bar.pack(side="bottom", fill="x")
     
     def show_main_menu():
         for widget in container.winfo_children():
