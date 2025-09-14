@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import smtplib
 import subprocess
 import sys
 from pathlib import Path
@@ -9,6 +8,7 @@ from gestorcompras.gui import config_gui
 from gestorcompras.gui import reasignacion_gui
 from gestorcompras.gui import despacho_gui
 from gestorcompras.gui import seguimientos_gui
+from gestorcompras.utils import test_email_connection
 
 # Palette
 bg_base = "#F0F4F8"
@@ -35,15 +35,6 @@ def center_window(win: tk.Tk | tk.Toplevel):
     x = (win.winfo_screenwidth() // 2) - (w // 2)
     y = (win.winfo_screenheight() // 2) - (h // 2)
     win.geometry(f"{w}x{h}+{x}+{y}")
-
-def test_email_connection(email_address, email_password):
-    try:
-        with smtplib.SMTP("smtp.telconet.ec", 587) as server:
-            server.starttls()
-            server.login(email_address, email_password)
-        return True
-    except Exception:
-        return False
 
 def init_styles():
     style = ttk.Style()

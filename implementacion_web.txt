@@ -1,0 +1,20 @@
+Implementación web del Gestor de Compras
+=======================================
+
+Pruebas locales
+---------------
+1. Crear un entorno virtual y activarlo.
+2. Instalar dependencias: `pip install -r requirements.txt`.
+3. Ejecutar la aplicación con `python run_web.py`.
+4. Abrir `http://localhost:5000` en el navegador y realizar inicio de sesión.
+
+Despliegue gratuito en Render
+-----------------------------
+1. Subir este repositorio a GitHub.
+2. Crear una cuenta gratuita en https://render.com.
+3. Crear un **New Web Service** enlazando el repositorio.
+4. Build Command: `pip install -r requirements.txt`.
+5. Start Command: `gunicorn run_web:app`.
+6. Añadir la variable de entorno `SECRET_KEY` con un valor seguro.
+7. Presionar **Create Web Service** y esperar a que finalice el despliegue.
+8. Probar la aplicación utilizando la URL pública que entrega Render.

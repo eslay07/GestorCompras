@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Solicitud de Despachos</h2>
+<form method="post">
+  <div class="mb-3">
+    <label class="form-label">Número de Orden</label>
+    <input class="form-control" type="text" name="orden" required>
+  </div>
+  <div class="mb-3 form-check">
+    <input class="form-check-input" type="checkbox" name="include_pdf" id="pdfCheck" checked>
+    <label class="form-check-label" for="pdfCheck">Adjuntar PDF</label>
+  </div>
+  <div class="mb-3">
+    <label class="form-label">Formato de correo (opcional)</label>
+    <input class="form-control" type="text" name="template" placeholder="FORMATO">
+  </div>
+  <button class="btn btn-primary" type="submit">Enviar</button>
+</form>
+{% if result %}
+<div class="alert alert-info mt-3">{{ result }}</div>
+{% endif %}
+{% endblock %}
