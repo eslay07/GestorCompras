@@ -68,6 +68,11 @@ def init_styles():
     
     style.configure("MyFrame.TFrame", background=bg_frame, relief="groove", borderwidth=1)
     style.configure("MyLabel.TLabel", background=bg_frame, foreground=color_texto, font=fuente_normal)
+    style.map(
+        "MyLabel.TLabel",
+        background=[("active", bg_frame)],
+        foreground=[("active", color_texto)],
+    )
     style.configure(
         "MyButton.TButton",
         font=fuente_bold,
@@ -229,7 +234,8 @@ class MainMenu(tk.Frame):
         self.animate_banner()
         
         menu_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
-        menu_frame.place(relx=0.5, rely=0.5, anchor="center")
+        menu_frame.pack(pady=20)
+        menu_frame.columnconfigure(0, weight=1)
         
         lbl_title = ttk.Label(menu_frame, text="Menú Principal", style="MyLabel.TLabel")
         lbl_title.configure(font=fuente_bold, foreground=color_titulos)
@@ -344,6 +350,13 @@ def main():
     root = tk.Tk()
     root.title("Sistema de Automatización")
     root.geometry("800x600")
+    root.tk_setPalette(
+        background=bg_base,
+        foreground=color_texto,
+        activeBackground=color_hover,
+        activeForeground=color_texto,
+        highlightColor=color_borde,
+    )
     center_window(root)
     
     init_styles()
