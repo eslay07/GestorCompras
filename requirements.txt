@@ -2,11 +2,13 @@ jinja2
 pdfplumber
 pandas 
 openpyxl
-selenium 
+selenium
 
 webdriver_manager
 gspread
 google-auth
+
+psutil
 
 
 

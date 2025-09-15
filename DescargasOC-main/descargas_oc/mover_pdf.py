@@ -8,11 +8,17 @@ import PyPDF2
 try:  # allow running as script
     from .config import Config
     from .logger import get_logger
-    from .organizador_bienes import extraer_numero_tarea_desde_pdf
+    from .organizador_bienes import (
+        extraer_numero_tarea_desde_pdf,
+        extraer_proveedor_desde_pdf,
+    )
 except ImportError:  # pragma: no cover
     from config import Config
     from logger import get_logger
-    from organizador_bienes import extraer_numero_tarea_desde_pdf
+    from organizador_bienes import (
+        extraer_numero_tarea_desde_pdf,
+        extraer_proveedor_desde_pdf,
+    )
 
 logger = get_logger(__name__)
 
@@ -78,7 +84,11 @@ def mover_oc(config: Config, ordenes=None):
             continue
 
         prov = proveedores.get(numero)
-        if es_bienes and prov:
+        if not prov:
+            prov = extraer_proveedor_desde_pdf(ruta)
+            if indice_ordenes.get(numero) is not None and prov:
+                indice_ordenes[numero]["proveedor"] = prov
+        if prov:
             prov_clean = re.sub(r"[^\w\- ]", "_", prov)
             nuevo_nombre = os.path.join(carpeta_origen, f"{numero} - {prov_clean}.pdf")
             if ruta != nuevo_nombre:
