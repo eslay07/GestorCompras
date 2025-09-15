@@ -82,21 +82,39 @@ def main():
     )
     entry_aut.grid(row=3, column=1, padx=5, pady=2)
 
+    var_visible = tk.BooleanVar(value=not bool(cfg.headless))
+
+    def actualizar_visible():
+        cfg.load()
+        cfg.data["headless"] = not var_visible.get()
+        cfg.save()
+
+    chk_visible = tk.Checkbutton(
+        root,
+        text="Descarga visible",
+        variable=var_visible,
+        command=actualizar_visible,
+        selectcolor="#00aa00",
+    )
+    chk_visible.grid(row=4, column=1, sticky="w", padx=5, pady=2)
+
     btn_ejecutar = tk.Button(
         root,
         text="Descargar",
         command=lambda: ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn_ejecutar),
     )
-    btn_ejecutar.grid(row=4, column=0, columnspan=2, pady=10)
+    btn_ejecutar.grid(row=5, column=0, columnspan=2, pady=10)
 
     def abrir_config():
         configurar_abastecimiento()
         nuevo = Config()
-        entry_sol['values'] = nuevo.abastecimiento_solicitantes or []
-        entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
+        if entry_sol.winfo_exists():
+            entry_sol['values'] = nuevo.abastecimiento_solicitantes or []
+        if entry_aut.winfo_exists():
+            entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
 
     btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
-    btn_cfg.grid(row=5, column=0, columnspan=2, pady=(0, 10))
+    btn_cfg.grid(row=6, column=0, columnspan=2, pady=(0, 10))
 
     def center_window(win):
         win.update_idletasks()
