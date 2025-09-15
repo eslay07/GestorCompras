@@ -15,6 +15,9 @@ except ImportError:  # pragma: no cover
 
 lock = threading.Lock()
 
+# Valor por defecto para el campo "Solicitante"
+DEFAULT_SOLICITANTE = "1221 - HERRERA PUENTE WILLIAM"
+
 
 def ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):
     if not lock.acquire(blocking=False):
@@ -63,11 +66,14 @@ def main():
 
     cfg = Config()
     tk.Label(root, text="Solicitante:").grid(row=2, column=0, sticky="e")
-    sol_var = tk.StringVar()
+    solicitantes = cfg.abastecimiento_solicitantes or []
+    if DEFAULT_SOLICITANTE not in solicitantes:
+        solicitantes.insert(0, DEFAULT_SOLICITANTE)
+    sol_var = tk.StringVar(value=DEFAULT_SOLICITANTE)
     entry_sol = ttk.Combobox(
         root,
         textvariable=sol_var,
-        values=cfg.abastecimiento_solicitantes or [],
+        values=solicitantes,
         width=40,
     )
     entry_sol.grid(row=2, column=1, padx=5, pady=2)
@@ -109,7 +115,11 @@ def main():
         configurar_abastecimiento()
         nuevo = Config()
         if entry_sol.winfo_exists():
-            entry_sol['values'] = nuevo.abastecimiento_solicitantes or []
+            solicitantes = nuevo.abastecimiento_solicitantes or []
+            if DEFAULT_SOLICITANTE not in solicitantes:
+                solicitantes.insert(0, DEFAULT_SOLICITANTE)
+            entry_sol['values'] = solicitantes
+            sol_var.set(DEFAULT_SOLICITANTE)
         if entry_aut.winfo_exists():
             entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
 
