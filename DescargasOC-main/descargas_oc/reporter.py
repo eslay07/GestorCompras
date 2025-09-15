@@ -140,7 +140,14 @@ def _tabla_html(filas: list[tuple[str, str, str]]) -> str:
     )
 
 
-def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
+def enviar_reporte(
+    exitosas,
+    faltantes,
+    ordenes,
+    cfg: Config,
+    categoria: str | None = None,
+    destinatario: str | None = None,
+) -> bool:
     if not exitosas and not faltantes:
         return False
     if not ordenes:
@@ -154,7 +161,7 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     faltantes_uniq = list(dict.fromkeys(faltantes))
     info = {o["numero"]: o for o in ordenes}
 
-    destinatario = cfg.correo_reporte
+    destinatario = destinatario or cfg.correo_reporte
     usuario = cfg.usuario
     password = cfg.password
     if not destinatario or not usuario or not password:
@@ -170,17 +177,26 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config) -> bool:
     except Exception as exc:  # pragma: no cover - la ausencia de POP no debe abortar
         logger.warning("Autenticación POP fallida: %s", exc)
     mensaje = EmailMessage()
-    mensaje['Subject'] = 'Reporte de órdenes descargadas'
+    subject = 'Reporte de órdenes descargadas'
+    if categoria:
+        subject += f' - {categoria}'
+    mensaje['Subject'] = subject
     mensaje['From'] = usuario
     mensaje['To'] = destinatario
-    texto = 'Órdenes subidas correctamente:\n'
+    texto = ''
+    if categoria:
+        texto += f'Categoría: {categoria}\n\n'
+    texto += 'Órdenes subidas correctamente:\n'
     filas_ok: list[tuple[str, str, str]] = []
     for num in exitosas_uniq:
         data = info.get(num, {})
         prov = data.get('proveedor') or '-'
         tarea = data.get('tarea') or _buscar_tarea(num, cfg) or '-'
         filas_ok.append((num, tarea, prov))
-    html = '<h3>Órdenes subidas correctamente:</h3>' + _tabla_html(filas_ok)
+    html = ''
+    if categoria:
+        html += f"<p>Categoría: {escape(categoria)}</p>"
+    html += '<h3>Órdenes subidas correctamente:</h3>' + _tabla_html(filas_ok)
     if filas_ok:
         texto += _formatear_tabla(filas_ok) + '\n'
     if faltantes_uniq:

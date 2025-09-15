@@ -246,6 +246,74 @@ def configurar():
     center_window(ventana)
     ventana.mainloop()
 
+
+def configurar_abastecimiento():
+    cfg = Config()
+
+    def center_window(win: tk.Tk | tk.Toplevel):
+        win.update_idletasks()
+        w = win.winfo_width()
+        h = win.winfo_height()
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+
+    def seleccionar_carpeta(entry):
+        carpeta = filedialog.askdirectory(initialdir=entry.get() or os.getcwd())
+        if carpeta:
+            entry.delete(0, tk.END)
+            entry.insert(0, carpeta)
+
+    def guardar():
+        cfg.data.update(
+            {
+                'abastecimiento_carpeta_descarga': entry_destino.get(),
+                'abastecimiento_correo_reporte': entry_correo.get(),
+                'abastecimiento_solicitantes': [s.strip() for s in entry_sol.get().split(',') if s.strip()],
+                'abastecimiento_autorizadores': [s.strip() for s in entry_aut.get().split(',') if s.strip()],
+            }
+        )
+        cfg.save()
+        try:
+            ventana.grab_release()
+        except Exception:
+            pass
+        ventana.destroy()
+
+    parent = tk._get_default_root()
+    if parent is None:
+        ventana = tk.Tk()
+    else:
+        ventana = tk.Toplevel(parent)
+        ventana.transient(parent)
+        ventana.grab_set()
+    ventana.title('Configuración Abastecimiento')
+
+    tk.Label(ventana, text='Carpeta de descarga:').pack()
+    entry_destino = tk.Entry(ventana, width=50)
+    entry_destino.pack()
+    entry_destino.insert(0, cfg.abastecimiento_carpeta_descarga or '')
+    tk.Button(ventana, text='Seleccionar', command=lambda: seleccionar_carpeta(entry_destino)).pack()
+
+    tk.Label(ventana, text='Correo para reporte:').pack()
+    entry_correo = tk.Entry(ventana, width=50)
+    entry_correo.pack()
+    entry_correo.insert(0, cfg.abastecimiento_correo_reporte or '')
+
+    tk.Label(ventana, text='Solicitantes (separados por coma):').pack()
+    entry_sol = tk.Entry(ventana, width=50)
+    entry_sol.pack()
+    entry_sol.insert(0, ', '.join(cfg.abastecimiento_solicitantes or []))
+
+    tk.Label(ventana, text='Autorizadores (separados por coma):').pack()
+    entry_aut = tk.Entry(ventana, width=50)
+    entry_aut.pack()
+    entry_aut.insert(0, ', '.join(cfg.abastecimiento_autorizadores or []))
+
+    tk.Button(ventana, text='Guardar', command=guardar).pack(pady=10)
+    center_window(ventana)
+    ventana.mainloop()
+
 if __name__ == '__main__':
     configurar()
 
