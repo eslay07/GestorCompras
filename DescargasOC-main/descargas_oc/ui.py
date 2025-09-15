@@ -197,39 +197,54 @@ def main():
     text.bind("<KeyRelease>", check_manual_input)
 
     def ejecutar_manual():
+        if not scanning_lock.acquire(blocking=False):
+            text.insert(tk.END, "Descarga en progreso...\n")
+            text.see(tk.END)
+            return
         contenido = text.get("2.0", tk.END).strip()
         numeros = [n.strip() for n in contenido.splitlines() if n.strip()]
         if not numeros:
+            scanning_lock.release()
             return
         if not messagebox.askyesno(
             "Confirmación",
             "Se descargarán las siguientes órdenes:\n" + "\n".join(numeros),
         ):
+            scanning_lock.release()
             return
         text.delete("1.0", tk.END)
         manual_mode["active"] = False
+        btn_ejecutar.config(state=tk.DISABLED)
 
         def run():
-            cfg.load()
-            ordenes = [{"numero": n} for n in numeros]
-            def append(msg: str):
-                text.after(0, lambda m=msg: (text.insert(tk.END, m), text.see(tk.END)))
-            append(f"Procesando {len(ordenes)} OC(s)\n")
             try:
-                subidos, no_encontrados, errores = descargar_oc(ordenes, headless=cfg.headless)
-            except Exception as exc:
-                errores = [str(exc)]
-                subidos, no_encontrados = [], numeros
-            for num in subidos:
-                append(f"✔️ OC {num} procesada\n")
-            for num in no_encontrados:
-                append(f"❌ OC {num} faltante\n")
-            enviar_reporte(subidos, no_encontrados, ordenes, cfg)
-            if errores:
-                summary = "Errores durante la descarga:\n" + "\n".join(errores)
-            else:
-                summary = "Proceso finalizado"
-            text.after(0, lambda: messagebox.showinfo("Resultado", summary))
+                cfg.load()
+                ordenes = [{"numero": n} for n in numeros]
+
+                def append(msg: str):
+                    text.after(0, lambda m=msg: (text.insert(tk.END, m), text.see(tk.END)))
+
+                append(f"Procesando {len(ordenes)} OC(s)\n")
+                try:
+                    subidos, no_encontrados, errores = descargar_oc(
+                        ordenes, headless=cfg.headless
+                    )
+                except Exception as exc:
+                    errores = [str(exc)]
+                    subidos, no_encontrados = [], numeros
+                for num in subidos:
+                    append(f"✔️ OC {num} procesada\n")
+                for num in no_encontrados:
+                    append(f"❌ OC {num} faltante\n")
+                enviar_reporte(subidos, no_encontrados, ordenes, cfg)
+                if errores:
+                    summary = "Errores durante la descarga:\n" + "\n".join(errores)
+                else:
+                    summary = "Proceso finalizado"
+                text.after(0, lambda: messagebox.showinfo("Resultado", summary))
+            finally:
+                scanning_lock.release()
+                text.after(0, lambda: btn_ejecutar.config(state=tk.DISABLED))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -278,6 +293,7 @@ def main():
         text="Compra Bienes",
         variable=var_bienes,
         command=actualizar_bienes,
+        selectcolor="#00aa00",
     )
     chk_bienes.pack(side=tk.LEFT, padx=5)
 
@@ -293,6 +309,7 @@ def main():
         text="Descarga visible",
         variable=var_visible,
         command=actualizar_visible,
+        selectcolor="#00aa00",
     )
     chk_visible.pack(side=tk.LEFT, padx=5)
 

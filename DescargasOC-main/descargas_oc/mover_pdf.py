@@ -90,7 +90,9 @@ def mover_oc(config: Config, ordenes=None):
                 indice_ordenes[numero]["proveedor"] = prov
         if prov:
             prov_clean = re.sub(r"[^\w\- ]", "_", prov)
-            nuevo_nombre = os.path.join(carpeta_origen, f"{numero} - {prov_clean}.pdf")
+            nuevo_nombre = os.path.join(
+                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+            )
             if ruta != nuevo_nombre:
                 try:
                     os.rename(ruta, nuevo_nombre)
@@ -105,18 +107,22 @@ def mover_oc(config: Config, ordenes=None):
             if indice_ordenes.get(numero) is not None:
                 indice_ordenes[numero]["tarea"] = tarea
 
-        if es_bienes and tarea:
-            # buscar carpeta existente que comience con el número de tarea
-            destino = None
-            for root, dirs, _files in os.walk(carpeta_destino):
-                for d in dirs:
-                    if d.startswith(tarea):
-                        destino = os.path.join(root, d)
+        if es_bienes:
+            if tarea:
+                # buscar carpeta existente que comience con el número de tarea
+                destino = None
+                for root, dirs, _files in os.walk(carpeta_destino):
+                    for d in dirs:
+                        if d.startswith(tarea):
+                            destino = os.path.join(root, d)
+                            break
+                    if destino:
                         break
-                if destino:
-                    break
-            if not destino:
-                destino = os.path.join(carpeta_destino, tarea)
+                if not destino:
+                    destino = os.path.join(carpeta_destino, tarea)
+                    os.makedirs(destino, exist_ok=True)
+            else:
+                destino = os.path.join(carpeta_destino, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
             try:
                 nombre_archivo = os.path.basename(ruta)
