@@ -64,14 +64,22 @@ def main():
     cfg = Config()
     tk.Label(root, text="Solicitante:").grid(row=2, column=0, sticky="e")
     sol_var = tk.StringVar()
-    entry_sol = ttk.Combobox(root, textvariable=sol_var, state="readonly")
-    entry_sol['values'] = cfg.abastecimiento_solicitantes or []
+    entry_sol = ttk.Combobox(
+        root,
+        textvariable=sol_var,
+        values=cfg.abastecimiento_solicitantes or [],
+        width=40,
+    )
     entry_sol.grid(row=2, column=1, padx=5, pady=2)
 
     tk.Label(root, text="Autoriza:").grid(row=3, column=0, sticky="e")
     aut_var = tk.StringVar()
-    entry_aut = ttk.Combobox(root, textvariable=aut_var, state="readonly")
-    entry_aut['values'] = cfg.abastecimiento_autorizadores or []
+    entry_aut = ttk.Combobox(
+        root,
+        textvariable=aut_var,
+        values=cfg.abastecimiento_autorizadores or [],
+        width=40,
+    )
     entry_aut.grid(row=3, column=1, padx=5, pady=2)
 
     btn_ejecutar = tk.Button(

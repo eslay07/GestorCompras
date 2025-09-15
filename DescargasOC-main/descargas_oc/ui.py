@@ -275,8 +275,11 @@ def main():
         cfg.load()
         var_bienes.set(bool(cfg.compra_bienes))
         var_visible.set(not bool(cfg.headless))
-        entry_interval.delete(0, tk.END)
-        entry_interval.insert(0, str(cfg.scan_interval))
+        try:
+            entry_interval.delete(0, tk.END)
+            entry_interval.insert(0, str(cfg.scan_interval))
+        except tk.TclError:
+            logger.error("Campo de intervalo no disponible", exc_info=True)
 
     btn_config = tk.Button(frame, text="Configuración", command=abrir_config)
     btn_config.pack(side=tk.LEFT, padx=5)
