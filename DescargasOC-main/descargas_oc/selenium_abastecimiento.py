@@ -42,7 +42,12 @@ def descargar_abastecimiento(
     if user:
         user = user.split("@")[0]
     pwd = password if password is not None else cfg.password
-    destino = Path(download_dir or cfg.carpeta_destino_local or Path.home())
+    destino = Path(
+        download_dir
+        or cfg.abastecimiento_carpeta_descarga
+        or cfg.carpeta_destino_local
+        or Path.home()
+    )
     destino.mkdir(parents=True, exist_ok=True)
 
     options = webdriver.ChromeOptions()
@@ -107,12 +112,12 @@ def descargar_abastecimiento(
         "fecha_desde": (By.ID, "mat-input-2"),
         "fecha_hasta": (By.ID, "mat-input-3"),
         "solicitante": (
-            By.CSS_SELECTOR,
-            "input[autocomplete='a4447c8f027d']",
+            By.XPATH,
+            "(//input[@aria-autocomplete='list'])[1]",
         ),
         "autoriza": (
-            By.CSS_SELECTOR,
-            "input[autocomplete='af7012f9b4eb']",
+            By.XPATH,
+            "(//input[@aria-autocomplete='list'])[2]",
         ),
         "btnbuscarorden": (
             By.XPATH,
@@ -200,7 +205,14 @@ def descargar_abastecimiento(
     driver.quit()
 
     subidos, faltantes = mover_oc(cfg, ordenes)
-    enviar_reporte(subidos, faltantes, ordenes, cfg, categoria="abastecimiento")
+    enviar_reporte(
+        subidos,
+        faltantes,
+        ordenes,
+        cfg,
+        categoria="abastecimiento",
+        destinatario=cfg.abastecimiento_correo_reporte,
+    )
     return subidos, faltantes
 
 

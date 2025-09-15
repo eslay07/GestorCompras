@@ -140,7 +140,14 @@ def _tabla_html(filas: list[tuple[str, str, str]]) -> str:
     )
 
 
-def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config, categoria: str | None = None) -> bool:
+def enviar_reporte(
+    exitosas,
+    faltantes,
+    ordenes,
+    cfg: Config,
+    categoria: str | None = None,
+    destinatario: str | None = None,
+) -> bool:
     if not exitosas and not faltantes:
         return False
     if not ordenes:
@@ -154,7 +161,7 @@ def enviar_reporte(exitosas, faltantes, ordenes, cfg: Config, categoria: str | N
     faltantes_uniq = list(dict.fromkeys(faltantes))
     info = {o["numero"]: o for o in ordenes}
 
-    destinatario = cfg.correo_reporte
+    destinatario = destinatario or cfg.correo_reporte
     usuario = cfg.usuario
     password = cfg.password
     if not destinatario or not usuario or not password:

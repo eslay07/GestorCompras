@@ -35,7 +35,10 @@ def mover_oc(config: Config, ordenes=None):
     proveedores = {o.get("numero"): o.get("proveedor") for o in ordenes}
     indice_ordenes = {o.get("numero"): o for o in ordenes}
 
-    carpeta_origen = config.carpeta_destino_local
+    carpeta_origen = (
+        getattr(config, 'abastecimiento_carpeta_descarga', None)
+        or config.carpeta_destino_local
+    )
     carpeta_destino = config.carpeta_analizar
     if not carpeta_origen:
         logger.error("Configuración incompleta")

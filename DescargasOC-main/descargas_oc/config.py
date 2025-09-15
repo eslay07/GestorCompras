@@ -64,6 +64,14 @@ class Config:
         self.data.setdefault('remitente_adicional', 'naf@telconet.ec')
         self.data.setdefault('compra_bienes', False)
         self.data.setdefault('headless', False)
+        self.data.setdefault(
+            'abastecimiento_carpeta_descarga', self.data.get('carpeta_destino_local')
+        )
+        self.data.setdefault(
+            'abastecimiento_correo_reporte', self.data.get('correo_reporte')
+        )
+        self.data.setdefault('abastecimiento_solicitantes', [])
+        self.data.setdefault('abastecimiento_autorizadores', [])
         # persist values so configuration survives between executions
         self.save()
         return self

@@ -2,13 +2,14 @@
 import threading
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk
 
 try:  # allow running as script
-    from .configurador import configurar
+    from .configurador import configurar_abastecimiento
     from .selenium_abastecimiento import descargar_abastecimiento
     from .config import Config
 except ImportError:  # pragma: no cover
-    from configurador import configurar
+    from configurador import configurar_abastecimiento
     from selenium_abastecimiento import descargar_abastecimiento
     from config import Config
 
@@ -42,34 +43,62 @@ def ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):
 
 def main():
     root = tk.Tk()
-    root.title("Descargas OC - Abastecimiento")
+    root.title("Descarga Abastecimiento")
+    root.tk_setPalette(
+        background="#1e1e1e",
+        foreground="#f0f0f0",
+        activeBackground="#333333",
+        activeForeground="#f0f0f0",
+        highlightColor="#555555",
+    )
+    root.configure(bg="#1e1e1e")
 
-    tk.Label(root, text="Fecha desde (dd/mm/aa):").grid(row=0, column=0, sticky="e")
+    tk.Label(root, text="Fecha inicio (dd/mm/aa):").grid(row=0, column=0, sticky="e")
     entry_fd = tk.Entry(root)
     entry_fd.grid(row=0, column=1, padx=5, pady=2)
 
-    tk.Label(root, text="Fecha hasta (dd/mm/aa):").grid(row=1, column=0, sticky="e")
+    tk.Label(root, text="Fecha final (dd/mm/aa):").grid(row=1, column=0, sticky="e")
     entry_fh = tk.Entry(root)
     entry_fh.grid(row=1, column=1, padx=5, pady=2)
 
+    cfg = Config()
     tk.Label(root, text="Solicitante:").grid(row=2, column=0, sticky="e")
-    entry_sol = tk.Entry(root, width=40)
+    sol_var = tk.StringVar()
+    entry_sol = ttk.Combobox(root, textvariable=sol_var, state="readonly")
+    entry_sol['values'] = cfg.abastecimiento_solicitantes or []
     entry_sol.grid(row=2, column=1, padx=5, pady=2)
 
     tk.Label(root, text="Autoriza:").grid(row=3, column=0, sticky="e")
-    entry_aut = tk.Entry(root, width=40)
+    aut_var = tk.StringVar()
+    entry_aut = ttk.Combobox(root, textvariable=aut_var, state="readonly")
+    entry_aut['values'] = cfg.abastecimiento_autorizadores or []
     entry_aut.grid(row=3, column=1, padx=5, pady=2)
 
     btn_ejecutar = tk.Button(
         root,
-        text="Ejecutar descarga",
+        text="Descargar",
         command=lambda: ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn_ejecutar),
     )
     btn_ejecutar.grid(row=4, column=0, columnspan=2, pady=10)
 
-    btn_cfg = tk.Button(root, text="Configurar", command=configurar)
+    def abrir_config():
+        configurar_abastecimiento()
+        nuevo = Config()
+        entry_sol['values'] = nuevo.abastecimiento_solicitantes or []
+        entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
+
+    btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
     btn_cfg.grid(row=5, column=0, columnspan=2, pady=(0, 10))
 
+    def center_window(win):
+        win.update_idletasks()
+        w = win.winfo_width()
+        h = win.winfo_height()
+        x = (win.winfo_screenwidth() // 2) - (w // 2)
+        y = (win.winfo_screenheight() // 2) - (h // 2)
+        win.geometry(f"{w}x{h}+{x}+{y}")
+
+    center_window(root)
     root.mainloop()
 
 
