@@ -1,6 +1,7 @@
 import poplib
 from email import parser as email_parser
 from email.header import decode_header, make_header
+from email.utils import getaddresses
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -19,7 +20,42 @@ DATA_DIR = Path(__file__).resolve().parents[1] / 'data'
 PROCESADOS_FILE = DATA_DIR / 'procesados.txt'
 LAST_UIDL_FILE = DATA_DIR / 'last_uidl.txt'
 ORDENES_TMP = DATA_DIR / 'ordenes_tmp.json'
-REMITENTE_BASE = 'jotoapanta@telconet.ec'
+REMITENTES_BASE = {
+    'jotoapanta@telconet.ec',
+    'naf@telconet.ec',
+}
+
+
+def _normalizar_remitentes(valor: str | None) -> set[str]:
+    """Extrae direcciones de correo en minúsculas desde un encabezado."""
+
+    if not valor:
+        return set()
+    parsed = {
+        addr.strip().lower()
+        for _, addr in getaddresses([valor.replace(';', ',')])
+        if addr
+    }
+    if parsed:
+        return parsed
+    return {valor.strip().lower()}
+
+
+def _conjunto_remitentes(valor) -> set[str]:
+    """Convierte diferentes formatos (str, lista) en un conjunto de correos."""
+
+    if not valor:
+        return set()
+    if isinstance(valor, str):
+        return _normalizar_remitentes(valor)
+    remitentes: set[str] = set()
+    try:
+        iterable = list(valor)
+    except TypeError:
+        return _normalizar_remitentes(str(valor))
+    for item in iterable:
+        remitentes.update(_normalizar_remitentes(str(item)))
+    return remitentes
 
 
 def cargar_procesados() -> set[str]:
@@ -110,10 +146,10 @@ def buscar_ocs(cfg: Config) -> tuple[list[dict], str | None]:
     procesados = cargar_procesados()
     last_uidl = cargar_ultimo_uidl()
 
-    remitentes_validos = {REMITENTE_BASE}
-    extra = getattr(cfg, 'remitente_adicional', None)
-    if extra:
-        remitentes_validos.add(extra.lower())
+    remitentes_validos = {r.lower() for r in REMITENTES_BASE}
+    remitentes_validos.update(_conjunto_remitentes(getattr(cfg, 'usuario', None)))
+    remitentes_validos.update(_conjunto_remitentes(getattr(cfg, 'remitente_adicional', None)))
+    remitentes_validos.discard('')
 
     conn = poplib.POP3_SSL(cfg.pop_server, cfg.pop_port)
     conn.user(cfg.usuario)
@@ -167,9 +203,16 @@ def buscar_ocs(cfg: Config) -> tuple[list[dict], str | None]:
                     cuerpo = mensaje.get_payload(decode=True).decode(charset, errors='replace')
                 numero, fecha_aut, fecha_orden, proveedor, tarea = extraer_datos(asunto, cuerpo)
                 asunto_ok = re.search(r'SISTEMA\s+NAF:.*AUTORIZACI', asunto or '', re.IGNORECASE)
-                remitente_ok = any(r in remitente.lower() for r in remitentes_validos)
+                remitentes_mensaje = _normalizar_remitentes(remitente)
+                remitente_ok = bool(remitentes_mensaje & remitentes_validos)
                 if remitente_ok and asunto_ok and numero:
                     ordenes.append({'uidl': uidl_res, 'numero': numero, 'fecha_aut': fecha_aut, 'fecha_orden': fecha_orden, 'proveedor': proveedor, 'tarea': tarea})
+                elif remitente_ok:
+                    logger.warning(
+                        'Mensaje UIDL %s de remitente válido sin datos de OC. Asunto="%s"',
+                        uidl_res,
+                        asunto,
+                    )
                 else:
                     guardar_procesado(uidl_res)
             except Exception as e:

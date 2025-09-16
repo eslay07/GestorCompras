@@ -78,6 +78,8 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 
         append("Buscando órdenes...\n")
         ordenes, ultimo = buscar_ocs(cfg)
+        uidl_por_numero = {o.get('numero'): o.get('uidl') for o in ordenes if o.get('numero') and o.get('uidl')}
+        pendientes_uidls = {uidl for uidl in uidl_por_numero.values() if uidl}
         exitosas: list[str] = []
         faltantes: list[str] = []
         errores: list[str] = []
@@ -97,11 +99,19 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
+            uidls_exitosos = [
+                uidl_por_numero[num]
+                for num in subidos
+                if num in uidl_por_numero and uidl_por_numero[num]
+            ]
+            pendientes_uidls -= set(uidls_exitosos)
+            if uidls_exitosos:
+                uidls_sin_duplicados = list(dict.fromkeys(uidls_exitosos))
+                ultimo_guardar = ultimo if not pendientes_uidls else None
+                registrar_procesados(uidls_sin_duplicados, ultimo_guardar)
         else:
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)
-        if enviado:
-            registrar_procesados([o['uidl'] for o in ordenes], ultimo)
         if ordenes:
             if errores:
                 summary = "Errores durante la descarga:\n" + "\n".join(errores)
