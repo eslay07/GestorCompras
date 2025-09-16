@@ -22,6 +22,21 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+MAX_PROV_LEN = 50
+
+
+def sanitize_filename(nombre: str, max_len: int = MAX_PROV_LEN) -> str:
+    """Sanitize *nombre* to be safe for filesystem usage.
+
+    Replaces problematic characters and truncates the text to ``max_len``
+    to avoid errors such as ``File name too long``.
+    """
+    limpio = re.sub(r"[^\w\- ]", "_", nombre).strip()
+    limpio = re.sub(r"\s+", " ", limpio)
+    if len(limpio) > max_len:
+        limpio = limpio[:max_len].rstrip()
+    return limpio
+
 
 def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
@@ -92,7 +107,7 @@ def mover_oc(config: Config, ordenes=None):
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
         if prov:
-            prov_clean = re.sub(r"[^\w\- ]", "_", prov)
+            prov_clean = sanitize_filename(prov)
             nuevo_nombre = os.path.join(
                 carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
             )
@@ -102,6 +117,15 @@ def mover_oc(config: Config, ordenes=None):
                     ruta = nuevo_nombre
                 except Exception as e:
                     logger.warning('No se pudo renombrar %s: %s', ruta, e)
+                    prov_clean = sanitize_filename(prov, max_len=20)
+                    nuevo_nombre = os.path.join(
+                        carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+                    )
+                    try:
+                        os.rename(ruta, nuevo_nombre)
+                        ruta = nuevo_nombre
+                    except Exception:
+                        pass
 
         tarea = None
         if es_bienes:
