@@ -4,6 +4,7 @@ from email.header import decode_header, make_header
 from email.utils import getaddresses
 import json
 import re
+import html
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -58,6 +59,18 @@ def _conjunto_remitentes(valor) -> set[str]:
     return remitentes
 
 
+def _limpiar_html(valor: str) -> str:
+    """Convierte HTML básico en texto plano preservando saltos de línea."""
+
+    if not valor:
+        return ""
+    texto = re.sub(r"(?i)<br\s*/?>", "\n", valor)
+    texto = re.sub(r"(?i)</p>", "\n", texto)
+    texto = re.sub(r"<[^>]+>", "", texto)
+    texto = html.unescape(texto)
+    return texto.replace("\xa0", " ")
+
+
 def cargar_procesados() -> set[str]:
     try:
         with open(PROCESADOS_FILE, 'r') as f:
@@ -108,21 +121,23 @@ def extraer_datos(asunto: str, cuerpo: str):
         if m:
             numero = m.group(1)
 
-    if cuerpo:
+    cuerpo_texto = _limpiar_html(cuerpo or "")
+
+    if cuerpo_texto:
         if not numero:
-            m = re.search(r"orden\s+de\s+compra\s+de\s+(?:No|N[°º])\.?\s*(\d+)", cuerpo, re.IGNORECASE)
+            m = re.search(r"orden\s+de\s+compra\s+de\s+(?:No|N[°º])\.?\s*(\d+)", cuerpo_texto, re.IGNORECASE)
             if m:
                 numero = m.group(1)
-        m = re.search(r"Fecha\s+Autorizaci(?:o|\xc3\xb3)n[:\s]*([0-9]{2}/[0-9]{2}/[0-9]{4})", cuerpo, re.IGNORECASE)
+        m = re.search(r"Fecha\s+Autorizaci(?:o|\xc3\xb3)n[:\s]*([0-9]{2}/[0-9]{2}/[0-9]{4})", cuerpo_texto, re.IGNORECASE)
         if m:
             fecha_aut = m.group(1)
-        m = re.search(r"Fecha\s+Orden[:\s]*([0-9]{2}/[0-9]{2}/[0-9]{4})", cuerpo, re.IGNORECASE)
+        m = re.search(r"Fecha\s+Orden[:\s]*([0-9]{2}/[0-9]{2}/[0-9]{4})", cuerpo_texto, re.IGNORECASE)
         if m:
             fecha_orden = m.group(1)
-        m = re.search(r"proveedor\s+([^\n]+?)(?:\s+con\s+Fecha|\n|$)", cuerpo, re.IGNORECASE)
+        m = re.search(r"proveedor\s*:?[\s\xa0]+([^\n]+?)(?:\s+con\s+Fecha|\n|$)", cuerpo_texto, re.IGNORECASE)
         if m:
-            proveedor = m.group(1).strip()
-        m = re.search(r"#(\d+)\s*//", cuerpo)
+            proveedor = re.sub(r"\s+", " ", m.group(1)).strip()
+        m = re.search(r"#(\d+)\s*//", cuerpo_texto)
         if m:
             tarea = m.group(1)
 

@@ -146,3 +146,20 @@ def test_additional_sender_from_config(tmp_path, monkeypatch, cfg):
     assert len(ordenes) == 1
     assert ordenes[0]['numero'] == '55555'
     assert not escuchador.PROCESADOS_FILE.exists()
+
+
+def test_extracts_provider_from_html_body():
+    asunto = 'SISTEMA NAF: Notificacion AUTORIZACION ORDEN COMPRA No 140144463'
+    cuerpo = (
+        '<p><strong>Proveedor:</strong> '
+        '<strong>004465 - SALAZAR RUIZ MARCELO VLADIMIR</strong> '
+        'con <strong>Fecha de Vencimiento:</strong> 16/10/2025</p>'
+        '<br><p><strong>Observacion:</strong> '
+        'TAREA #140144463//PEDIDO:S/N//DETALLE</p>'
+    )
+
+    numero, _, _, proveedor, tarea = escuchador.extraer_datos(asunto, cuerpo)
+
+    assert numero == '140144463'
+    assert proveedor == '004465 - SALAZAR RUIZ MARCELO VLADIMIR'
+    assert tarea == '140144463'
