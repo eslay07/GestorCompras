@@ -1,6 +1,7 @@
 import tkinter as tk
 import threading
 import logging
+import re
 from datetime import datetime
 from tkinter import messagebox
 
@@ -78,6 +79,17 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 
         append("Buscando órdenes...\n")
         ordenes, ultimo = buscar_ocs(cfg)
+        uidl_por_numero = {
+            o.get("numero"): o.get("uidl")
+            for o in ordenes
+            if o.get("numero") and o.get("uidl")
+        }
+        uidl_a_numeros: dict[str, set[str]] = {}
+        for numero, uidl in uidl_por_numero.items():
+            if not uidl:
+                continue
+            uidl_a_numeros.setdefault(uidl, set()).add(numero)
+        pendientes_uidls = set(uidl_a_numeros)
         exitosas: list[str] = []
         faltantes: list[str] = []
         errores: list[str] = []
@@ -93,15 +105,37 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 subidos, no_encontrados = [], [o.get("numero") for o in ordenes]
             exitosas.extend(subidos)
             faltantes.extend(no_encontrados)
+            numeros_con_problemas = {str(n) for n in no_encontrados}
+            for error in errores:
+                m = re.search(r"OC\s*(\d+)", error)
+                if m:
+                    numeros_con_problemas.add(m.group(1))
+            uidls_con_problemas = {
+                uidl_por_numero[num]
+                for num in numeros_con_problemas
+                if num in uidl_por_numero and uidl_por_numero[num]
+            }
+            subidos_set = set(subidos)
+            uidls_exitosos: list[str] = []
+            for orden in ordenes:
+                uidl = orden.get("uidl")
+                if not uidl or uidl in uidls_con_problemas:
+                    continue
+                numeros_uidl = uidl_a_numeros.get(uidl, set())
+                if numeros_uidl and numeros_uidl.issubset(subidos_set) and uidl not in uidls_exitosos:
+                    uidls_exitosos.append(uidl)
+            pendientes_uidls -= set(uidls_exitosos)
             for num in subidos:
                 append(f"✔️ OC {num} procesada\n")
             for num in no_encontrados:
                 append(f"❌ OC {num} faltante\n")
+            if uidls_exitosos:
+                uidls_sin_duplicados = list(dict.fromkeys(uidls_exitosos))
+                ultimo_guardar = ultimo if not pendientes_uidls else None
+                registrar_procesados(uidls_sin_duplicados, ultimo_guardar)
         else:
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)
-        if enviado:
-            registrar_procesados([o['uidl'] for o in ordenes], ultimo)
         if ordenes:
             if errores:
                 summary = "Errores durante la descarga:\n" + "\n".join(errores)

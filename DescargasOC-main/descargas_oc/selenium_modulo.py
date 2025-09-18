@@ -299,9 +299,10 @@ def descargar_oc(
         driver.quit()
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes = mover_oc(cfg, ordenes)
+    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
+    errores.extend(errores_mov)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
     # evitar números repetidos al reportar faltantes
     faltantes = list(dict.fromkeys(faltantes))

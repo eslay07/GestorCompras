@@ -204,7 +204,7 @@ def descargar_abastecimiento(
 
     driver.quit()
 
-    subidos, faltantes = mover_oc(cfg, ordenes)
+    subidos, faltantes, _errores_mov = mover_oc(cfg, ordenes)
     enviar_reporte(
         subidos,
         faltantes,

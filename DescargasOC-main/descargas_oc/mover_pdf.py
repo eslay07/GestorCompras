@@ -27,7 +27,8 @@ def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
 
     ``ordenes`` debe ser una lista de diccionarios con al menos la clave
-    ``numero`` y opcionalmente ``proveedor``.
+    ``numero`` y opcionalmente ``proveedor``.  Devuelve una tupla con las
+    órdenes subidas, las que faltaron y una lista de errores descriptivos.
     """
     ordenes = ordenes or []
     # evitar números repetidos para no procesar la misma OC varias veces
@@ -40,15 +41,19 @@ def mover_oc(config: Config, ordenes=None):
         or config.carpeta_destino_local
     )
     carpeta_destino = config.carpeta_analizar
+    errores: list[str] = []
     if not carpeta_origen:
         logger.error("Configuración incompleta")
-        return [], numeros_oc
+        errores.append("Carpeta de descarga no configurada")
+        return [], numeros_oc, errores
     if not os.path.exists(carpeta_origen):
         logger.error('Carpeta origen inexistente: %s', carpeta_origen)
-        return [], numeros_oc
+        errores.append(f"Carpeta origen inexistente: {carpeta_origen}")
+        return [], numeros_oc, errores
 
     archivos = [f for f in os.listdir(carpeta_origen) if f.lower().endswith('.pdf')]
     encontrados: dict[str, str] = {}
+    procesados_en_origen: set[Path] = set()
 
     # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for archivo in archivos:
@@ -77,13 +82,14 @@ def mover_oc(config: Config, ordenes=None):
                 encontrados[numero] = ruta
                 break
 
-    faltantes = []
-    subidos = []
+    faltantes: list[str] = []
+    subidos: list[str] = []
     es_bienes = bool(getattr(config, "compra_bienes", False))
     for numero in numeros_oc:
         ruta = encontrados.get(numero)
         if not ruta:
             faltantes.append(numero)
+            errores.append(f"OC {numero}: archivo no encontrado en carpeta de descarga")
             continue
 
         prov = proveedores.get(numero)
@@ -141,14 +147,23 @@ def mover_oc(config: Config, ordenes=None):
                 logger.info("%s movido a %s", nombre_archivo, destino)
             except Exception as e:
                 logger.warning("No se pudo mover %s a %s: %s", ruta, destino, e)
+                errores.append(
+                    f"OC {numero}: no se pudo mover a '{destino}': {e}"
+                )
+                faltantes.append(numero)
+                # intentar mantener el archivo en la carpeta de origen para reintentos
+                continue
 
         subidos.append(numero)
+        if not es_bienes:
+            procesados_en_origen.add(Path(ruta))
 
     # limpiar carpeta de origen después del proceso
     for f in Path(carpeta_origen).glob("*.pdf"):
-        try:
-            f.unlink()
-        except Exception:
-            pass
-    return subidos, faltantes
+        if f in procesados_en_origen:
+            try:
+                f.unlink()
+            except Exception:
+                pass
+    return subidos, faltantes, errores
 
