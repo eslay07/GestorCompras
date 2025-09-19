@@ -281,35 +281,24 @@ class MainMenu(tk.Frame):
             option_win.destroy()
 
         def open_abastecimiento():
+            script = (
+                Path(__file__).resolve().parents[2]
+                / "DescargasOC-main"
+                / "descargas_oc"
+                / "ui_abastecimiento.py"
+            )
+            try:
+                subprocess.Popen([sys.executable, str(script)])
+            except OSError as exc:
+                messagebox.showerror(
+                    "Error",
+                    (
+                        "No se pudo abrir el módulo de Abastecimiento. "
+                        f"Detalle: {exc}"
+                    ),
+                )
+                return
             option_win.destroy()
-            win = tk.Toplevel(self.master)
-            win.title("Descarga Abastecimiento")
-            win.transient(self.master)
-            win.grab_set()
-            center_window(win)
-
-            frame = ttk.Frame(win, style="MyFrame.TFrame", padding=10)
-            frame.pack(fill="both", expand=True)
-
-            ttk.Label(frame, text="Fecha inicio:", style="MyLabel.TLabel").grid(
-                row=0, column=0, sticky="e", pady=5
-            )
-            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=0, column=1, pady=5)
-            ttk.Label(frame, text="Fecha final:", style="MyLabel.TLabel").grid(
-                row=1, column=0, sticky="e", pady=5
-            )
-            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=1, column=1, pady=5)
-
-            btn_desc = ttk.Button(
-                frame,
-                text="Descargar",
-                style="MyButton.TButton",
-                command=lambda: messagebox.showinfo(
-                    "Información", "Funcionalidad en desarrollo"
-                ),
-            )
-            btn_desc.grid(row=2, column=0, columnspan=2, pady=10)
-            add_hover_effect(btn_desc)
 
         option_win = tk.Toplevel(self.master)
         option_win.title("Descargas OC")
