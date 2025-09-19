@@ -7,7 +7,6 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 import time
@@ -25,11 +24,11 @@ except ImportError:  # pragma: no cover
 
 try:  # allow running as script
     from .config import Config
-    from .mover_pdf import mover_oc
+    from .mover_pdf import mover_oc, sanitize_filename
     from .organizador_bienes import organizar as organizar_bienes
 except ImportError:  # pragma: no cover
     from config import Config
-    from mover_pdf import mover_oc
+    from mover_pdf import mover_oc, sanitize_filename
     from organizador_bienes import organizar as organizar_bienes
 
 
@@ -333,6 +332,7 @@ def descargar_oc(
                 except ElementClickInterceptedException:
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal
                 archivo = esperar_descarga_pdf(download_dir, existentes)
                 if not getattr(cfg, "compra_bienes", False):
                     prov_clean = None
@@ -348,6 +348,31 @@ def descargar_oc(
                         partes.append(prov_clean)
                     base_nombre = " - ".join(partes) if partes else None
                     archivo = _renombrar_descarga(archivo, base_nombre)
+#=======
+                antes = set(download_dir.glob("*.pdf"))
+                for _ in range(120):  # esperar hasta 60 s
+                    time.sleep(0.5)
+                    nuevos = set(download_dir.glob("*.pdf")) - antes
+                    if nuevos:
+                        archivo = nuevos.pop()
+                        break
+                else:
+                    raise RuntimeError("No se descargó archivo")
+                if not getattr(cfg, "compra_bienes", False) and proveedor:
+                    prov_clean = sanitize_filename(proveedor)
+                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    try:
+                        archivo.rename(nuevo_nombre)
+                        archivo = nuevo_nombre
+                    except Exception:
+                        prov_clean = sanitize_filename(proveedor, max_len=20)
+                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                        try:
+                            archivo.rename(nuevo_nombre)
+                            archivo = nuevo_nombre
+                        except Exception:
+                            pass
+#>>>>>>> master
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder
