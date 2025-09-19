@@ -103,6 +103,27 @@ class Config:
         )
         self.data.setdefault('abastecimiento_solicitantes', [])
         self.data.setdefault('abastecimiento_autorizadores', [])
+
+        def _normalize_list(key: str) -> None:
+            raw = self.data.get(key)
+            normalized: list[str] = []
+            if raw is None:
+                pass
+            elif isinstance(raw, str):
+                normalized = [part.strip() for part in raw.split(',') if part.strip()]
+            else:
+                try:
+                    iterable = list(raw)
+                except TypeError:
+                    iterable = [raw]
+                for item in iterable:
+                    text = str(item).strip()
+                    if text:
+                        normalized.append(text)
+            self.data[key] = normalized
+
+        _normalize_list('abastecimiento_solicitantes')
+        _normalize_list('abastecimiento_autorizadores')
         # persist values so configuration survives between executions
         self.save()
         return self

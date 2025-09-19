@@ -92,8 +92,16 @@ def main():
     def abrir_config():
         configurar_abastecimiento()
         nuevo = Config()
-        entry_sol['values'] = nuevo.abastecimiento_solicitantes or []
-        entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
+        solicitantes = tuple(nuevo.abastecimiento_solicitantes or [])
+        autorizadores = tuple(nuevo.abastecimiento_autorizadores or [])
+        if entry_sol.winfo_exists():
+            entry_sol.configure(values=solicitantes)
+            if sol_var.get() and sol_var.get() not in solicitantes:
+                sol_var.set('')
+        if entry_aut.winfo_exists():
+            entry_aut.configure(values=autorizadores)
+            if aut_var.get() and aut_var.get() not in autorizadores:
+                aut_var.set('')
 
     btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
     btn_cfg.grid(row=5, column=0, columnspan=2, pady=(0, 10))
