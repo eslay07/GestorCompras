@@ -1,7 +1,10 @@
 import requests
-import requests_mock
 import sys
 from pathlib import Path
+
+import pytest
+
+requests_mock = pytest.importorskip('requests_mock')
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'descargas_oc'))
 from seafile_client import SeafileClient
