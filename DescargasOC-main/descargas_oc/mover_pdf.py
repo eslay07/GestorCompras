@@ -154,6 +154,23 @@ def _mover_archivo(
     return None, f"No se pudo mover '{ruta_path.name}' a '{destino_dir}'"
 
 
+def _carpetas_origen(config: Config) -> list[Path]:
+    """Obtiene las carpetas de descarga configuradas sin duplicados."""
+
+    rutas: list[Path] = []
+    for attr in ("carpeta_destino_local", "abastecimiento_carpeta_descarga"):
+        valor = getattr(config, attr, None)
+        if not valor:
+            continue
+        try:
+            path = Path(valor)
+        except (TypeError, ValueError, OSError):  # pragma: no cover - rutas inválidas
+            continue
+        if path not in rutas:
+            rutas.append(path)
+    return rutas
+
+
 def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
 
@@ -167,81 +184,83 @@ def mover_oc(config: Config, ordenes=None):
     proveedores = {o.get("numero"): o.get("proveedor") for o in ordenes}
     indice_ordenes = {o.get("numero"): o for o in ordenes}
 
-    carpeta_origen = (
-        getattr(config, 'abastecimiento_carpeta_descarga', None)
-        or config.carpeta_destino_local
-    )
-    carpeta_destino = config.carpeta_analizar
-    origen_dir = Path(carpeta_origen) if carpeta_origen else None
+    carpetas_origen = _carpetas_origen(config)
     errores: list[str] = []
-    if not carpeta_origen:
-        logger.error("Configuración incompleta")
-        errores.append("Carpeta de descarga no configurada")
-        return [], numeros_oc, errores
-    if not os.path.exists(carpeta_origen):
-        logger.error('Carpeta origen inexistente: %s', carpeta_origen)
-        errores.append(f"Carpeta origen inexistente: {carpeta_origen}")
+    if not carpetas_origen:
+        logger.error("Carpetas de descarga no configuradas")
+        errores.append("Carpetas de descarga no configuradas")
         return [], numeros_oc, errores
 
-    archivos = [f for f in os.listdir(carpeta_origen) if f.lower().endswith('.pdf')]
-    encontrados: dict[str, str] = {}
+    carpeta_destino = config.carpeta_analizar
+
+    archivos: list[Path] = []
+    for carpeta in carpetas_origen:
+        if not carpeta.exists():
+            logger.warning("Carpeta origen inexistente: %s", carpeta)
+            continue
+        archivos.extend(p for p in carpeta.glob("*.pdf"))
+
+    encontrados: dict[str, Path] = {}
     procesados_en_origen: set[Path] = set()
 
     # intentar asociar por nombre de archivo primero (más rápido y confiable)
-    for archivo in archivos:
-        ruta = os.path.join(carpeta_origen, archivo)
+    for ruta_path in archivos:
+        archivo = ruta_path.name
         for numero in numeros_oc:
             if not numero or numero in encontrados:
                 continue
             if _nombre_contiene_numero(archivo, numero):
-                encontrados[numero] = ruta
+                encontrados[numero] = ruta_path
                 break
 
     # para los que no se encontraron, buscar dentro del contenido del PDF
-    restantes = [a for a in archivos if os.path.join(carpeta_origen, a) not in encontrados.values()]
-    for archivo in restantes:
-        ruta = os.path.join(carpeta_origen, archivo)
+    encontrados_paths = set(encontrados.values())
+    restantes = [ruta for ruta in archivos if ruta not in encontrados_paths]
+    for ruta_path in restantes:
+        ruta = str(ruta_path)
         try:
             with open(ruta, 'rb') as f:
                 pdf = PyPDF2.PdfReader(f)
                 texto = ''.join(p.extract_text() or '' for p in pdf.pages)
         except Exception as e:
-            logger.warning('Error leyendo %s: %s', archivo, e)
+            logger.warning('Error leyendo %s: %s', ruta_path.name, e)
             continue
         for numero in numeros_oc:
             if numero in encontrados:
                 continue
             if numero and numero in texto:
-                encontrados[numero] = ruta
+                encontrados[numero] = ruta_path
+                encontrados_paths.add(ruta_path)
                 break
 
     faltantes: list[str] = []
     subidos: list[str] = []
     es_bienes = bool(getattr(config, "compra_bienes", False))
     for numero in numeros_oc:
-        ruta = encontrados.get(numero)
-        if not ruta:
+        ruta_path = encontrados.get(numero)
+        if not ruta_path:
             faltantes.append(numero)
             errores.append(f"OC {numero}: archivo no encontrado en carpeta de descarga")
             continue
 
         prov = proveedores.get(numero)
+        ruta_str = str(ruta_path)
         if not prov:
-            prov = extraer_proveedor_desde_pdf(ruta)
+            prov = extraer_proveedor_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
 
         tarea = None
         if es_bienes:
             # extraer número de tarea para organizar y para el reporte
-            tarea = extraer_numero_tarea_desde_pdf(ruta)
+            tarea = extraer_numero_tarea_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None:
                 indice_ordenes[numero]["tarea"] = tarea
 
-        ruta_path = Path(ruta)
         ext = ruta_path.suffix or ".pdf"
         nombre_deseado = _nombre_destino(numero, prov, ext)
         nombre_original = ruta_path.name
+        origen_descarga = ruta_path.parent
 
         if es_bienes:
             if tarea:
@@ -268,26 +287,25 @@ def mover_oc(config: Config, ordenes=None):
                 # mantener el archivo disponible en origen para reintentos
                 continue
             ruta_path = destino_path
-            ruta = str(destino_path)
+            ruta_str = str(destino_path)
 
             ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
             if ruta_path is None:
                 errores.append(f"OC {numero}: {error_nombre}")
                 faltantes.append(numero)
-                if origen_dir is not None:
+                if origen_descarga is not None:
                     try:
-                        regreso = _resolver_conflicto(origen_dir, nombre_original)
+                        regreso = _resolver_conflicto(origen_descarga, nombre_original)
                         shutil.move(str(destino_path), regreso)
                     except Exception as exc:  # pragma: no cover - best effort recovery
                         logger.warning(
                             "No se pudo regresar '%s' a '%s' tras fallo de renombre: %s",
                             destino_path,
-                            origen_dir,
+                            origen_descarga,
                             exc,
                         )
                 continue
 
-            ruta = str(ruta_path)
             logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
         else:
             ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
@@ -296,17 +314,15 @@ def mover_oc(config: Config, ordenes=None):
                 faltantes.append(numero)
                 continue
 
-            ruta = str(ruta_path)
             procesados_en_origen.add(ruta_path)
 
         subidos.append(numero)
 
     # limpiar carpeta de origen después del proceso
-    for f in Path(carpeta_origen).glob("*.pdf"):
-        if f in procesados_en_origen:
-            try:
-                f.unlink()
-            except Exception:
-                pass
+    for ruta in procesados_en_origen:
+        try:
+            ruta.unlink()
+        except Exception:
+            pass
     return subidos, faltantes, errores
 
