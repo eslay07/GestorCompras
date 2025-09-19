@@ -13,10 +13,12 @@ try:
     from .config import Config
     from .mover_pdf import mover_oc
     from .reporter import enviar_reporte
+    from .selenium_modulo import esperar_descarga_pdf
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
     from reporter import enviar_reporte
+    from selenium_modulo import esperar_descarga_pdf
 
 
 def descargar_abastecimiento(
@@ -186,16 +188,12 @@ def descargar_abastecimiento(
         except Exception:
             numero = str(idx)
             proveedor = ""
+        existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
         try:
             btn.click()
         except ElementClickInterceptedException:
             driver.execute_script("arguments[0].click();", btn)
-        antes = set(destino.glob("*.pdf"))
-        for _ in range(120):
-            time.sleep(0.5)
-            nuevos = set(destino.glob("*.pdf")) - antes
-            if nuevos:
-                break
+        archivo_descargado = esperar_descarga_pdf(destino, existentes)
         ordenes.append({"numero": numero, "proveedor": proveedor})
         for _ in range(5):
             if not driver.find_elements(*elements["toast"]):
