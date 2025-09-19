@@ -165,6 +165,7 @@ def mover_oc(config: Config, ordenes=None):
         or config.carpeta_destino_local
     )
     carpeta_destino = config.carpeta_analizar
+    origen_dir = Path(carpeta_origen) if carpeta_origen else None
     errores: list[str] = []
     if not carpeta_origen:
         logger.error("Configuración incompleta")
@@ -232,15 +233,7 @@ def mover_oc(config: Config, ordenes=None):
         ruta_path = Path(ruta)
         ext = ruta_path.suffix or ".pdf"
         nombre_deseado = _nombre_destino(numero, prov, ext)
-
-        ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
-        if ruta_path is None:
-            errores.append(f"OC {numero}: {error_nombre}")
-            faltantes.append(numero)
-            continue
-
-        ruta = str(ruta_path)
-        nombre_archivo = ruta_path.name
+        nombre_original = ruta_path.name
 
         if es_bienes:
             if tarea:
@@ -259,15 +252,43 @@ def mover_oc(config: Config, ordenes=None):
             else:
                 destino = os.path.join(carpeta_destino, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
-            destino_path, error_mov = _mover_archivo(ruta_path, Path(destino), nombre_archivo)
+            destino_dir = Path(destino)
+            destino_path, error_mov = _mover_archivo(ruta_path, destino_dir, nombre_original)
             if destino_path is None:
                 errores.append(f"OC {numero}: {error_mov}")
                 faltantes.append(numero)
                 # mantener el archivo disponible en origen para reintentos
                 continue
+            ruta_path = destino_path
             ruta = str(destino_path)
-            logger.info("%s movido a %s", destino_path.name, destino_path.parent)
+
+            ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+            if ruta_path is None:
+                errores.append(f"OC {numero}: {error_nombre}")
+                faltantes.append(numero)
+                if origen_dir is not None:
+                    try:
+                        regreso = _resolver_conflicto(origen_dir, nombre_original)
+                        shutil.move(str(destino_path), regreso)
+                    except Exception as exc:  # pragma: no cover - best effort recovery
+                        logger.warning(
+                            "No se pudo regresar '%s' a '%s' tras fallo de renombre: %s",
+                            destino_path,
+                            origen_dir,
+                            exc,
+                        )
+                continue
+
+            ruta = str(ruta_path)
+            logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
         else:
+            ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+            if ruta_path is None:
+                errores.append(f"OC {numero}: {error_nombre}")
+                faltantes.append(numero)
+                continue
+
+            ruta = str(ruta_path)
             procesados_en_origen.add(ruta_path)
 
         subidos.append(numero)
