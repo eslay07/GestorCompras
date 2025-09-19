@@ -23,6 +23,33 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 
+def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
+    numero = numero or ""
+    base = numero.strip()
+    if proveedor:
+        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+        base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+    if not base:
+        base = "archivo"
+    if not ext.startswith("."):
+        ext = f".{ext}" if ext else ".pdf"
+    return f"{base}{ext}"
+
+
+def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
+    destino_dir.mkdir(parents=True, exist_ok=True)
+    destino = destino_dir / nombre
+    if not destino.exists():
+        return destino
+    base, ext = os.path.splitext(nombre)
+    i = 1
+    while True:
+        candidato = destino_dir / f"{base} ({i}){ext}"
+        if not candidato.exists():
+            return candidato
+        i += 1
+
+
 def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
 
@@ -97,17 +124,6 @@ def mover_oc(config: Config, ordenes=None):
             prov = extraer_proveedor_desde_pdf(ruta)
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
-        if prov:
-            prov_clean = re.sub(r"[^\w\- ]", "_", prov)
-            nuevo_nombre = os.path.join(
-                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
-            )
-            if ruta != nuevo_nombre:
-                try:
-                    os.rename(ruta, nuevo_nombre)
-                    ruta = nuevo_nombre
-                except Exception as e:
-                    logger.warning('No se pudo renombrar %s: %s', ruta, e)
 
         tarea = None
         if es_bienes:
@@ -115,6 +131,10 @@ def mover_oc(config: Config, ordenes=None):
             tarea = extraer_numero_tarea_desde_pdf(ruta)
             if indice_ordenes.get(numero) is not None:
                 indice_ordenes[numero]["tarea"] = tarea
+
+        ruta_path = Path(ruta)
+        ext = ruta_path.suffix or ".pdf"
+        nombre_deseado = _nombre_destino(numero, prov, ext)
 
         if es_bienes:
             if tarea:
@@ -133,30 +153,32 @@ def mover_oc(config: Config, ordenes=None):
             else:
                 destino = os.path.join(carpeta_destino, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
+            destino_path = _resolver_conflicto(Path(destino), nombre_deseado)
             try:
-                nombre_archivo = os.path.basename(ruta)
-                destino_archivo = os.path.join(destino, nombre_archivo)
-                if os.path.exists(destino_archivo):
-                    base, ext = os.path.splitext(nombre_archivo)
-                    i = 1
-                    while os.path.exists(destino_archivo):
-                        destino_archivo = os.path.join(destino, f"{base} ({i}){ext}")
-                        i += 1
-                shutil.move(ruta, destino_archivo)
-                ruta = destino_archivo
-                logger.info("%s movido a %s", nombre_archivo, destino)
+                shutil.move(str(ruta_path), destino_path)
+                ruta = str(destino_path)
+                logger.info("%s movido a %s", destino_path.name, destino_path.parent)
             except Exception as e:
-                logger.warning("No se pudo mover %s a %s: %s", ruta, destino, e)
+                logger.warning("No se pudo mover %s a %s: %s", ruta, destino_path.parent, e)
                 errores.append(
-                    f"OC {numero}: no se pudo mover a '{destino}': {e}"
+                    f"OC {numero}: no se pudo mover a '{destino_path.parent}': {e}"
                 )
                 faltantes.append(numero)
                 # intentar mantener el archivo en la carpeta de origen para reintentos
                 continue
+        else:
+            destino_path = _resolver_conflicto(ruta_path.parent, nombre_deseado)
+            if destino_path != ruta_path:
+                try:
+                    shutil.move(str(ruta_path), destino_path)
+                    ruta_path = destino_path
+                    ruta = str(destino_path)
+                except Exception as e:
+                    logger.warning("No se pudo renombrar %s a %s: %s", ruta, destino_path.name, e)
+                    ruta = str(ruta_path)
+            procesados_en_origen.add(Path(ruta))
 
         subidos.append(numero)
-        if not es_bienes:
-            procesados_en_origen.add(Path(ruta))
 
     # limpiar carpeta de origen después del proceso
     for f in Path(carpeta_origen).glob("*.pdf"):
