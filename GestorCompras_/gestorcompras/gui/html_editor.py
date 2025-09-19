@@ -11,13 +11,19 @@ class HtmlEditor(ttk.Frame):
         self._setup_tags()
         # Track active styles to apply to newly typed text
         self.active_tags = set()
-        self.current_font = self.font_var.get()
-        self.current_size = self.size_var.get()
+        self.default_font = self.font_var.get()
+        self.default_size = self.size_var.get()
+        self.current_font = self.default_font
+        self.current_size = self.default_size
         self.current_color = None
         self.current_bg = None
-        self.text.bind("<KeyRelease>", self._apply_active_tags)
+        self.text.bind("<KeyRelease>", self._on_key_release)
+        self.text.bind("<ButtonRelease-1>", self._update_current_styles)
+        self.text.bind("<<Selection>>", self._update_current_styles)
+        self.text.bind("<FocusIn>", self._update_current_styles)
         for seq in ("<<Paste>>", "<Control-v>", "<Command-v>"):
             self.text.bind(seq, self._handle_paste)
+        self._update_current_styles()
 
     def _create_widgets(self):
         toolbar = ttk.Frame(self)
@@ -109,7 +115,10 @@ class HtmlEditor(ttk.Frame):
         return True
 
     def _make_bold(self):
-        font = tkfont.Font(family=self.current_font, size=int(self.current_size))
+        font = tkfont.Font(
+            family=self.current_font or self.default_font,
+            size=int(self.current_size or self.default_size),
+        )
         font.configure(weight="bold")
         self.text.tag_configure("bold", font=font)
         self.text.tag_raise("bold")
@@ -120,7 +129,10 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.add("bold")
 
     def _make_italic(self):
-        font = tkfont.Font(family=self.current_font, size=int(self.current_size))
+        font = tkfont.Font(
+            family=self.current_font or self.default_font,
+            size=int(self.current_size or self.default_size),
+        )
         font.configure(slant="italic")
         self.text.tag_configure("italic", font=font)
         self.text.tag_raise("italic")
@@ -167,6 +179,7 @@ class HtmlEditor(ttk.Frame):
         family = self.font_var.get()
         tag = f"font_{family.replace(' ', '_')}"
         self.text.tag_configure(tag, font=tkfont.Font(family=family))
+        self.text.tag_raise(tag)
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -183,6 +196,7 @@ class HtmlEditor(ttk.Frame):
         size = self.size_var.get()
         tag = f"size_{size}"
         self.text.tag_configure(tag, font=tkfont.Font(size=int(size)))
+        self.text.tag_raise(tag)
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -214,6 +228,7 @@ class HtmlEditor(ttk.Frame):
             return
         tag = f"color_{color.lstrip('#')}"
         self.text.tag_configure(tag, foreground=color)
+        self.text.tag_raise(tag)
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -231,6 +246,7 @@ class HtmlEditor(ttk.Frame):
             return
         tag = f"bg_{color.lstrip('#')}"
         self.text.tag_configure(tag, background=color)
+        self.text.tag_raise(tag)
         try:
             start = self.text.index("sel.first")
             end = self.text.index("sel.last")
@@ -242,6 +258,154 @@ class HtmlEditor(ttk.Frame):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
 
+    def _on_key_release(self, event=None):
+        navigation = {
+            "Shift_L",
+            "Shift_R",
+            "Control_L",
+            "Control_R",
+            "Alt_L",
+            "Alt_R",
+            "Caps_Lock",
+            "Num_Lock",
+            "Scroll_Lock",
+            "Left",
+            "Right",
+            "Up",
+            "Down",
+            "Home",
+            "End",
+            "Prior",
+            "Next",
+            "Escape",
+        }
+        if event is not None:
+            if event.keysym in navigation or event.char == "":
+                self._update_current_styles()
+                return
+            if event.keysym in {"BackSpace", "Delete"}:
+                self._update_current_styles()
+                return
+        self._apply_active_tags()
+        self._update_current_styles()
+
+    def _update_current_styles(self, event=None):
+        try:
+            insert_index = self.text.index("insert")
+        except tk.TclError:
+            return
+        if self.text.compare(insert_index, ">", "1.0"):
+            index = self.text.index(f"{insert_index}-1c")
+        else:
+            index = "1.0"
+        tags = self._effective_tags(index, clean=True)
+        style_tags = {t for t in tags if t in {"bold", "italic", "underline", "strike"}}
+        self.active_tags = style_tags
+
+        font_tags = [t for t in tags if t.startswith("font_")]
+        if font_tags:
+            font_name = font_tags[-1].split("_", 1)[1].replace("_", " ")
+            self.current_font = font_name
+            self.font_var.set(font_name)
+        else:
+            self.current_font = self.default_font
+            self.font_var.set(self.default_font)
+
+        size_tags = [t for t in tags if t.startswith("size_")]
+        if size_tags:
+            size_value = size_tags[-1].split("_", 1)[1]
+            self.current_size = size_value
+            self.size_var.set(size_value)
+        else:
+            self.current_size = self.default_size
+            self.size_var.set(self.default_size)
+
+        color_tags = [t for t in tags if t.startswith("color_")]
+        if color_tags:
+            color_value = color_tags[-1].split("_", 1)[1]
+            if not color_value.startswith("#"):
+                color_value = "#" + color_value
+            self.current_color = color_value
+        else:
+            self.current_color = None
+
+        bg_tags = [t for t in tags if t.startswith("bg_")]
+        if bg_tags:
+            bg_value = bg_tags[-1].split("_", 1)[1]
+            if not bg_value.startswith("#"):
+                bg_value = "#" + bg_value
+            self.current_bg = bg_value
+        else:
+            self.current_bg = None
+
+    def _effective_tags(self, index, clean=False):
+        index = self.text.index(index)
+        tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
+        return self._resolve_tag_conflicts(index, tags, clean=clean)
+
+    def _resolve_tag_conflicts(self, index, tags, clean=False):
+        index = self.text.index(index)
+        try:
+            end = self.text.index(f"{index}+1c")
+        except tk.TclError:
+            end = index
+        group_map: dict[str, list[str]] = {"font_": [], "size_": [], "color_": [], "bg_": [], "align_": []}
+        group_order: list[str] = []
+        filtered: list[str] = []
+        for tag in tags:
+            matched = False
+            for prefix in group_map:
+                if tag.startswith(prefix):
+                    group_map[prefix].append(tag)
+                    if prefix not in group_order:
+                        group_order.append(prefix)
+                    matched = True
+                    break
+            if not matched:
+                filtered.append(tag)
+        for prefix in group_order:
+            candidates = group_map[prefix]
+            if not candidates:
+                continue
+            keep = self._choose_tag_from_candidates(prefix, candidates, index)
+            filtered.append(keep)
+            if clean and self.text.compare(end, ">", index) and self.text.get(index, end):
+                for tag in candidates:
+                    if tag != keep:
+                        self.text.tag_remove(tag, index, end)
+        return filtered
+
+    def _choose_tag_from_candidates(self, prefix, candidates, index):
+        for delta in ("-1c", "+1c"):
+            neighbor = self._neighbor_index(index, delta)
+            if not neighbor:
+                continue
+            neighbor_tags = [t for t in self.text.tag_names(neighbor) if t.startswith(prefix)]
+            if len(neighbor_tags) == 1 and neighbor_tags[0] in candidates:
+                return neighbor_tags[0]
+        if prefix == "size_":
+            default_tag = f"{prefix}{self.default_size}"
+            if default_tag in candidates:
+                return default_tag
+        if prefix == "font_":
+            default_tag = f"{prefix}{self.default_font.replace(' ', '_')}"
+            if default_tag in candidates:
+                return default_tag
+        return candidates[-1]
+
+    def _neighbor_index(self, index, delta):
+        try:
+            neighbor = self.text.index(f"{index}{delta}")
+        except tk.TclError:
+            return None
+        if self.text.compare(neighbor, "<", "1.0"):
+            return None
+        if self.text.compare(neighbor, ">=", "end"):
+            return None
+        if self.text.get(neighbor, f"{neighbor}+1c") == "":
+            return None
+        return neighbor
+
     def _apply_active_tags(self, event=None):
         try:
             start = self.text.index("insert-1c")
@@ -249,25 +413,41 @@ class HtmlEditor(ttk.Frame):
         except tk.TclError:
             return
         if "bold" in self.active_tags:
-            font = tkfont.Font(family=self.current_font, size=int(self.current_size), weight="bold")
+            font = tkfont.Font(
+                family=self.current_font or self.default_font,
+                size=int(self.current_size or self.default_size),
+                weight="bold",
+            )
             self.text.tag_configure("bold", font=font)
             self.text.tag_raise("bold")
             self.text.tag_add("bold", start, end)
         if "italic" in self.active_tags:
-            font = tkfont.Font(family=self.current_font, size=int(self.current_size), slant="italic")
+            font = tkfont.Font(
+                family=self.current_font or self.default_font,
+                size=int(self.current_size or self.default_size),
+                slant="italic",
+            )
             self.text.tag_configure("italic", font=font)
             self.text.tag_raise("italic")
             self.text.tag_add("italic", start, end)
         for tag in self.active_tags - {"bold", "italic"}:
             self.text.tag_add(tag, start, end)
         if self.current_font:
-            self.text.tag_add(f"font_{self.current_font.replace(' ', '_')}", start, end)
+            font_tag = f"font_{self.current_font.replace(' ', '_')}"
+            self.text.tag_add(font_tag, start, end)
+            self.text.tag_raise(font_tag)
         if self.current_size:
-            self.text.tag_add(f"size_{self.current_size}", start, end)
+            size_tag = f"size_{self.current_size}"
+            self.text.tag_add(size_tag, start, end)
+            self.text.tag_raise(size_tag)
         if self.current_color:
-            self.text.tag_add(f"color_{self.current_color.lstrip('#')}", start, end)
+            color_tag = f"color_{self.current_color.lstrip('#')}"
+            self.text.tag_add(color_tag, start, end)
+            self.text.tag_raise(color_tag)
         if getattr(self, "current_bg", None):
-            self.text.tag_add(f"bg_{self.current_bg.lstrip('#')}", start, end)
+            bg_tag = f"bg_{self.current_bg.lstrip('#')}"
+            self.text.tag_add(bg_tag, start, end)
+            self.text.tag_raise(bg_tag)
 
     def _handle_paste(self, event=None):
         try:
@@ -283,6 +463,7 @@ class HtmlEditor(ttk.Frame):
                 return "break"
             self.text.insert("insert", text)
         self._apply_active_tags()
+        self._update_current_styles()
         return "break"
 
     def insert_html(self, html_string, index="insert"):
@@ -433,7 +614,8 @@ class HtmlEditor(ttk.Frame):
 
         while self.text.compare(index, "<=", end_index):
             char = self.text.get(index)
-            curr_tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
+            raw_tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
+            curr_tags = self._resolve_tag_conflicts(index, raw_tags, clean=False)
             # Close tags that no longer apply
             for t in reversed([tg for tg in prev_tags if tg not in curr_tags]):
                 html_chunks.append(self._tag_end_html(t))
@@ -561,6 +743,7 @@ class HtmlEditor(ttk.Frame):
                     self.widget.tag_add(t, start, end)
         self.text.delete("1.0", "end")
         Parser(self.text).feed(html_string)
+        self._update_current_styles()
 
     @staticmethod
     def _tag_start_html(tag):
