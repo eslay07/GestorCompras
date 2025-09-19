@@ -162,26 +162,52 @@ def enviar_reporte(
     info = {o["numero"]: o for o in ordenes}
 
     destinatario = destinatario or cfg.correo_reporte
-    usuario = cfg.usuario
-    password = cfg.password
-    if not destinatario or not usuario or not password:
-        logger.warning('Datos de correo incompletos, no se enviará reporte')
+    usuario_pop = getattr(cfg, "usuario", None)
+    password_pop = getattr(cfg, "password", None)
+    smtp_usuario = getattr(cfg, "smtp_usuario", None) or usuario_pop
+    smtp_password = getattr(cfg, "smtp_password", None) or password_pop
+    smtp_server = getattr(cfg, "smtp_server", None) or SMTP_SERVER
+    smtp_port = getattr(cfg, "smtp_port", None) or SMTP_PORT
+    smtp_ssl_port = getattr(cfg, "smtp_ssl_port", None) or SMTP_SSL_PORT
+    smtp_plain_port = getattr(cfg, "smtp_plain_port", None) or SMTP_PLAIN_PORT
+
+    def _as_int(value, default):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    smtp_port = _as_int(smtp_port, SMTP_PORT)
+    smtp_ssl_port = _as_int(smtp_ssl_port, SMTP_SSL_PORT)
+    smtp_plain_port = _as_int(smtp_plain_port, SMTP_PLAIN_PORT)
+
+    if not destinatario or not smtp_usuario or not smtp_password:
+        logger.warning('Datos de correo SMTP incompletos, no se enviará reporte')
         return False
 
     # Algunos servidores requieren autenticarse vía POP3 antes de enviar SMTP
-    try:
-        pop = poplib.POP3_SSL(cfg.pop_server, cfg.pop_port)
-        pop.user(usuario)
-        pop.pass_(password)
-        pop.quit()
-    except Exception as exc:  # pragma: no cover - la ausencia de POP no debe abortar
-        logger.warning("Autenticación POP fallida: %s", exc)
+    if usuario_pop and password_pop:
+        try:
+            pop = poplib.POP3_SSL(cfg.pop_server, cfg.pop_port)
+            pop.user(usuario_pop)
+            pop.pass_(password_pop)
+            pop.quit()
+        except Exception as exc:  # pragma: no cover - la ausencia de POP no debe abortar
+            logger.warning("Autenticación POP fallida: %s", exc)
+    else:  # pragma: no cover - se deja registro para diagnósticos
+        logger.warning('Credenciales POP incompletas, se omite autenticación previa')
     mensaje = EmailMessage()
     subject = 'Reporte de órdenes descargadas'
     if categoria:
         subject += f' - {categoria}'
     mensaje['Subject'] = subject
-    mensaje['From'] = usuario
+    if smtp_usuario and "@" in smtp_usuario:
+        remitente = smtp_usuario
+    elif usuario_pop:
+        remitente = usuario_pop
+    else:
+        remitente = smtp_usuario
+    mensaje['From'] = remitente
     mensaje['To'] = destinatario
     texto = ''
     if categoria:
@@ -211,33 +237,52 @@ def enviar_reporte(
         html += '<h3>No se encontraron archivos para las siguientes OC:</h3>' + _tabla_html(filas_bad)
     mensaje.set_content(texto)
     mensaje.add_alternative(html, subtype='html')
-    usernames = [usuario]
-    if "@" in usuario:
-        base = usuario.split("@")[0]
-        usernames.append(base)
-        dominio = usuario.split("@")[1].split(".")[0].upper()
-        usernames.append(f"{dominio}\\{base}")
+    candidatos: list[str] = []
+
+    def _agregar_candidato(valor: str | None):
+        if not valor:
+            return
+        candidatos.append(valor)
+        if "@" in valor:
+            base, _, resto = valor.partition("@")
+            dominio = resto.split(".")[0].upper() if resto else ""
+            if base:
+                candidatos.append(base)
+                if dominio:
+                    candidatos.append(f"{dominio}\\{base}")
+
+    _agregar_candidato(smtp_usuario)
+    if usuario_pop != smtp_usuario:
+        _agregar_candidato(usuario_pop)
+
+    usernames = list(dict.fromkeys(c for c in candidatos if c))
 
     def _intentar_envio(factory):
-        try:
-            with factory() as smtp:
-                for u in usernames:
+        last_error: Exception | None = None
+        for u in usernames:
+            try:
+                with factory() as smtp:
                     try:
-                        smtp.login(u, password)
-                        break
-                    except smtplib.SMTPAuthenticationError:
+                        smtp.login(u, smtp_password)
+                    except smtplib.SMTPAuthenticationError as exc:
                         logger.warning("Fallo de autenticación con '%s'", u)
-                else:
-                    raise smtplib.SMTPAuthenticationError(535, b"Authentication failed")
-                smtp.send_message(mensaje)
-            logger.info('Reporte enviado')
-            return True
-        except Exception as e:
-            logger.error('No se pudo enviar reporte: %s', e)
-            return False
+                        last_error = exc
+                        continue
+                    smtp.send_message(mensaje)
+                    logger.info('Reporte enviado')
+                    return True
+            except smtplib.SMTPAuthenticationError as exc:
+                logger.warning("Fallo de autenticación con '%s'", u)
+                last_error = exc
+            except Exception as exc:
+                logger.error('No se pudo enviar reporte: %s', exc)
+                return False
+        if last_error:
+            logger.error('No se pudo enviar reporte: %s', last_error)
+        return False
 
     def _smtp_tls():
-        s = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        s = smtplib.SMTP(smtp_server, smtp_port)
         s.ehlo()
         s.starttls()
         s.ehlo()
@@ -250,14 +295,19 @@ def enviar_reporte(
             pass
         return True
 
-    if _intentar_envio(lambda: smtplib.SMTP_SSL(SMTP_SERVER, SMTP_SSL_PORT)):
+    if _intentar_envio(lambda: smtplib.SMTP_SSL(smtp_server, smtp_ssl_port)):
         try:
             ORDENES_TMP.unlink(missing_ok=True)
         except Exception:
             pass
         return True
 
-    if _intentar_envio(lambda: smtplib.SMTP(SMTP_SERVER, SMTP_PLAIN_PORT)):
+    def _smtp_plain():
+        s = smtplib.SMTP(smtp_server, smtp_plain_port)
+        s.ehlo()
+        return s
+
+    if _intentar_envio(_smtp_plain):
         try:
             ORDENES_TMP.unlink(missing_ok=True)
         except Exception:
