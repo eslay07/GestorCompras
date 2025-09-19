@@ -102,6 +102,25 @@ def descargar_oc(
     download_dir = Path(cfg.carpeta_destino_local or Path.home() / "Documentos")
     download_dir.mkdir(parents=True, exist_ok=True)
 
+    def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
+        if not base:
+            return archivo
+        destino = download_dir / f"{base}.pdf"
+        if archivo == destino:
+            return archivo
+        intento = 0
+        while True:
+            candidato = destino if intento == 0 else download_dir / f"{base} ({intento}).pdf"
+            try:
+                archivo.rename(candidato)
+                return candidato
+            except FileExistsError:
+                intento += 1
+                continue
+            except OSError:
+                break
+        return archivo
+
     user = username if username is not None else cfg.usuario
     if user:
         user = user.split("@")[0]
@@ -315,14 +334,20 @@ def descargar_oc(
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
                 archivo = esperar_descarga_pdf(download_dir, existentes)
-                if not getattr(cfg, "compra_bienes", False) and proveedor:
-                    prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                    try:
-                        archivo.rename(nuevo_nombre)
-                        archivo = nuevo_nombre
-                    except Exception:
-                        pass
+                if not getattr(cfg, "compra_bienes", False):
+                    prov_clean = None
+                    if proveedor:
+                        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+                        if not prov_clean:
+                            prov_clean = None
+                    partes: list[str] = []
+                    if numero:
+                        partes.append(str(numero))
+                    if prov_clean:
+                        partes.append(prov_clean)
+                    base_nombre = " - ".join(partes) if partes else None
+                    archivo = _renombrar_descarga(archivo, base_nombre)
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder

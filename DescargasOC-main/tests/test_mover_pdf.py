@@ -180,3 +180,20 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
     assert len(archivos) == 2
     nombres = [p.name for p in archivos]
     assert any(name.endswith("(1).pdf") for name in nombres)
+
+
+def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
+    cfg, origen, _destino = _config(tmp_path, bienes=False)
+
+    pdf = origen / "ORDEN # 123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: None)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": None}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []

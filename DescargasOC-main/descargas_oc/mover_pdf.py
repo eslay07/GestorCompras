@@ -28,6 +28,13 @@ REINTENTOS = 5
 ESPERA_INICIAL = 0.3
 
 
+def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
+    if not nombre or not numero:
+        return False
+    patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
+    return re.search(patron, nombre) is not None
+
+
 def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
     numero = (numero or "").strip()
     base = numero
@@ -183,11 +190,12 @@ def mover_oc(config: Config, ordenes=None):
     # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for archivo in archivos:
         ruta = os.path.join(carpeta_origen, archivo)
-        m = re.match(r"^(\d+)", archivo)
-        if m:
-            num = m.group(1)
-            if num in numeros_oc and num not in encontrados:
-                encontrados[num] = ruta
+        for numero in numeros_oc:
+            if not numero or numero in encontrados:
+                continue
+            if _nombre_contiene_numero(archivo, numero):
+                encontrados[numero] = ruta
+                break
 
     # para los que no se encontraron, buscar dentro del contenido del PDF
     restantes = [a for a in archivos if os.path.join(carpeta_origen, a) not in encontrados.values()]
