@@ -34,11 +34,36 @@ class Config:
         self.data['remitente_adicional'] = os.getenv(
             'REMITENTE_ADICIONAL', self.data.get('remitente_adicional')
         )
-        pop_port = os.getenv('POP_PORT', self.data.get('pop_port', 995))
-        try:
-            self.data['pop_port'] = int(pop_port)
-        except (TypeError, ValueError):
-            self.data['pop_port'] = 995
+
+        def _parse_int(value, default):
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return default
+
+        self.data['pop_port'] = _parse_int(
+            os.getenv('POP_PORT', self.data.get('pop_port', 995)), 995
+        )
+        self.data['smtp_server'] = os.getenv(
+            'SMTP_SERVER', self.data.get('smtp_server', 'smtp.telconet.ec')
+        )
+        self.data['smtp_port'] = _parse_int(
+            os.getenv('SMTP_PORT', self.data.get('smtp_port', 587)), 587
+        )
+        self.data['smtp_ssl_port'] = _parse_int(
+            os.getenv('SMTP_SSL_PORT', self.data.get('smtp_ssl_port', 465)), 465
+        )
+        self.data['smtp_plain_port'] = _parse_int(
+            os.getenv('SMTP_PLAIN_PORT', self.data.get('smtp_plain_port', 25)), 25
+        )
+        self.data['smtp_usuario'] = os.getenv(
+            'SMTP_USER',
+            self.data.get('smtp_usuario', self.data.get('usuario')),
+        )
+        self.data['smtp_password'] = os.getenv(
+            'SMTP_PASSWORD',
+            self.data.get('smtp_password', self.data.get('password')),
+        )
         self.data.setdefault('max_threads', 5)
         self.data.setdefault('batch_size', 50)
 
@@ -62,6 +87,12 @@ class Config:
         self.data.setdefault('seafile_subfolder', '/prueba')
         self.data.setdefault('correo_reporte', 'jotoapanta@telconet.ec')
         self.data.setdefault('remitente_adicional', 'naf@telconet.ec')
+        self.data.setdefault('smtp_server', 'smtp.telconet.ec')
+        self.data.setdefault('smtp_port', 587)
+        self.data.setdefault('smtp_ssl_port', 465)
+        self.data.setdefault('smtp_plain_port', 25)
+        self.data.setdefault('smtp_usuario', self.data.get('usuario'))
+        self.data.setdefault('smtp_password', self.data.get('password'))
         self.data.setdefault('compra_bienes', False)
         self.data.setdefault('headless', False)
         self.data.setdefault(
