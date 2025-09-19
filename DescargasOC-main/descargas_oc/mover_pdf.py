@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 import PyPDF2
@@ -22,15 +23,25 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+MAX_NOMBRE = 180
+REINTENTOS = 5
+ESPERA_INICIAL = 0.3
+
 
 def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
-    numero = numero or ""
-    base = numero.strip()
+    numero = (numero or "").strip()
+    base = numero
     if proveedor:
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
         base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+    base = re.sub(r"\s+", " ", base).strip()
     if not base:
         base = "archivo"
+    if len(base) > MAX_NOMBRE:
+        base = base[:MAX_NOMBRE].rstrip(" .-_")
+        if not base:
+            base = "archivo"
     if not ext.startswith("."):
         ext = f".{ext}" if ext else ".pdf"
     return f"{base}{ext}"
@@ -48,6 +59,92 @@ def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
         if not candidato.exists():
             return candidato
         i += 1
+
+
+def _asegurar_nombre(ruta_path: Path, nombre_deseado: str) -> tuple[Path | None, str | None]:
+    if ruta_path.name == nombre_deseado:
+        return ruta_path, None
+    ultimo_error: Exception | None = None
+    destino_final: Path | None = None
+    for intento in range(REINTENTOS):
+        destino = _resolver_conflicto(ruta_path.parent, nombre_deseado)
+        destino_final = destino
+        try:
+            ruta_path.rename(destino)
+            return destino, None
+        except PermissionError as exc:
+            ultimo_error = exc
+        except OSError as exc:
+            ultimo_error = exc
+            break
+        if intento < REINTENTOS - 1:
+            time.sleep(ESPERA_INICIAL * (intento + 1))
+    if ultimo_error:
+        logger.warning(
+            "No se pudo renombrar '%s' como '%s': %s",
+            ruta_path,
+            destino_final or (ruta_path.parent / nombre_deseado),
+            ultimo_error,
+        )
+        mensaje = (
+            f"No se pudo renombrar '{ruta_path.name}' a "
+            f"'{(destino_final or Path(nombre_deseado)).name}': {ultimo_error}"
+        )
+    else:
+        mensaje = (
+            f"No se pudo renombrar '{ruta_path.name}' a '{nombre_deseado}'"
+        )
+    return None, mensaje
+
+
+def _mover_archivo(
+    ruta_path: Path, destino_dir: Path, nombre_final: str
+) -> tuple[Path | None, str | None]:
+    ultimo_error: Exception | None = None
+    destino_final: Path | None = None
+    for intento in range(REINTENTOS):
+        destino = _resolver_conflicto(destino_dir, nombre_final)
+        destino_final = destino
+        try:
+            resultado = Path(shutil.move(str(ruta_path), destino))
+            return resultado, None
+        except PermissionError as exc:
+            ultimo_error = exc
+        except OSError as exc:
+            ultimo_error = exc
+        if intento < REINTENTOS - 1:
+            time.sleep(ESPERA_INICIAL * (intento + 1))
+
+    if ruta_path.exists():
+        destino_final = _resolver_conflicto(destino_dir, nombre_final)
+        try:
+            shutil.copy2(str(ruta_path), str(destino_final))
+            try:
+                ruta_path.unlink()
+            except Exception as exc:  # pragma: no cover - best effort cleanup
+                logger.warning(
+                    "No se pudo eliminar '%s' tras copiarlo a '%s': %s",
+                    ruta_path,
+                    destino_final,
+                    exc,
+                )
+            return destino_final, None
+        except Exception as exc:
+            ultimo_error = exc
+
+    if ultimo_error:
+        logger.warning(
+            "No se pudo mover '%s' a '%s': %s",
+            ruta_path,
+            destino_final.parent if destino_final else destino_dir,
+            ultimo_error,
+        )
+        return (
+            None,
+            f"No se pudo mover '{ruta_path.name}' a "
+            f"'{destino_final or destino_dir}': {ultimo_error}",
+        )
+    return None, f"No se pudo mover '{ruta_path.name}' a '{destino_dir}'"
 
 
 def mover_oc(config: Config, ordenes=None):
@@ -136,6 +233,15 @@ def mover_oc(config: Config, ordenes=None):
         ext = ruta_path.suffix or ".pdf"
         nombre_deseado = _nombre_destino(numero, prov, ext)
 
+        ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+        if ruta_path is None:
+            errores.append(f"OC {numero}: {error_nombre}")
+            faltantes.append(numero)
+            continue
+
+        ruta = str(ruta_path)
+        nombre_archivo = ruta_path.name
+
         if es_bienes:
             if tarea:
                 # buscar carpeta existente que comience con el número de tarea
@@ -153,30 +259,16 @@ def mover_oc(config: Config, ordenes=None):
             else:
                 destino = os.path.join(carpeta_destino, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
-            destino_path = _resolver_conflicto(Path(destino), nombre_deseado)
-            try:
-                shutil.move(str(ruta_path), destino_path)
-                ruta = str(destino_path)
-                logger.info("%s movido a %s", destino_path.name, destino_path.parent)
-            except Exception as e:
-                logger.warning("No se pudo mover %s a %s: %s", ruta, destino_path.parent, e)
-                errores.append(
-                    f"OC {numero}: no se pudo mover a '{destino_path.parent}': {e}"
-                )
+            destino_path, error_mov = _mover_archivo(ruta_path, Path(destino), nombre_archivo)
+            if destino_path is None:
+                errores.append(f"OC {numero}: {error_mov}")
                 faltantes.append(numero)
-                # intentar mantener el archivo en la carpeta de origen para reintentos
+                # mantener el archivo disponible en origen para reintentos
                 continue
+            ruta = str(destino_path)
+            logger.info("%s movido a %s", destino_path.name, destino_path.parent)
         else:
-            destino_path = _resolver_conflicto(ruta_path.parent, nombre_deseado)
-            if destino_path != ruta_path:
-                try:
-                    shutil.move(str(ruta_path), destino_path)
-                    ruta_path = destino_path
-                    ruta = str(destino_path)
-                except Exception as e:
-                    logger.warning("No se pudo renombrar %s a %s: %s", ruta, destino_path.name, e)
-                    ruta = str(ruta_path)
-            procesados_en_origen.add(Path(ruta))
+            procesados_en_origen.add(ruta_path)
 
         subidos.append(numero)
 
