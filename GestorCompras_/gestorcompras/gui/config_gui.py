@@ -72,6 +72,8 @@ class ConfigGUI(tk.Toplevel):
         self._procesados_button: ttk.Button | None = None
         self._abastecimiento_focus: tk.Widget | None = None
         self._oc_focus: tk.Widget | None = None
+        self._oc_canvas: tk.Canvas | None = None
+        self._oc_scrollable: tk.Widget | None = None
         self.create_widgets()
         center_window(self)
 
@@ -401,6 +403,27 @@ class ConfigGUI(tk.Toplevel):
     def create_oc_tab(self):
         cfg = self.descargas_cfg
 
+        canvas = tk.Canvas(self.oc_frame, highlightthickness=0, borderwidth=0)
+        scrollbar = ttk.Scrollbar(self.oc_frame, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        scrollable = ttk.Frame(canvas, style="MyFrame.TFrame", padding=10)
+        window_id = canvas.create_window((0, 0), window=scrollable, anchor="nw")
+
+        def _update_scrollregion(_event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _resize_inner(event):
+            canvas.itemconfigure(window_id, width=event.width)
+
+        scrollable.bind("<Configure>", _update_scrollregion)
+        canvas.bind("<Configure>", _resize_inner)
+
+        self._oc_canvas = canvas
+        self._oc_scrollable = scrollable
+
         def _str_var(key: str, value: str) -> tk.StringVar:
             var = tk.StringVar(value=value)
             self._oc_vars[key] = var
@@ -418,12 +441,12 @@ class ConfigGUI(tk.Toplevel):
             remitente_txt = str(remitente_cfg or "")
 
         general_frame = ttk.LabelFrame(
-            self.oc_frame,
+            scrollable,
             text="Descargas OC (Normal)",
             style="MyLabelFrame.TLabelframe",
             padding=10,
         )
-        general_frame.pack(fill="x", expand=False)
+        general_frame.pack(fill="x", expand=False, pady=(0, 10))
         general_frame.columnconfigure(1, weight=1)
 
         row = 0
@@ -596,12 +619,12 @@ class ConfigGUI(tk.Toplevel):
         self._oc_entries["headless"] = headless_check
 
         abas_frame = ttk.LabelFrame(
-            self.oc_frame,
+            scrollable,
             text="Abastecimiento",
             style="MyLabelFrame.TLabelframe",
             padding=10,
         )
-        abas_frame.pack(fill="x", expand=False, pady=(10, 0))
+        abas_frame.pack(fill="x", expand=False, pady=(0, 10))
         abas_frame.columnconfigure(1, weight=1)
 
         abas_row = 0
@@ -673,8 +696,8 @@ class ConfigGUI(tk.Toplevel):
         abas_aut_entry.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
         self._oc_entries["abastecimiento_autorizadores"] = abas_aut_entry
 
-        button_frame = ttk.Frame(self.oc_frame, style="MyFrame.TFrame")
-        button_frame.pack(fill="x", pady=10)
+        button_frame = ttk.Frame(scrollable, style="MyFrame.TFrame")
+        button_frame.pack(fill="x", pady=(0, 10))
 
         ttk.Button(
             button_frame,
@@ -935,6 +958,41 @@ class ConfigGUI(tk.Toplevel):
 
         threading.Thread(target=tarea, daemon=True).start()
 
+    def _scroll_to_widget(self, widget: tk.Widget):
+        canvas = self._oc_canvas
+        container = self._oc_scrollable
+        if not canvas or not container:
+            return
+        try:
+            canvas.update_idletasks()
+            container.update_idletasks()
+            widget.update_idletasks()
+        except tk.TclError:  # pragma: no cover - widget destruido
+            return
+
+        frame_height = container.winfo_height()
+        canvas_height = canvas.winfo_height()
+        if frame_height <= canvas_height or canvas_height <= 0:
+            return
+
+        try:
+            widget_top = widget.winfo_rooty() - container.winfo_rooty()
+            widget_bottom = widget_top + widget.winfo_height()
+        except tk.TclError:  # pragma: no cover - widget sin geometría
+            return
+
+        view_top, view_bottom = canvas.yview()
+        view_top *= frame_height
+        view_bottom *= frame_height
+
+        if widget_top < view_top:
+            destino = max(0, widget_top / frame_height)
+            canvas.yview_moveto(destino)
+        elif widget_bottom > view_bottom:
+            destino = (widget_bottom - canvas_height) / frame_height
+            destino = min(max(0, destino), 1)
+            canvas.yview_moveto(destino)
+
     def focus_descargas_tab(self, section: str | None = None):
         try:
             self.notebook.select(self.oc_frame)
@@ -945,6 +1003,7 @@ class ConfigGUI(tk.Toplevel):
             objetivo = self._abastecimiento_focus
         if objetivo:
             objetivo.focus_set()
+            self.after(50, lambda: self._scroll_to_widget(objetivo))
 
 
 class TemplateForm(tk.Toplevel):

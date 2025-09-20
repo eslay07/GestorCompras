@@ -5,11 +5,9 @@ from tkinter import messagebox
 from tkinter import ttk
 
 try:  # allow running as script
-    from .configurador import configurar_abastecimiento
     from .selenium_abastecimiento import descargar_abastecimiento
     from .config import Config
 except ImportError:  # pragma: no cover
-    from configurador import configurar_abastecimiento
     from selenium_abastecimiento import descargar_abastecimiento
     from config import Config
 
@@ -88,23 +86,6 @@ def main():
         command=lambda: ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn_ejecutar),
     )
     btn_ejecutar.grid(row=4, column=0, columnspan=2, pady=10)
-
-    def abrir_config():
-        configurar_abastecimiento()
-        nuevo = Config()
-        solicitantes = tuple(nuevo.abastecimiento_solicitantes or [])
-        autorizadores = tuple(nuevo.abastecimiento_autorizadores or [])
-        if entry_sol.winfo_exists():
-            entry_sol.configure(values=solicitantes)
-            if sol_var.get() and sol_var.get() not in solicitantes:
-                sol_var.set('')
-        if entry_aut.winfo_exists():
-            entry_aut.configure(values=autorizadores)
-            if aut_var.get() and aut_var.get() not in autorizadores:
-                aut_var.set('')
-
-    btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
-    btn_cfg.grid(row=5, column=0, columnspan=2, pady=(0, 10))
 
     def center_window(win):
         win.update_idletasks()
