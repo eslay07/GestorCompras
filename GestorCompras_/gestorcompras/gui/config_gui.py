@@ -2,11 +2,15 @@ import tkinter as tk
 import os
 import tkinter.font as tkFont
 import re
+import threading
+import poplib
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
 from gestorcompras.services import db
 from gestorcompras.gui.html_editor import HtmlEditor
 from gestorcompras.services.email_sender import send_email_custom
+from descargas_oc.config import Config as DescargasConfig
+from descargas_oc.escuchador import PROCESADOS_FILE
 
 def center_window(win: tk.Tk | tk.Toplevel):
     win.update_idletasks()
@@ -25,29 +29,39 @@ class ConfigGUI(tk.Toplevel):
         self.title("Configuración")
         self.geometry("800x600")
         self.email_session = email_session
+        self.descargas_cfg = DescargasConfig()
+        self._oc_entries: dict[str, tk.Widget] = {}
+        self._oc_vars: dict[str, tk.Variable] = {}
+        self._procesados_status = tk.StringVar(value="Generado" if PROCESADOS_FILE.exists() else "Pendiente")
+        self._procesados_button: ttk.Button | None = None
+        self._abastecimiento_focus: tk.Widget | None = None
+        self._oc_focus: tk.Widget | None = None
         self.create_widgets()
         center_window(self)
-    
+
     def create_widgets(self):
         self.notebook = ttk.Notebook(self, style="MyNotebook.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
-        
+
         self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
+        self.oc_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
         self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        
+
         self.notebook.add(self.suppliers_frame, text="Proveedores")
         self.notebook.add(self.assign_frame, text="Asignación")
         self.notebook.add(self.tracking_frame, text="Seguimientos")
         self.notebook.add(self.dispatch_frame, text="Despacho")
+        self.notebook.add(self.oc_frame, text="Descargas OC")
         self.notebook.add(self.email_templates_frame, text="Formatos de Correo")
-        
+
         self.create_suppliers_tab()
         self.create_assignment_tab()
         self.create_tracking_tab()
         self.create_dispatch_tab()
+        self.create_oc_tab()
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
@@ -332,7 +346,313 @@ class ConfigGUI(tk.Toplevel):
         db.set_config("EMAIL_CC_DESPACHO", ";".join(emails) if emails else "")
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
-    
+
+    def create_oc_tab(self):
+        cfg = self.descargas_cfg
+
+        def _str_var(key: str, value: str) -> tk.StringVar:
+            var = tk.StringVar(value=value)
+            self._oc_vars[key] = var
+            return var
+
+        def _bool_var(key: str, value: bool) -> tk.BooleanVar:
+            var = tk.BooleanVar(value=value)
+            self._oc_vars[key] = var
+            return var
+
+        remitente_cfg = cfg.data.get("remitente_adicional", "")
+        if isinstance(remitente_cfg, (list, tuple, set)):
+            remitente_txt = ", ".join(str(r).strip() for r in remitente_cfg if str(r).strip())
+        else:
+            remitente_txt = str(remitente_cfg or "")
+
+        general_frame = ttk.LabelFrame(
+            self.oc_frame,
+            text="Descargas OC (Normal)",
+            style="MyLabelFrame.TLabelframe",
+            padding=10,
+        )
+        general_frame.pack(fill="x", expand=False)
+        general_frame.columnconfigure(1, weight=1)
+
+        row = 0
+        ttk.Label(general_frame, text="Servidor POP3:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        pop_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("pop_server", cfg.pop_server or ""),
+            style="MyEntry.TEntry",
+        )
+        pop_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["pop_server"] = pop_entry
+        self._oc_focus = pop_entry
+
+        row += 1
+        ttk.Label(general_frame, text="Puerto POP3:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        ttk.Entry(
+            general_frame,
+            textvariable=_str_var("pop_port", str(cfg.pop_port or 995)),
+            width=10,
+            style="MyEntry.TEntry",
+        ).grid(row=row, column=1, sticky="w", padx=5, pady=2)
+
+        row += 1
+        ttk.Label(general_frame, text="Usuario:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        user_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("usuario", cfg.usuario or ""),
+            style="MyEntry.TEntry",
+        )
+        user_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["usuario"] = user_entry
+
+        row += 1
+        ttk.Label(general_frame, text="Contraseña:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        pwd_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("password", cfg.password or ""),
+            show="*",
+            style="MyEntry.TEntry",
+        )
+        pwd_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["password"] = pwd_entry
+
+        row += 1
+        ttk.Label(
+            general_frame,
+            text="Carpeta de descarga principal:",
+            style="MyLabel.TLabel",
+        ).grid(row=row, column=0, sticky="w", padx=5, pady=2)
+        dest_frame = ttk.Frame(general_frame, style="MyFrame.TFrame")
+        dest_frame.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        dest_entry = ttk.Entry(
+            dest_frame,
+            textvariable=_str_var(
+                "carpeta_destino_local", cfg.carpeta_destino_local or ""
+            ),
+            style="MyEntry.TEntry",
+        )
+        dest_entry.pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            dest_frame,
+            text="Seleccionar",
+            style="MyButton.TButton",
+            command=lambda: self._browse_directory(self._oc_vars["carpeta_destino_local"]),
+        ).pack(side="left", padx=(5, 0))
+        self._oc_entries["carpeta_destino_local"] = dest_entry
+
+        row += 1
+        ttk.Label(
+            general_frame,
+            text="Carpeta de tareas Bienes:",
+            style="MyLabel.TLabel",
+        ).grid(row=row, column=0, sticky="w", padx=5, pady=2)
+        analizar_frame = ttk.Frame(general_frame, style="MyFrame.TFrame")
+        analizar_frame.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        analizar_entry = ttk.Entry(
+            analizar_frame,
+            textvariable=_str_var("carpeta_analizar", cfg.carpeta_analizar or ""),
+            style="MyEntry.TEntry",
+        )
+        analizar_entry.pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            analizar_frame,
+            text="Seleccionar",
+            style="MyButton.TButton",
+            command=lambda: self._browse_directory(self._oc_vars["carpeta_analizar"]),
+        ).pack(side="left", padx=(5, 0))
+        self._oc_entries["carpeta_analizar"] = analizar_entry
+
+        row += 1
+        ttk.Label(general_frame, text="URL Telcodrive:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        url_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("seafile_url", cfg.seafile_url or ""),
+            style="MyEntry.TEntry",
+        )
+        url_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["seafile_url"] = url_entry
+
+        row += 1
+        ttk.Label(general_frame, text="ID de carpeta principal:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        repo_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("seafile_repo_id", cfg.seafile_repo_id or ""),
+            style="MyEntry.TEntry",
+        )
+        repo_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["seafile_repo_id"] = repo_entry
+
+        row += 1
+        ttk.Label(
+            general_frame,
+            text="Carpeta personal Telcodrive:",
+            style="MyLabel.TLabel",
+        ).grid(row=row, column=0, sticky="w", padx=5, pady=2)
+        sub_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("seafile_subfolder", cfg.seafile_subfolder or "/"),
+            style="MyEntry.TEntry",
+        )
+        sub_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["seafile_subfolder"] = sub_entry
+
+        row += 1
+        ttk.Label(general_frame, text="Correo para reporte:", style="MyLabel.TLabel").grid(
+            row=row, column=0, sticky="w", padx=5, pady=2
+        )
+        correo_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("correo_reporte", cfg.correo_reporte or ""),
+            style="MyEntry.TEntry",
+        )
+        correo_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["correo_reporte"] = correo_entry
+
+        row += 1
+        ttk.Label(
+            general_frame,
+            text="Remitentes adicionales (separar con coma):",
+            style="MyLabel.TLabel",
+        ).grid(row=row, column=0, sticky="w", padx=5, pady=2)
+        remitente_entry = ttk.Entry(
+            general_frame,
+            textvariable=_str_var("remitente_adicional", remitente_txt),
+            style="MyEntry.TEntry",
+        )
+        remitente_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["remitente_adicional"] = remitente_entry
+
+        row += 1
+        headless_check = ttk.Checkbutton(
+            general_frame,
+            text="Ejecutar Chrome en modo oculto (headless)",
+            style="MyCheckbutton.TCheckbutton",
+            variable=_bool_var("headless", bool(cfg.headless)),
+        )
+        headless_check.grid(row=row, column=0, columnspan=2, sticky="w", padx=5, pady=4)
+        self._oc_entries["headless"] = headless_check
+
+        abas_frame = ttk.LabelFrame(
+            self.oc_frame,
+            text="Abastecimiento",
+            style="MyLabelFrame.TLabelframe",
+            padding=10,
+        )
+        abas_frame.pack(fill="x", expand=False, pady=(10, 0))
+        abas_frame.columnconfigure(1, weight=1)
+
+        abas_row = 0
+        ttk.Label(abas_frame, text="Carpeta de descarga:", style="MyLabel.TLabel").grid(
+            row=abas_row, column=0, sticky="w", padx=5, pady=2
+        )
+        abas_dest_frame = ttk.Frame(abas_frame, style="MyFrame.TFrame")
+        abas_dest_frame.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
+        abas_dest_entry = ttk.Entry(
+            abas_dest_frame,
+            textvariable=_str_var(
+                "abastecimiento_carpeta_descarga",
+                cfg.abastecimiento_carpeta_descarga or cfg.carpeta_destino_local or "",
+            ),
+            style="MyEntry.TEntry",
+        )
+        abas_dest_entry.pack(side="left", fill="x", expand=True)
+        ttk.Button(
+            abas_dest_frame,
+            text="Seleccionar",
+            style="MyButton.TButton",
+            command=lambda: self._browse_directory(self._oc_vars["abastecimiento_carpeta_descarga"]),
+        ).pack(side="left", padx=(5, 0))
+        self._oc_entries["abastecimiento_carpeta_descarga"] = abas_dest_entry
+        self._abastecimiento_focus = abas_dest_entry
+
+        abas_row += 1
+        ttk.Label(abas_frame, text="Correo para reporte:", style="MyLabel.TLabel").grid(
+            row=abas_row, column=0, sticky="w", padx=5, pady=2
+        )
+        abas_correo_entry = ttk.Entry(
+            abas_frame,
+            textvariable=_str_var(
+                "abastecimiento_correo_reporte",
+                cfg.abastecimiento_correo_reporte or cfg.correo_reporte or "",
+            ),
+            style="MyEntry.TEntry",
+        )
+        abas_correo_entry.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["abastecimiento_correo_reporte"] = abas_correo_entry
+
+        abas_row += 1
+        solicitantes_txt = ", ".join(cfg.abastecimiento_solicitantes or [])
+        ttk.Label(
+            abas_frame,
+            text="Solicitantes (separa con coma o salto de línea):",
+            style="MyLabel.TLabel",
+        ).grid(row=abas_row, column=0, sticky="w", padx=5, pady=2)
+        abas_sol_entry = ttk.Entry(
+            abas_frame,
+            textvariable=_str_var("abastecimiento_solicitantes", solicitantes_txt),
+            style="MyEntry.TEntry",
+        )
+        abas_sol_entry.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["abastecimiento_solicitantes"] = abas_sol_entry
+
+        abas_row += 1
+        autorizadores_txt = ", ".join(cfg.abastecimiento_autorizadores or [])
+        ttk.Label(
+            abas_frame,
+            text="Autorizadores (separa con coma o salto de línea):",
+            style="MyLabel.TLabel",
+        ).grid(row=abas_row, column=0, sticky="w", padx=5, pady=2)
+        abas_aut_entry = ttk.Entry(
+            abas_frame,
+            textvariable=_str_var("abastecimiento_autorizadores", autorizadores_txt),
+            style="MyEntry.TEntry",
+        )
+        abas_aut_entry.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
+        self._oc_entries["abastecimiento_autorizadores"] = abas_aut_entry
+
+        button_frame = ttk.Frame(self.oc_frame, style="MyFrame.TFrame")
+        button_frame.pack(fill="x", pady=10)
+
+        ttk.Button(
+            button_frame,
+            text="Guardar Configuración",
+            style="MyButton.TButton",
+            command=self.save_descargas_config,
+        ).pack(side="left", padx=5)
+
+        ttk.Button(
+            button_frame,
+            text="Probar subida a Telcodrive",
+            style="MyButton.TButton",
+            command=self.test_seafile_upload,
+        ).pack(side="left", padx=5)
+
+        self._procesados_button = ttk.Button(
+            button_frame,
+            text="Generar procesados",
+            style="MyButton.TButton",
+            command=self.generate_processed_file,
+        )
+        self._procesados_button.pack(side="left", padx=5)
+
+        ttk.Label(
+            button_frame,
+            textvariable=self._procesados_status,
+            style="MyLabel.TLabel",
+        ).pack(side="left", padx=5)
+
     def create_email_templates_tab(self):
         frame = self.email_templates_frame
         ttk.Label(frame, text="Seleccione el Formato de Correo Actual:",
@@ -411,6 +731,169 @@ class ConfigGUI(tk.Toplevel):
         if messagebox.askyesno("Confirmar", "¿Eliminar el formato seleccionado?"):
             db.delete_email_template(tpl_id)
             self.load_email_templates()
+
+    def _browse_directory(self, var: tk.StringVar):
+        initial = var.get().strip() or os.getcwd()
+        path = filedialog.askdirectory(initialdir=initial)
+        if path:
+            var.set(path)
+
+    @staticmethod
+    def _parse_list(value: str) -> list[str]:
+        if not value:
+            return []
+        partes = [p.strip() for p in re.split(r"[;\n,]+", value) if p.strip()]
+        return partes
+
+    def _safe_int(self, key: str, default: int) -> int:
+        raw = self._oc_vars.get(key)
+        if raw is None:
+            return default
+        valor = raw.get()
+        try:
+            return int(str(valor).strip())
+        except (TypeError, ValueError):
+            return default
+
+    def _collect_descargas_form(self) -> dict:
+        cfg = self.descargas_cfg
+        data = {
+            "pop_server": self._oc_vars["pop_server"].get().strip(),
+            "pop_port": self._safe_int("pop_port", cfg.data.get("pop_port", 995)),
+            "usuario": self._oc_vars["usuario"].get().strip(),
+            "password": self._oc_vars["password"].get(),
+            "carpeta_destino_local": self._oc_vars["carpeta_destino_local"].get().strip(),
+            "carpeta_analizar": self._oc_vars["carpeta_analizar"].get().strip(),
+            "seafile_url": self._oc_vars["seafile_url"].get().strip(),
+            "seafile_repo_id": self._oc_vars["seafile_repo_id"].get().strip(),
+            "seafile_subfolder": self._oc_vars["seafile_subfolder"].get().strip() or "/",
+            "correo_reporte": self._oc_vars["correo_reporte"].get().strip(),
+            "headless": bool(self._oc_vars["headless"].get()),
+            "abastecimiento_carpeta_descarga": self._oc_vars[
+                "abastecimiento_carpeta_descarga"
+            ].get().strip(),
+            "abastecimiento_correo_reporte": self._oc_vars[
+                "abastecimiento_correo_reporte"
+            ].get().strip(),
+            "abastecimiento_solicitantes": self._parse_list(
+                self._oc_vars["abastecimiento_solicitantes"].get()
+            ),
+            "abastecimiento_autorizadores": self._parse_list(
+                self._oc_vars["abastecimiento_autorizadores"].get()
+            ),
+        }
+
+        remitentes_texto = self._oc_vars["remitente_adicional"].get().strip()
+        if remitentes_texto:
+            remitentes = self._parse_list(remitentes_texto)
+            data["remitente_adicional"] = ", ".join(remitentes) if remitentes else remitentes_texto
+        else:
+            data["remitente_adicional"] = ""
+        return data
+
+    def save_descargas_config(self):
+        datos = self._collect_descargas_form()
+        self.descargas_cfg.data.update(datos)
+        try:
+            self.descargas_cfg.validate()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Configuración inválida: {exc}")
+            return
+        self.descargas_cfg.save()
+        self._procesados_status.set("Generado" if PROCESADOS_FILE.exists() else "Pendiente")
+        messagebox.showinfo("Información", "Configuración guardada correctamente.")
+
+    def test_seafile_upload(self):
+        datos = self._collect_descargas_form()
+        self.descargas_cfg.data.update(datos)
+        try:
+            self.descargas_cfg.validate()
+        except Exception as exc:
+            messagebox.showerror("Error", f"Configuración inválida: {exc}")
+            return
+        archivo = filedialog.askopenfilename(title="Seleccionar archivo de prueba")
+        if not archivo:
+            return
+        try:
+            from descargas_oc.seafile_client import SeafileClient
+
+            cliente = SeafileClient(
+                self.descargas_cfg.seafile_url,
+                self.descargas_cfg.usuario,
+                self.descargas_cfg.password,
+            )
+            cliente.upload_file(
+                self.descargas_cfg.seafile_repo_id,
+                archivo,
+                parent_dir=self.descargas_cfg.seafile_subfolder,
+            )
+        except Exception as exc:
+            messagebox.showerror("Error", f"No se pudo subir el archivo: {exc}")
+            return
+        messagebox.showinfo("Información", "Archivo subido correctamente.")
+
+    def generate_processed_file(self):
+        datos = self._collect_descargas_form()
+        servidor = datos["pop_server"]
+        usuario = datos["usuario"]
+        contrasena = datos["password"]
+        puerto = datos["pop_port"]
+        if not (servidor and usuario and contrasena):
+            messagebox.showwarning(
+                "Advertencia",
+                "Debe completar servidor, usuario y contraseña para generar el archivo.",
+            )
+            return
+
+        if self._procesados_button:
+            self._procesados_button.config(state=tk.DISABLED)
+        self._procesados_status.set("Generando...")
+
+        def tarea():
+            mensaje = ""
+            estado = "Pendiente"
+            try:
+                conn = poplib.POP3_SSL(servidor, puerto)
+                conn.user(usuario)
+                conn.pass_(contrasena)
+                total = len(conn.list()[1])
+                PROCESADOS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                with open(PROCESADOS_FILE, "w", encoding="utf-8") as archivo:
+                    for indice in range(total):
+                        respuesta = conn.uidl(indice + 1)
+                        linea = respuesta.decode() if isinstance(respuesta, bytes) else respuesta
+                        uidl = linea.split()[2]
+                        archivo.write(uidl + "\n")
+                conn.quit()
+                mensaje = f"Se generaron {total} UIDL(s)."
+                estado = "Generado"
+            except Exception as exc:  # pragma: no cover - interacción con servidor
+                mensaje = f"No se pudo generar el archivo: {exc}"
+                estado = "Error"
+
+            def finalizar():
+                if self._procesados_button:
+                    self._procesados_button.config(state=tk.NORMAL)
+                self._procesados_status.set(estado)
+                if estado == "Generado":
+                    messagebox.showinfo("Procesados", mensaje)
+                else:
+                    messagebox.showerror("Procesados", mensaje)
+
+            self.after(0, finalizar)
+
+        threading.Thread(target=tarea, daemon=True).start()
+
+    def focus_descargas_tab(self, section: str | None = None):
+        try:
+            self.notebook.select(self.oc_frame)
+        except tk.TclError:  # pragma: no cover - defensive
+            return
+        objetivo: tk.Widget | None = self._oc_focus
+        if section == "abastecimiento" and self._abastecimiento_focus:
+            objetivo = self._abastecimiento_focus
+        if objetivo:
+            objetivo.focus_set()
 
 
 class TemplateForm(tk.Toplevel):
@@ -636,8 +1119,10 @@ class AssignmentForm(tk.Toplevel):
         self.refresh_callback()
         self.destroy()
 
-def open_config_gui(root, email_session):
+def open_config_gui(root, email_session, *, focus_descargas: bool = False, section: str | None = None):
     config_window = ConfigGUI(root, email_session)
+    if focus_descargas:
+        config_window.focus_descargas_tab(section)
     config_window.transient(root)
     config_window.grab_set()
     config_window.wait_window()
