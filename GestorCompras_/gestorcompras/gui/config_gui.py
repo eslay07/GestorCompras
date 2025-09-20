@@ -4,13 +4,39 @@ import tkinter.font as tkFont
 import re
 import threading
 import poplib
+import sys
+from pathlib import Path
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
+
+# Garantiza que el paquete descargas_oc esté disponible incluso cuando la
+# aplicación se ejecute desde el directorio GestorCompras_.
+_DESCARGAS_ROOT = Path(__file__).resolve().parents[2] / "DescargasOC-main"
+if _DESCARGAS_ROOT.exists():
+    _path = str(_DESCARGAS_ROOT)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 from gestorcompras.services import db
 from gestorcompras.gui.html_editor import HtmlEditor
 from gestorcompras.services.email_sender import send_email_custom
 from descargas_oc.config import Config as DescargasConfig
 from descargas_oc.escuchador import PROCESADOS_FILE
+
+
+def _format_ruc(value: str | int) -> str:
+    """Devuelve el RUC como cadena preservando ceros a la izquierda."""
+    if isinstance(value, int):
+        value = str(value)
+    elif not isinstance(value, str):
+        value = str(value)
+    digits = value.strip()
+    if digits.isdigit():
+        if digits.startswith("0"):
+            return digits
+        if len(digits) == 12:
+            return digits.zfill(13)
+    return value
 
 def center_window(win: tk.Tk | tk.Toplevel):
     win.update_idletasks()
@@ -127,7 +153,10 @@ class ConfigGUI(tk.Toplevel):
             suppliers = db.get_suppliers()
         self.suppliers_list.delete(*self.suppliers_list.get_children())
         for sup in suppliers:
-            self.suppliers_list.insert("", "end", values=sup)
+            values = list(sup)
+            if len(values) > 2:
+                values[2] = _format_ruc(values[2])
+            self.suppliers_list.insert("", "end", values=values)
         self.auto_adjust_columns()
 
     def filter_suppliers(self):
@@ -158,7 +187,19 @@ class ConfigGUI(tk.Toplevel):
             messagebox.showwarning("Advertencia", "Seleccione un proveedor para editar.")
             return
         data = self.suppliers_list.item(selected[0])["values"]
-        SupplierForm(self, "Editar Proveedor", self.load_suppliers, data)
+        supplier_id = data[0]
+        try:
+            supplier_id_int = int(supplier_id)
+        except (TypeError, ValueError):
+            supplier_id_int = supplier_id
+        supplier_data = db.get_supplier(supplier_id_int)
+        if not supplier_data:
+            messagebox.showerror("Error", "No se pudo cargar el proveedor seleccionado.")
+            return
+        supplier_values = list(supplier_data)
+        if len(supplier_values) > 2:
+            supplier_values[2] = _format_ruc(supplier_values[2])
+        SupplierForm(self, "Editar Proveedor", self.load_suppliers, supplier_values)
     
     def delete_supplier(self):
         selected = self.suppliers_list.selection()
