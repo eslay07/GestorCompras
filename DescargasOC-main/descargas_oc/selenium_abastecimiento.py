@@ -102,6 +102,11 @@ def descargar_abastecimiento(
         except Exception:  # pragma: no cover - depende de Chrome
             pass
 
+        etiqueta_normalizada = (
+            "translate(normalize-space(.), 'ÁÉÍÓÚÜABCDEFGHIJKLMNOPQRSTUVWXYZ', "
+            "'áéíóúüabcdefghijklmnopqrstuvwxyz')"
+        )
+
         elements = {
             "usuario": (By.ID, "username"),
             "contrasena": (By.ID, "password"),
@@ -139,11 +144,11 @@ def descargar_abastecimiento(
             "fecha_hasta": (By.ID, "mat-input-3"),
             "solicitante": (
                 By.XPATH,
-                "(//input[@aria-autocomplete='list'])[1]",
+                f"//mat-form-field[.//mat-label[contains({etiqueta_normalizada}, 'solicitante')]]//input[@aria-autocomplete='list']",
             ),
             "autoriza": (
                 By.XPATH,
-                "(//input[@aria-autocomplete='list'])[2]",
+                f"//mat-form-field[.//mat-label[contains({etiqueta_normalizada}, 'autoriza')]]//input[@aria-autocomplete='list']",
             ),
             "btnbuscarorden": (
                 By.XPATH,
@@ -190,6 +195,52 @@ def descargar_abastecimiento(
             except TimeoutException:
                 pass
 
+        def seleccionar_combo(nombre: str, locator, texto: str):
+            if not texto:
+                return
+            campo = limpiar_y_escribir(nombre, locator, texto)
+            opciones_locator = (
+                By.XPATH,
+                "//div[contains(@class,'cdk-overlay-pane')]//mat-option[not(@aria-disabled='true')]",
+            )
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located(opciones_locator)
+                )
+            except TimeoutException:
+                logger.warning(
+                    "%s: no se encontraron opciones para '%s'", nombre, texto
+                )
+                campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
+                return
+            opciones = driver.find_elements(*opciones_locator)
+            objetivo = texto.strip().lower()
+            seleccionada = False
+            for opcion in opciones:
+                try:
+                    texto_opcion = opcion.text.strip()
+                except StaleElementReferenceException:
+                    continue
+                if not texto_opcion:
+                    continue
+                texto_normalizado = texto_opcion.lower()
+                if objetivo in texto_normalizado or texto_normalizado in objetivo:
+                    try:
+                        opcion.click()
+                    except (ElementClickInterceptedException, StaleElementReferenceException):
+                        driver.execute_script("arguments[0].click();", opcion)
+                    seleccionada = True
+                    break
+            if not seleccionada:
+                campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
+            try:
+                WebDriverWait(driver, 5).until(
+                    EC.invisibility_of_element_located(opciones_locator)
+                )
+            except TimeoutException:
+                pass
+            time.sleep(0.2)
+
         driver.get("https://cas.telconet.ec/cas/login?service=")
         limpiar_y_escribir("usuario", elements["usuario"], user)
         limpiar_y_escribir("contrasena", elements["contrasena"], pwd)
@@ -213,17 +264,8 @@ def descargar_abastecimiento(
             Keys.TAB
         )
 
-        if solicitante:
-            sol_input = limpiar_y_escribir(
-                "solicitante", elements["solicitante"], solicitante
-            )
-            time.sleep(0.5)
-            sol_input.send_keys(Keys.ENTER)
-
-        if autoriza:
-            aut_input = limpiar_y_escribir("autoriza", elements["autoriza"], autoriza)
-            time.sleep(0.5)
-            aut_input.send_keys(Keys.ENTER)
+        seleccionar_combo("solicitante", elements["solicitante"], solicitante)
+        seleccionar_combo("autoriza", elements["autoriza"], autoriza)
 
         hacer_click("btnbuscarorden", elements["btnbuscarorden"])
         esperar_toast()
