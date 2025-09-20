@@ -10,9 +10,19 @@ from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
 
 # Garantiza que el paquete descargas_oc esté disponible incluso cuando la
-# aplicación se ejecute desde el directorio GestorCompras_.
-_DESCARGAS_ROOT = Path(__file__).resolve().parents[2] / "DescargasOC-main"
-if _DESCARGAS_ROOT.exists():
+# aplicación se ejecute desde el directorio GestorCompras_. Buscamos la carpeta
+# "DescargasOC-main" ascendiendo en el árbol de directorios para soportar
+# distribuciones donde ambos módulos viven como carpetas hermanas.
+def _find_descargas_root() -> Path | None:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "DescargasOC-main"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_DESCARGAS_ROOT = _find_descargas_root()
+if _DESCARGAS_ROOT is not None:
     _path = str(_DESCARGAS_ROOT)
     if _path not in sys.path:
         sys.path.insert(0, _path)
