@@ -114,6 +114,7 @@ def descargar_abastecimiento(
                 By.CSS_SELECTOR,
                 "button[type='submit'], input[type='submit']",
             ),
+            "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
             "lista_accesos": (
                 By.XPATH,
                 "//span[contains(@class,'simple-sidenav__text') and text()='Accesos']",
@@ -241,10 +242,43 @@ def descargar_abastecimiento(
                 pass
             time.sleep(0.2)
 
-        driver.get("https://cas.telconet.ec/cas/login?service=")
+        driver.get(
+            "https://cas.telconet.ec/cas/login?service="
+            "https://sites.telconet.ec/naf/compras/sso/check"
+        )
         limpiar_y_escribir("usuario", elements["usuario"], user)
         limpiar_y_escribir("contrasena", elements["contrasena"], pwd)
-        hacer_click("iniciar_sesion", elements["iniciar_sesion"])
+        try:
+            hacer_click("iniciar_sesion", elements["iniciar_sesion"])
+        except RuntimeError:
+            try:
+                campo_pwd = esperar_clickable("contrasena", elements["contrasena"])
+                campo_pwd.send_keys(Keys.RETURN)
+            except RuntimeError:
+                try:
+                    driver.execute_script(
+                        "const f=document.querySelector('form'); if(f) f.submit();"
+                    )
+                except Exception:
+                    raise
+
+        time.sleep(2)
+        for _ in range(3):
+            try:
+                driver.switch_to.window(driver.window_handles[-1])
+            except Exception:
+                pass
+            if driver.find_elements(*elements["lista_accesos"]):
+                break
+            try:
+                menu = driver.find_elements(*elements["menu_hamburguesa"])
+                if menu:
+                    menu[0].click()
+            except Exception:
+                pass
+            time.sleep(2)
+        else:
+            raise RuntimeError("No se pudo localizar 'lista_accesos'")
 
         hacer_click("lista_accesos", elements["lista_accesos"])
         hacer_click("seleccion_compania", elements["seleccion_compania"])
