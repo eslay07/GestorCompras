@@ -519,12 +519,61 @@ def descargar_abastecimiento(
                 logger.error("%s: no se encontró un campo visible", nombre)
                 raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
 
-        def completar_autocomplete(nombre: str, indice: int, texto: str):
+        def _es_campo_autocomplete(elemento) -> bool:
+            try:
+                if elemento.tag_name.lower() != "input":
+                    return False
+            except Exception:
+                return False
+            try:
+                return (elemento.get_attribute("aria-autocomplete") or "").lower() == "list"
+            except Exception:
+                return False
+
+        def _enviar_tabs(cantidad: int, espera: float = 0.2):
+            for _ in range(max(0, cantidad)):
+                try:
+                    activo = driver.switch_to.active_element
+                except Exception:
+                    activo = None
+                if activo is not None:
+                    try:
+                        activo.send_keys(Keys.TAB)
+                    except Exception as exc:
+                        logger.debug("No se pudo enviar TAB directo: %s", exc)
+                        try:
+                            driver.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keydown', {key: 'Tab'}));", activo)
+                            driver.execute_script("arguments[0].dispatchEvent(new KeyboardEvent('keyup', {key: 'Tab'}));", activo)
+                        except Exception:
+                            pass
+                time.sleep(espera)
+
+        def completar_autocomplete(
+            nombre: str,
+            indice: int,
+            texto: str,
+            *,
+            usar_activo: bool = False,
+            avanzar_tab: bool = True,
+        ):
             if not texto:
                 logger.warning("%s sin valor configurado; se omite", nombre.capitalize())
                 return
 
-            campo, origen_info = obtener_autocomplete(nombre, indice)
+            campo = None
+            origen_info = ("index", indice)
+
+            if usar_activo:
+                try:
+                    activo = driver.switch_to.active_element
+                except Exception:
+                    activo = None
+                if activo is not None and _es_campo_autocomplete(activo):
+                    campo = activo
+                    origen_info = ("active", None)
+
+            if campo is None:
+                campo, origen_info = obtener_autocomplete(nombre, indice)
 
             def refrescar_campo():
                 nonlocal campo, origen_info
@@ -627,11 +676,12 @@ def descargar_abastecimiento(
                     "%s: no se confirmó la selección para '%s'", nombre, texto
                 )
 
-            try:
-                campo = refrescar_campo()
-                campo.send_keys(Keys.TAB)
-            except StaleElementReferenceException:
-                pass
+            if avanzar_tab:
+                try:
+                    campo = refrescar_campo()
+                    campo.send_keys(Keys.TAB)
+                except StaleElementReferenceException:
+                    pass
 
         driver.get(
             "https://cas.telconet.ec/cas/login?service="
@@ -682,15 +732,25 @@ def descargar_abastecimiento(
 
         fecha_desde_fmt = _normalizar_fecha(fecha_desde)
         fecha_hasta_fmt = _normalizar_fecha(fecha_hasta)
-        limpiar_y_escribir("fecha_desde", elements["fecha_desde"], fecha_desde_fmt).send_keys(
-            Keys.TAB
+        campo_fecha_desde = limpiar_y_escribir(
+            "fecha_desde", elements["fecha_desde"], fecha_desde_fmt
         )
-        limpiar_y_escribir("fecha_hasta", elements["fecha_hasta"], fecha_hasta_fmt).send_keys(
-            Keys.TAB
-        )
+        campo_fecha_desde.send_keys(Keys.TAB)
 
-        completar_autocomplete("solicitante", 0, solicitante)
-        completar_autocomplete("autoriza", 1, autoriza)
+        campo_fecha_hasta = limpiar_y_escribir(
+            "fecha_hasta", elements["fecha_hasta"], fecha_hasta_fmt
+        )
+        campo_fecha_hasta.send_keys(Keys.TAB)
+        _enviar_tabs(1)
+
+        completar_autocomplete(
+            "solicitante", 0, solicitante, usar_activo=True, avanzar_tab=False
+        )
+        _enviar_tabs(1)
+
+        completar_autocomplete(
+            "autoriza", 1, autoriza, usar_activo=True, avanzar_tab=False
+        )
 
         hacer_click("btnbuscarorden", elements["btnbuscarorden"])
         esperar_toast()
