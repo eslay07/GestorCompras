@@ -165,6 +165,28 @@ def descargar_abastecimiento(
             "'áéíóúüabcdefghijklmnopqrstuvwxyz')"
         )
 
+        # Localizadores flexibles que toleran cambios en las etiquetas visibles
+        campo_por_etiqueta = (
+            "//mat-form-field[.//*[contains({normalizador}, '{{texto}}')]]"
+            "//input[@aria-autocomplete='list']"
+        )
+        campo_por_etiqueta_div = (
+            "//div[contains(@class,'mat-form-field')][.//*[contains({normalizador}, '{{texto}}')]]"
+            "//input[@aria-autocomplete='list']"
+        )
+
+        def _selector_autocomplete(busqueda: str) -> tuple[str, str]:
+            consulta = busqueda.lower()
+            xpath = (
+                "(" +
+                " | ".join(
+                    patron.format(normalizador=etiqueta_normalizada).replace("{texto}", consulta)
+                    for patron in (campo_por_etiqueta, campo_por_etiqueta_div)
+                ) +
+                ")[1]"
+            )
+            return (By.XPATH, xpath)
+
         elements = {
             "usuario": (By.ID, "username"),
             "contrasena": (By.ID, "password"),
@@ -201,14 +223,8 @@ def descargar_abastecimiento(
             ),
             "fecha_desde": (By.ID, "mat-input-2"),
             "fecha_hasta": (By.ID, "mat-input-3"),
-            "solicitante": (
-                By.XPATH,
-                f"//mat-form-field[.//mat-label[contains({etiqueta_normalizada}, 'solicitante')]]//input[@aria-autocomplete='list']",
-            ),
-            "autoriza": (
-                By.XPATH,
-                f"//mat-form-field[.//mat-label[contains({etiqueta_normalizada}, 'autoriza')]]//input[@aria-autocomplete='list']",
-            ),
+            "solicitante": _selector_autocomplete("solicitante"),
+            "autoriza": _selector_autocomplete("autoriza"),
             "btnbuscarorden": (
                 By.XPATH,
                 "//button[.//span[text()='Aplicar filtros']]",
