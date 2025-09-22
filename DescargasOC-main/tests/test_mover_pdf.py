@@ -1,0 +1,199 @@
+import sys
+import types
+from types import SimpleNamespace
+
+fake_pdf = types.ModuleType("PyPDF2")
+
+
+class DummyReader:
+    def __init__(self, _file):
+        self.pages = []
+
+
+fake_pdf.PdfReader = DummyReader
+sys.modules.setdefault("PyPDF2", fake_pdf)
+
+from descargas_oc import mover_pdf
+
+
+def _config(tmp_path, bienes=True):
+    origen = tmp_path / "descargas"
+    destino = tmp_path / "destino"
+    origen.mkdir()
+    destino.mkdir()
+    return (
+        SimpleNamespace(
+            compra_bienes=bienes,
+            carpeta_destino_local=str(origen),
+            carpeta_analizar=str(destino),
+            abastecimiento_carpeta_descarga=str(origen),
+        ),
+        origen,
+        destino,
+    )
+
+
+def test_mover_oc_bienes_registra_error_si_no_se_mueve(tmp_path, monkeypatch):
+    origen = tmp_path / "descargas"
+    destino = tmp_path / "destino"
+    origen.mkdir()
+    destino.mkdir()
+
+    pdf = origen / "123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    cfg = SimpleNamespace(
+        compra_bienes=True,
+        carpeta_destino_local=str(origen),
+        carpeta_analizar=str(destino),
+        abastecimiento_carpeta_descarga=str(origen),
+    )
+
+    monkeypatch.setattr(
+        mover_pdf, "extraer_numero_tarea_desde_pdf", lambda ruta: "140144463"
+    )
+    monkeypatch.setattr(
+        mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: "Proveedor X"
+    )
+
+    def failing_move(src, dst):
+        raise PermissionError("sin permisos")
+
+    monkeypatch.setattr(mover_pdf.shutil, "move", failing_move)
+    monkeypatch.setattr(mover_pdf.shutil, "copy2", failing_move)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
+    )
+
+    assert subidos == []
+    assert faltantes == ["123456"]
+    assert any("OC 123456" in msg for msg in errores)
+    # el PDF debe permanecer en la carpeta de origen para reintentos
+    assert any(item.suffix.lower() == ".pdf" for item in origen.iterdir())
+
+
+def test_mover_oc_bienes_copia_si_move_falla(tmp_path, monkeypatch):
+    cfg, origen, destino = _config(tmp_path)
+    carpeta_tarea = destino / "140144463"
+    carpeta_tarea.mkdir()
+
+    pdf = origen / "123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(
+        mover_pdf, "extraer_numero_tarea_desde_pdf", lambda ruta: "140144463"
+    )
+    monkeypatch.setattr(
+        mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: "Proveedor X"
+    )
+
+    def failing_move(_src, _dst):
+        raise PermissionError("sin permisos")
+
+    monkeypatch.setattr(mover_pdf.shutil, "move", failing_move)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []
+    archivos = list(carpeta_tarea.glob("*.pdf"))
+    assert len(archivos) == 1
+    assert archivos[0].name.startswith("123456")
+    assert not any(origen.glob("*.pdf"))
+
+
+def test_mover_oc_reporta_error_si_no_puede_renombrar(tmp_path, monkeypatch):
+    cfg, origen, _destino = _config(tmp_path)
+
+    pdf = origen / "123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(
+        mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: "Proveedor X"
+    )
+
+    def failing_rename(self, target):
+        raise PermissionError("bloqueado")
+
+    monkeypatch.setattr(mover_pdf.Path, "rename", failing_rename)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
+    )
+
+    assert subidos == []
+    assert faltantes == ["123456"]
+    assert any("renombrar" in err for err in errores)
+    assert any(p.name == "123456.pdf" for p in origen.iterdir())
+
+
+def test_mover_oc_bienes_mueve_a_carpeta_existente(tmp_path, monkeypatch):
+    cfg, origen, destino = _config(tmp_path)
+    carpeta_tarea = destino / "140144463 - carpeta"
+    carpeta_tarea.mkdir()
+
+    pdf = origen / "123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(
+        mover_pdf, "extraer_numero_tarea_desde_pdf", lambda ruta: "140144463"
+    )
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []
+    archivos = list(carpeta_tarea.glob("*.pdf"))
+    assert len(archivos) == 1
+    assert "Proveedor X" in archivos[0].stem
+    assert not any(origen.glob("*.pdf"))
+
+
+def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
+    cfg, origen, destino = _config(tmp_path)
+    monkeypatch.setattr(
+        mover_pdf, "extraer_numero_tarea_desde_pdf", lambda ruta: "140144463"
+    )
+
+    carpeta_tarea = destino / "140144463"
+    carpeta_tarea.mkdir()
+    conflicto = carpeta_tarea / "123456 - Proveedor X.pdf"
+    conflicto.write_text("existing")
+
+    pdf = origen / "123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []
+    archivos = sorted(carpeta_tarea.glob("*.pdf"))
+    assert len(archivos) == 2
+    nombres = [p.name for p in archivos]
+    assert any(name.endswith("(1).pdf") for name in nombres)
+
+
+def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
+    cfg, origen, _destino = _config(tmp_path, bienes=False)
+
+    pdf = origen / "ORDEN # 123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: None)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": None}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []

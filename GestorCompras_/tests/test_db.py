@@ -25,6 +25,19 @@ def test_get_suppliers_returns_inserted_suppliers(monkeypatch):
         tmp.cleanup()
 
 
+def test_get_supplier_preserves_leading_zero(monkeypatch):
+    tmp = setup_temp_db(monkeypatch)
+    try:
+        db.add_supplier('Prov', '0941234567001', 'a@b.com', '')
+        supplier = db.get_supplier(1)
+        assert supplier == (1, 'Prov', '0941234567001', 'a@b.com', '')
+        db.update_supplier(1, 'Prov', '0941234567001', 'a@b.com', '')
+        supplier_after_update = db.get_supplier(1)
+        assert supplier_after_update == (1, 'Prov', '0941234567001', 'a@b.com', '')
+    finally:
+        tmp.cleanup()
+
+
 def test_assignment_crud(monkeypatch):
     tmp = setup_temp_db(monkeypatch)
     try:

@@ -7,7 +7,6 @@ nombre legible para facilitar el control de errores y la trazabilidad.
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 import time
@@ -27,10 +26,53 @@ try:  # allow running as script
     from .config import Config
     from .mover_pdf import mover_oc
     from .organizador_bienes import organizar as organizar_bienes
+    from .pdf_info import actualizar_proveedores_desde_pdfs
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
     from organizador_bienes import organizar as organizar_bienes
+    from pdf_info import actualizar_proveedores_desde_pdfs
+
+
+def esperar_descarga_pdf(
+    directory: Path,
+    existentes: dict[Path, float],
+    timeout: float = 60.0,
+    intervalo: float = 0.5,
+) -> Path:
+    """Espera a que aparezca un PDF nuevo o actualizado en ``directory``."""
+
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        time.sleep(intervalo)
+        candidatos: list[tuple[float, Path]] = []
+        for pdf in directory.glob("*.pdf"):
+            try:
+                mtime = pdf.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            anterior = existentes.get(pdf)
+            if anterior is None or mtime > anterior:
+                candidatos.append((mtime, pdf))
+        if not candidatos:
+            continue
+        candidatos.sort()
+        candidato = candidatos[-1][1]
+        crdownload = candidato.with_suffix(candidato.suffix + ".crdownload")
+        if crdownload.exists():
+            continue
+        try:
+            size = candidato.stat().st_size
+        except FileNotFoundError:
+            continue
+        time.sleep(min(intervalo / 2, 0.5))
+        try:
+            if candidato.stat().st_size != size:
+                continue
+        except FileNotFoundError:
+            continue
+        return candidato
+    raise RuntimeError("No se descargó archivo")
 
 
 def descargar_oc(
@@ -265,28 +307,15 @@ def descargar_oc(
                         break
                     time.sleep(2)
                 boton_descarga = _find("descargar_orden", elements["descargar_orden"])
+                existentes = {
+                    pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
+                }
                 try:
                     boton_descarga.click()
                 except ElementClickInterceptedException:
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
-                antes = set(download_dir.glob("*.pdf"))
-                for _ in range(120):  # esperar hasta 60 s
-                    time.sleep(0.5)
-                    nuevos = set(download_dir.glob("*.pdf")) - antes
-                    if nuevos:
-                        archivo = nuevos.pop()
-                        break
-                else:
-                    raise RuntimeError("No se descargó archivo")
-                if not getattr(cfg, "compra_bienes", False) and proveedor:
-                    prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                    try:
-                        archivo.rename(nuevo_nombre)
-                        archivo = nuevo_nombre
-                    except Exception:
-                        pass
+                archivo = esperar_descarga_pdf(download_dir, existentes)
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder
@@ -298,10 +327,14 @@ def descargar_oc(
     finally:
         driver.quit()
 
+    if ordenes:
+        actualizar_proveedores_desde_pdfs(ordenes, download_dir)
+
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes = mover_oc(cfg, ordenes)
+    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
+    errores.extend(errores_mov)
     faltantes.extend(n for n in numeros if any(n in e for e in errores))
     # evitar números repetidos al reportar faltantes
     faltantes = list(dict.fromkeys(faltantes))

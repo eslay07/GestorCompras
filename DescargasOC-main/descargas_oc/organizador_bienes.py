@@ -18,7 +18,9 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 PATRON_TAREA = re.compile(r"#\s*([0-9]{6,11})\s*//")
-PATRON_PROVEEDOR = re.compile(r"Proveedor\s*[:\-]?\s*(.+)", re.IGNORECASE)
+PATRON_PROVEEDOR = re.compile(
+    r"(?:Proveedor|Nombre)\s*[:\-]?\s*(.+)", re.IGNORECASE
+)
 
 
 def extraer_numero_tarea_desde_pdf(ruta_pdf: str) -> str | None:
@@ -55,7 +57,9 @@ def extraer_proveedor_desde_pdf(ruta_pdf: str) -> str | None:
             continue
         m = PATRON_PROVEEDOR.search(texto)
         if m:
-            return m.group(1).strip().split("\n")[0]
+            valor = m.group(1).strip().split("\n")[0]
+            valor = re.sub(r"(?i)^nombre\s*[:\-]?\s*", "", valor).strip()
+            return valor
     return None
 
 

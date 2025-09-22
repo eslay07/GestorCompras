@@ -31,6 +31,17 @@ fuente_entry = ("Segoe UI", 14)
 email_session = {}
 
 
+def _find_descargas_root() -> Path | None:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "DescargasOC-main"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_DESCARGAS_ROOT = _find_descargas_root()
+
+
 def center_window(win: tk.Tk | tk.Toplevel):
     win.update_idletasks()
     w = win.winfo_width()
@@ -271,45 +282,36 @@ class MainMenu(tk.Frame):
 
     def open_descargas_oc(self):
         def launch_normal():
-            script = (
-                Path(__file__).resolve().parents[2]
-                / "DescargasOC-main"
-                / "descargas_oc"
-                / "ui.py"
-            )
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui.py"
             subprocess.Popen([sys.executable, str(script)])
             option_win.destroy()
 
         def open_abastecimiento():
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui_abastecimiento.py"
+            try:
+                subprocess.Popen([sys.executable, str(script)])
+            except OSError as exc:
+                messagebox.showerror(
+                    "Error",
+                    (
+                        "No se pudo abrir el módulo de Abastecimiento. "
+                        f"Detalle: {exc}"
+                    ),
+                )
+                return
             option_win.destroy()
-            win = tk.Toplevel(self.master)
-            win.title("Descarga Abastecimiento")
-            win.transient(self.master)
-            win.grab_set()
-            center_window(win)
-
-            frame = ttk.Frame(win, style="MyFrame.TFrame", padding=10)
-            frame.pack(fill="both", expand=True)
-
-            ttk.Label(frame, text="Fecha inicio:", style="MyLabel.TLabel").grid(
-                row=0, column=0, sticky="e", pady=5
-            )
-            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=0, column=1, pady=5)
-            ttk.Label(frame, text="Fecha final:", style="MyLabel.TLabel").grid(
-                row=1, column=0, sticky="e", pady=5
-            )
-            ttk.Entry(frame, style="MyEntry.TEntry").grid(row=1, column=1, pady=5)
-
-            btn_desc = ttk.Button(
-                frame,
-                text="Descargar",
-                style="MyButton.TButton",
-                command=lambda: messagebox.showinfo(
-                    "Información", "Funcionalidad en desarrollo"
-                ),
-            )
-            btn_desc.grid(row=2, column=0, columnspan=2, pady=10)
-            add_hover_effect(btn_desc)
 
         option_win = tk.Toplevel(self.master)
         option_win.title("Descargas OC")
