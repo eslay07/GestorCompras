@@ -266,71 +266,52 @@ def descargar_abastecimiento(
             if not variantes:
                 variantes = [texto.strip()]
 
-            campo = limpiar_y_escribir(nombre, locator, variantes[0])
+            consulta = ""
+            for variante in variantes:
+                match = re.search(r"\d+", variante)
+                if match:
+                    consulta = match.group(0)
+                    break
+            if not consulta:
+                consulta = variantes[0]
+
+            campo = limpiar_y_escribir(nombre, locator, consulta)
             opciones_locator = (
                 By.XPATH,
                 "//div[contains(@class,'cdk-overlay-pane')]//mat-option[not(@aria-disabled='true')]",
             )
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located(opciones_locator)
-                )
-            except TimeoutException:
-                logger.warning(
-                    "%s: no se encontraron opciones para '%s'", nombre, texto
-                )
-                campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
-                campo.send_keys(Keys.TAB)
-                return
-
-            opciones = driver.find_elements(*opciones_locator)
-            patrones = {_normalizar_texto(v) for v in variantes if v}
-            patrones.add(_normalizar_texto(texto))
-            patrones.discard("")
-
-            seleccionada = False
-            for opcion in opciones:
-                try:
-                    texto_opcion = opcion.text.strip()
-                except StaleElementReferenceException:
-                    continue
-                if not texto_opcion:
-                    continue
-                texto_normalizado = _normalizar_texto(texto_opcion)
-                if not texto_normalizado:
-                    continue
-                coincidencia = any(
-                    patron in texto_normalizado or texto_normalizado in patron
-                    or all(token in texto_normalizado for token in patron.split())
-                    for patron in patrones
-                )
-                if coincidencia:
-                    try:
-                        driver.execute_script(
-                            "arguments[0].scrollIntoView({block: 'center'});", opcion
-                        )
-                    except Exception:
-                        pass
-                    try:
-                        opcion.click()
-                    except (ElementClickInterceptedException, StaleElementReferenceException):
-                        driver.execute_script("arguments[0].click();", opcion)
-                    seleccionada = True
-                    break
-
-            if not seleccionada:
-                campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
-
+            opciones_visibles = False
             try:
                 WebDriverWait(driver, 5).until(
-                    EC.invisibility_of_element_located(opciones_locator)
+                    EC.visibility_of_element_located(opciones_locator)
                 )
+                opciones_visibles = True
             except TimeoutException:
-                pass
+                logger.warning(
+                    "%s: no se encontraron opciones visibles para '%s'", nombre, consulta
+                )
+
+            campo.send_keys(Keys.ENTER)
+
+            if opciones_visibles:
+                try:
+                    WebDriverWait(driver, 5).until(
+                        EC.invisibility_of_element_located(opciones_locator)
+                    )
+                except TimeoutException:
+                    campo.send_keys(Keys.ARROW_DOWN)
+                    campo.send_keys(Keys.ENTER)
 
             valor_final = (campo.get_attribute("value") or "").strip()
-            if not valor_final and variantes:
-                campo.send_keys(variantes[0])
+            if not valor_final:
+                campo.send_keys(Keys.ARROW_DOWN)
+                campo.send_keys(Keys.ENTER)
+                valor_final = (campo.get_attribute("value") or "").strip()
+
+            if not valor_final and consulta:
+                campo.send_keys(consulta)
+                campo.send_keys(Keys.ENTER)
+
             campo.send_keys(Keys.TAB)
             time.sleep(0.2)
 
