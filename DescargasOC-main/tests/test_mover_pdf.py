@@ -151,7 +151,7 @@ def test_mover_oc_bienes_mueve_a_carpeta_existente(tmp_path, monkeypatch):
     assert errores == []
     archivos = list(carpeta_tarea.glob("*.pdf"))
     assert len(archivos) == 1
-    assert "Proveedor X" in archivos[0].stem
+    assert "proveedor_x" in archivos[0].stem
     assert not any(origen.glob("*.pdf"))
 
 
@@ -163,7 +163,7 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
 
     carpeta_tarea = destino / "140144463"
     carpeta_tarea.mkdir()
-    conflicto = carpeta_tarea / "123456 - Proveedor X.pdf"
+    conflicto = carpeta_tarea / "123456 - proveedor_x.pdf"
     conflicto.write_text("existing")
 
     pdf = origen / "123456.pdf"

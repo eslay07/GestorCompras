@@ -30,3 +30,23 @@ def test_valor_coincide_detecta_nombre_y_codigo():
     assert modulo._valor_coincide("00045 - APROV TEST", variantes, consultas)
     assert modulo._valor_coincide("Código 00045", variantes, consultas)
     assert not modulo._valor_coincide("Sin coincidencia", variantes, consultas)
+
+
+def test_numero_desde_texto_identifica_oc():
+    modulo = importlib.import_module("descargas_oc.selenium_abastecimiento")
+
+    assert modulo._numero_desde_texto("ORDEN # 342050") == "342050"
+    assert modulo._numero_desde_texto("OC 00342059") == "342059"
+    assert modulo._numero_desde_texto("keyboard_arrow_down") == ""
+
+
+def test_renombrar_pdf_respeta_nombre_original(tmp_path):
+    modulo = importlib.import_module("descargas_oc.selenium_abastecimiento")
+
+    pdf = tmp_path / "ORDEN # 342050.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    renombrado = modulo._renombrar_pdf_descargado(pdf, "342050", "Electroleg S.A.")
+
+    assert renombrado.name.startswith("ORDEN #342050 - electroleg_s_a_")
+    assert renombrado.suffix == ".pdf"

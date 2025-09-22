@@ -38,10 +38,15 @@ def nombre_archivo_orden(
     """Genera un nombre de archivo seguro usando número y proveedor."""
 
     numero = (numero or "").strip()
+    if numero:
+        numero = re.sub(r"\s+", " ", numero)
+        numero = re.sub(r"(#)\s+(?=\d)", r"#", numero)
     base = numero
     if proveedor:
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+        prov_clean = re.sub(r"\s+", "_", prov_clean)
+        prov_clean = re.sub(r"_+", "_", prov_clean)
+        prov_clean = prov_clean.lstrip("_").lower()
         base = f"{base} - {prov_clean}" if base else prov_clean
     base = re.sub(r"\s+", " ", base).strip()
     if not base:

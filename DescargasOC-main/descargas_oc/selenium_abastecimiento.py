@@ -28,6 +28,7 @@ try:  # permitir la ejecución como script
     from .logger import get_logger
     from .pdf_info import (
         actualizar_proveedores_desde_pdfs,
+        limpiar_proveedor,
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
@@ -39,6 +40,7 @@ except ImportError:  # pragma: no cover
     from logger import get_logger
     from pdf_info import (
         actualizar_proveedores_desde_pdfs,
+        limpiar_proveedor,
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
@@ -53,11 +55,28 @@ AUTOCOMPLETE_LABELS: dict[str, list[str]] = {
     "autoriza": ["autoriza", "autoriza:", "autoriza por"],
 }
 
+ICON_TEXTOS = {
+    "keyboard_arrow_down",
+    "keyboard_arrow_up",
+    "keyboard_arrow_right",
+    "keyboard_arrow_left",
+    "picture_as_pdf",
+    "save_alt",
+}
+
+PATRONES_NUMERO = (
+    re.compile(r"orden\s*(?:de\s*compra\s*)?#?\s*(\d+)", re.IGNORECASE),
+    re.compile(r"oc\s*(\d+)", re.IGNORECASE),
+    re.compile(r"(\d{5,})"),
+)
+
 
 def _renombrar_pdf_descargado(pdf: Path, numero: str, proveedor: str) -> Path:
     """Renombra el PDF descargado usando número y proveedor."""
 
-    nombre_deseado = nombre_archivo_orden(numero, proveedor, pdf.suffix or ".pdf")
+    base_actual = re.sub(r"\s+", " ", pdf.stem).strip()
+    preferido = base_actual or (numero or "").strip()
+    nombre_deseado = nombre_archivo_orden(preferido, proveedor, pdf.suffix or ".pdf")
     destino = pdf.with_name(nombre_deseado)
     if destino == pdf:
         return pdf
@@ -93,6 +112,26 @@ def _normalizar_texto(texto: str) -> str:
     return sin_acentos.lower().strip()
 
 
+def _texto_es_icono(texto: str) -> bool:
+    if not texto:
+        return False
+    normalizado = _normalizar_texto(texto).replace(" ", "_")
+    return normalizado in ICON_TEXTOS
+
+
+def _numero_desde_texto(texto: str) -> str:
+    if not texto:
+        return ""
+    for patron in PATRONES_NUMERO:
+        coincidencia = patron.search(texto)
+        if coincidencia:
+            numero = re.sub(r"\D", "", coincidencia.group(1))
+            if numero:
+                numero_normalizado = numero.lstrip("0")
+                return numero_normalizado or numero
+    return ""
+
+
 def _normalizar_fecha(valor: str) -> str:
     if not valor:
         return ""
@@ -125,8 +164,26 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
     numero = ""
     proveedor = ""
 
+    textos: list[str] = []
     if fila is not None:
-        textos: list[str] = []
+        vistos: set[str] = set()
+
+        def _agregar(texto: str):
+            texto = (texto or "").strip()
+            if not texto:
+                return
+            if texto in vistos:
+                return
+            vistos.add(texto)
+            textos.append(texto)
+
+        try:
+            fila_texto = fila.text or ""
+        except Exception:
+            fila_texto = ""
+        for parte in fila_texto.splitlines():
+            _agregar(parte)
+
         for locator in (".//mat-cell", ".//td"):
             try:
                 celdas = fila.find_elements(By.XPATH, locator)
@@ -134,42 +191,50 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
                 continue
             for celda in celdas:
                 try:
-                    texto = celda.text.strip()
+                    texto = celda.text or ""
                 except Exception:
                     texto = ""
-                if texto:
-                    textos.append(texto)
-            if textos:
-                break
+                for parte in texto.splitlines():
+                    _agregar(parte)
 
-        if textos:
-            numero = textos[0]
-            if len(textos) > 1:
-                proveedor = textos[1]
-
-        if not numero or not proveedor:
+        try:
+            spans = fila.find_elements(By.XPATH, ".//span")
+        except Exception:
+            spans = []
+        for span in spans:
             try:
-                spans = fila.find_elements(By.XPATH, ".//span")
+                texto = span.text or ""
             except Exception:
-                spans = []
-            span_textos: list[str] = []
-            for span in spans:
-                try:
-                    texto = span.text.strip()
-                except Exception:
-                    texto = ""
-                if texto:
-                    span_textos.append(texto)
-            if not numero and span_textos:
-                numero = span_textos[0]
-            if not proveedor and span_textos:
-                for texto in span_textos:
-                    if texto != numero:
-                        proveedor = texto
-                        break
+                texto = ""
+            for parte in texto.splitlines():
+                _agregar(parte)
+
+    numero_texto = ""
+    for texto in textos:
+        if _texto_es_icono(texto):
+            continue
+        numero_candidato = _numero_desde_texto(texto)
+        if numero_candidato:
+            numero = numero_candidato
+            numero_texto = texto
+            break
 
     if not numero:
         numero = str(indice + 1)
+
+    for texto in textos:
+        if texto == numero_texto:
+            continue
+        if _texto_es_icono(texto):
+            continue
+        if _numero_desde_texto(texto) == numero:
+            continue
+        if not re.search(r"[a-zA-ZÁÉÍÓÚÜÑ]", texto):
+            continue
+        proveedor = texto
+        break
+
+    proveedor = limpiar_proveedor(proveedor)
 
     return numero, proveedor
 
@@ -828,12 +893,17 @@ def descargar_abastecimiento(
                 driver.execute_script("arguments[0].click();", btn)
             try:
                 archivo_descargado = esperar_descarga_pdf(destino, existentes)
+                ruta_descargada = Path(archivo_descargado)
+                numero_archivo = _numero_desde_texto(ruta_descargada.stem)
+                if numero_archivo:
+                    orden["numero"] = numero_archivo
+                    numero = numero_archivo
                 logger.info("OC %s descargada en %s", numero, archivo_descargado)
                 proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
                 if proveedor_pdf:
                     orden["proveedor"] = proveedor_pdf
                 _renombrar_pdf_descargado(
-                    Path(archivo_descargado),
+                    ruta_descargada,
                     str(numero),
                     orden.get("proveedor", ""),
                 )
