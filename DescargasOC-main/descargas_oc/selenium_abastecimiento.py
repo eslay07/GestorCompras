@@ -819,7 +819,9 @@ def descargar_abastecimiento(
             time.sleep(0.2)
             numero, proveedor = _extraer_datos_orden(btn, idx)
 
-            ordenes.append({"numero": numero, "proveedor": proveedor})
+            ordenes.append(
+                {"numero": numero, "proveedor": proveedor, "categoria": "abastecimiento"}
+            )
             existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
             try:
                 btn.click()
