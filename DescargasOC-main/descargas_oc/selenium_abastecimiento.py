@@ -36,6 +36,12 @@ logger = get_logger(__name__)
 WAIT_TIMEOUT = 30
 
 
+AUTOCOMPLETE_LABELS: dict[str, list[str]] = {
+    "solicitante": ["solicitante", "solicita", "solicitante:"],
+    "autoriza": ["autoriza", "autoriza:", "autoriza por"],
+}
+
+
 def _normalizar_texto(texto: str) -> str:
     """Normaliza texto para comparaciones flexibles."""
 
@@ -118,37 +124,81 @@ if (!needle) {
   return null;
 }
 
-const visibles = [];
-const campos = Array.from(document.querySelectorAll('mat-form-field, .mat-form-field'));
-for (const campo of campos) {
-  const label = normalizar(campo.innerText);
-  if (label && label.includes(needle)) {
-    const input = campo.querySelector('input[aria-autocomplete="list"]');
-    if (input && input.offsetParent !== null && !input.disabled) {
-      visibles.push(input);
-    }
+const esVisible = (el) => {
+  if (!el) {
+    return false;
+  }
+  try {
+    return el.offsetParent !== null && !el.disabled;
+  } catch (e) {
+    return false;
+  }
+};
+
+const contenedores = Array.from(document.querySelectorAll([
+  'mat-form-field',
+  '.mat-form-field',
+  'ng-select',
+  '.ng-select',
+  '.ng-select-container',
+  'div.form-group',
+  "div[class*='col']"
+].join(',')));
+
+for (const campo of contenedores) {
+  if (!esVisible(campo)) {
+    continue;
+  }
+  const texto = normalizar(campo.innerText);
+  if (!texto || !texto.includes(needle)) {
+    continue;
+  }
+  const input = campo.querySelector('input[aria-autocomplete="list"]');
+  if (esVisible(input)) {
+    return input;
   }
 }
 
-if (!visibles.length) {
-  const inputs = Array.from(document.querySelectorAll('input[aria-autocomplete="list"]'));
-  for (const input of inputs) {
-    if (!input || input.offsetParent === null || input.disabled) {
-      continue;
+const inputs = Array.from(document.querySelectorAll('input[aria-autocomplete="list"]'));
+
+const contextoInput = (input) => {
+  const partes = [];
+
+  if (input.id) {
+    const labelFor = document.querySelector(`label[for='${input.id}']`);
+    if (labelFor) {
+      partes.push(labelFor.innerText || '');
     }
-    const attrs = [
-      input.getAttribute('placeholder'),
-      input.getAttribute('aria-label'),
-      input.getAttribute('name'),
-      input.id
-    ].join(' ');
-    if (normalizar(attrs).includes(needle)) {
-      visibles.push(input);
+  }
+
+  let nodo = input.parentElement;
+  let profundidad = 0;
+  while (nodo && profundidad < 5) {
+    const label = nodo.querySelector ? nodo.querySelector('label, .ng-select-label, .mat-form-field-label') : null;
+    if (label) {
+      partes.push(label.innerText || '');
     }
+    if (nodo.previousElementSibling) {
+      partes.push(nodo.previousElementSibling.innerText || '');
+    }
+    nodo = nodo.parentElement;
+    profundidad += 1;
+  }
+
+  return normalizar(partes.join(' '));
+};
+
+for (const input of inputs) {
+  if (!esVisible(input)) {
+    continue;
+  }
+  const contexto = contextoInput(input);
+  if (contexto && contexto.includes(needle)) {
+    return input;
   }
 }
 
-return visibles.length ? visibles[0] : null;
+return null;
 """
 
 
@@ -443,15 +493,28 @@ def descargar_abastecimiento(
                     continue
             return campos
 
-        def obtener_autocomplete(nombre: str, indice: int):
+        def _obtener_por_indice(indice: int):
             def _resolver(_driver):
                 visibles = _autocompletes_visibles()
                 if len(visibles) > indice:
                     return visibles[indice]
                 return False
 
+            return WebDriverWait(driver, WAIT_TIMEOUT).until(_resolver)
+
+        def obtener_autocomplete(nombre: str, indice: int):
+            etiquetas = AUTOCOMPLETE_LABELS.get(nombre, [])
+            for etiqueta in etiquetas:
+                try:
+                    campo = _buscar_autocomplete_por_texto(driver, etiqueta)
+                    if campo:
+                        return campo, ("label", etiqueta)
+                except RuntimeError:
+                    continue
+
             try:
-                return WebDriverWait(driver, WAIT_TIMEOUT).until(_resolver)
+                campo = _obtener_por_indice(indice)
+                return campo, ("index", indice)
             except TimeoutException as exc:
                 logger.error("%s: no se encontró un campo visible", nombre)
                 raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
@@ -461,42 +524,73 @@ def descargar_abastecimiento(
                 logger.warning("%s sin valor configurado; se omite", nombre.capitalize())
                 return
 
-            campo = obtener_autocomplete(nombre, indice)
+            campo, origen_info = obtener_autocomplete(nombre, indice)
+
+            def refrescar_campo():
+                nonlocal campo, origen_info
+                try:
+                    if campo.is_displayed() and campo.is_enabled():
+                        return campo
+                except StaleElementReferenceException:
+                    pass
+
+                if origen_info[0] == "label":
+                    try:
+                        nuevo = _buscar_autocomplete_por_texto(driver, origen_info[1])
+                        if nuevo:
+                            campo = nuevo
+                            return campo
+                    except RuntimeError:
+                        pass
+
+                try:
+                    nuevo = _obtener_por_indice(indice)
+                    campo = nuevo
+                    origen_info = ("index", indice)
+                except Exception:
+                    pass
+                return campo
+
+            campo = refrescar_campo()
 
             try:
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", campo)
             except Exception:
                 pass
 
+            campo = refrescar_campo()
             try:
                 campo.click()
             except Exception:
                 driver.execute_script("arguments[0].focus();", campo)
 
+            campo = refrescar_campo()
             campo.send_keys(Keys.CONTROL, "a")
             campo.send_keys(Keys.DELETE)
             time.sleep(0.1)
 
+            campo = refrescar_campo()
             campo.send_keys(texto)
             time.sleep(2)
 
+            campo = refrescar_campo()
             try:
-                campo.send_keys(Keys.ENTER)
-            except StaleElementReferenceException:
-                campo = obtener_autocomplete(nombre, indice)
                 campo.send_keys(Keys.ENTER)
             except Exception as exc:
                 logger.debug("%s: no se pudo enviar Enter directamente: %s", nombre, exc)
+                try:
+                    campo = refrescar_campo()
+                    campo.send_keys(Keys.ENTER)
+                except Exception:
+                    pass
 
             _esperar_cierre_opciones(driver)
             time.sleep(0.2)
 
             def valor_seleccionado() -> str:
-                visibles = _autocompletes_visibles()
-                if len(visibles) <= indice:
-                    return ""
+                actual = refrescar_campo()
                 try:
-                    return (visibles[indice].get_attribute("value") or "").strip()
+                    return (actual.get_attribute("value") or "").strip()
                 except StaleElementReferenceException:
                     return ""
 
@@ -509,9 +603,10 @@ def descargar_abastecimiento(
 
             if not seleccionado:
                 try:
-                    campo = obtener_autocomplete(nombre, indice)
+                    campo = refrescar_campo()
                     campo.send_keys(Keys.ARROW_DOWN)
                     time.sleep(0.5)
+                    campo = refrescar_campo()
                     campo.send_keys(Keys.ENTER)
                     _esperar_cierre_opciones(driver)
                     WebDriverWait(driver, 3).until(
@@ -533,6 +628,7 @@ def descargar_abastecimiento(
                 )
 
             try:
+                campo = refrescar_campo()
                 campo.send_keys(Keys.TAB)
             except StaleElementReferenceException:
                 pass
