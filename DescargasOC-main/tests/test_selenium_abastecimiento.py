@@ -15,11 +15,11 @@ def test_nombre_archivo_normaliza_datos():
 
     assert (
         modulo._nombre_archivo("123456", "Proveedor S.A.")
-        == "123456 - NOMBRE Proveedor S_A"
+        == "123456 - Proveedor S_A"
     )
     assert (
         modulo._nombre_archivo("", "Proveedor Especial")
-        == "NOMBRE Proveedor Especial"
+        == "Proveedor Especial"
     )
     assert modulo._nombre_archivo(None, None) is None
 

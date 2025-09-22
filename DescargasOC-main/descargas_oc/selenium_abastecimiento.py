@@ -67,19 +67,17 @@ def _normalizar_fecha(valor: str) -> str:
 
 
 def _nombre_archivo(numero: str | None, proveedor: str | None) -> str | None:
-    """Genera el nombre base del PDF como en el módulo Selenium normal."""
+    """Genera el nombre base del PDF utilizando número y proveedor."""
 
     numero_limpio = (numero or "").strip()
     proveedor_limpio = re.sub(r"\s+", " ", (proveedor or "").strip())
-    proveedor_limpio = re.sub(r"[^\w\- ]", "_", proveedor_limpio)
-    if proveedor_limpio:
-        proveedor_limpio = proveedor_limpio.strip()
+    proveedor_limpio = re.sub(r"[^\w\- ]", "_", proveedor_limpio).strip()
 
     partes: list[str] = []
     if numero_limpio:
         partes.append(numero_limpio)
     if proveedor_limpio:
-        partes.append(f"NOMBRE {proveedor_limpio}")
+        partes.append(proveedor_limpio)
     if not partes:
         return None
     base = " - ".join(partes)
@@ -110,6 +108,74 @@ def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
         except OSError as exc:  # pragma: no cover - entorno Windows
             logger.warning("No se pudo renombrar %s a %s: %s", archivo, candidato, exc)
             return archivo
+
+
+def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
+    """Obtiene el número y proveedor asociados a un botón de descarga."""
+
+    fila = None
+    for xpath in (
+        "./ancestor::mat-row[1]",
+        "./ancestor::*[@role='row'][1]",
+        "./ancestor::tr[1]",
+    ):
+        try:
+            fila = btn.find_element(By.XPATH, xpath)
+            if fila is not None:
+                break
+        except Exception:
+            continue
+
+    numero = ""
+    proveedor = ""
+
+    if fila is not None:
+        textos: list[str] = []
+        for locator in (".//mat-cell", ".//td"):
+            try:
+                celdas = fila.find_elements(By.XPATH, locator)
+            except Exception:
+                continue
+            for celda in celdas:
+                try:
+                    texto = celda.text.strip()
+                except Exception:
+                    texto = ""
+                if texto:
+                    textos.append(texto)
+            if textos:
+                break
+
+        if textos:
+            numero = textos[0]
+            if len(textos) > 1:
+                proveedor = textos[1]
+
+        if not numero or not proveedor:
+            try:
+                spans = fila.find_elements(By.XPATH, ".//span")
+            except Exception:
+                spans = []
+            span_textos: list[str] = []
+            for span in spans:
+                try:
+                    texto = span.text.strip()
+                except Exception:
+                    texto = ""
+                if texto:
+                    span_textos.append(texto)
+            if not numero and span_textos:
+                numero = span_textos[0]
+            if not proveedor and span_textos:
+                for texto in span_textos:
+                    if texto != numero:
+                        proveedor = texto
+                        break
+
+    if not numero:
+        numero = str(indice + 1)
+
+    return numero, proveedor
 
 
 _SCRIPT_BUSCAR_AUTOCOMPLETE = r"""
@@ -341,7 +407,7 @@ def descargar_abastecimiento(
     username: str | None = None,
     password: str | None = None,
     download_dir: str | None = None,
-    headless: bool = False,
+    headless: bool | None = None,
 ):
     """Automatiza la descarga visible de órdenes de compra por abastecimiento."""
 
@@ -357,6 +423,12 @@ def descargar_abastecimiento(
         or Path.home()
     )
     destino.mkdir(parents=True, exist_ok=True)
+
+    headless_flag = (
+        bool(cfg.abastecimiento_headless)
+        if headless is None
+        else bool(headless)
+    )
 
     options = webdriver.ChromeOptions()
     prefs = {
@@ -375,7 +447,7 @@ def descargar_abastecimiento(
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--log-level=3")
-    if headless:
+    if headless_flag:
         options.add_argument("--headless=new")
 
     driver = webdriver.Chrome(options=options)
@@ -745,14 +817,7 @@ def descargar_abastecimiento(
             except Exception:
                 pass
             time.sleep(0.2)
-            try:
-                fila = btn.find_element(By.XPATH, "./ancestor::tr")
-                celdas = fila.find_elements(By.TAG_NAME, "td")
-                numero = celdas[0].text.strip() if celdas else str(idx + 1)
-                proveedor = celdas[1].text.strip() if len(celdas) > 1 else ""
-            except Exception:
-                numero = str(idx + 1)
-                proveedor = ""
+            numero, proveedor = _extraer_datos_orden(btn, idx)
 
             ordenes.append({"numero": numero, "proveedor": proveedor})
             existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}

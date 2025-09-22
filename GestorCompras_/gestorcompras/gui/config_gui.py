@@ -696,6 +696,20 @@ class ConfigGUI(tk.Toplevel):
         abas_aut_entry.grid(row=abas_row, column=1, sticky="ew", padx=5, pady=2)
         self._oc_entries["abastecimiento_autorizadores"] = abas_aut_entry
 
+        abas_row += 1
+        abas_headless_check = ttk.Checkbutton(
+            abas_frame,
+            text="Ejecutar Chrome en modo oculto (headless)",
+            style="MyCheckbutton.TCheckbutton",
+            variable=_bool_var(
+                "abastecimiento_headless", bool(cfg.abastecimiento_headless)
+            ),
+        )
+        abas_headless_check.grid(
+            row=abas_row, column=0, columnspan=2, sticky="w", padx=5, pady=4
+        )
+        self._oc_entries["abastecimiento_headless"] = abas_headless_check
+
         button_frame = ttk.Frame(scrollable, style="MyFrame.TFrame")
         button_frame.pack(fill="x", pady=(0, 10))
 
@@ -849,6 +863,9 @@ class ConfigGUI(tk.Toplevel):
             "abastecimiento_correo_reporte": self._oc_vars[
                 "abastecimiento_correo_reporte"
             ].get().strip(),
+            "abastecimiento_headless": bool(
+                self._oc_vars["abastecimiento_headless"].get()
+            ),
             "abastecimiento_solicitantes": self._parse_list(
                 self._oc_vars["abastecimiento_solicitantes"].get()
             ),

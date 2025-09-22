@@ -41,7 +41,7 @@ def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
     if proveedor:
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
         prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
-        base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+        base = f"{base} - {prov_clean}" if base else prov_clean
     base = re.sub(r"\s+", " ", base).strip()
     if not base:
         base = "archivo"

@@ -28,7 +28,9 @@ def ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):
 
     def tarea():
         try:
-            descargar_abastecimiento(fd, fh, sol, aut, headless=cfg.headless)
+            descargar_abastecimiento(
+                fd, fh, sol, aut, headless=cfg.abastecimiento_headless
+            )
             messagebox.showinfo("Finalizado", "Proceso completado")
         except Exception as exc:
             messagebox.showerror("Error", str(exc))

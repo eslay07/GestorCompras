@@ -163,7 +163,7 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
 
     carpeta_tarea = destino / "140144463"
     carpeta_tarea.mkdir()
-    conflicto = carpeta_tarea / "123456 - NOMBRE Proveedor X.pdf"
+    conflicto = carpeta_tarea / "123456 - Proveedor X.pdf"
     conflicto.write_text("existing")
 
     pdf = origen / "123456.pdf"

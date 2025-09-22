@@ -41,6 +41,19 @@ class Config:
             except (TypeError, ValueError):
                 return default
 
+        def _parse_bool(value, default):
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in {"1", "true", "t", "yes", "si", "sí"}:
+                    return True
+                if lowered in {"0", "false", "f", "no"}:
+                    return False
+            if isinstance(value, (int, float)):
+                return bool(value)
+            return default
+
         self.data['pop_port'] = _parse_int(
             os.getenv('POP_PORT', self.data.get('pop_port', 995)), 995
         )
@@ -63,6 +76,19 @@ class Config:
         self.data['smtp_password'] = os.getenv(
             'SMTP_PASSWORD',
             self.data.get('smtp_password', self.data.get('password')),
+        )
+
+        headless_raw = os.getenv('HEADLESS', self.data.get('headless'))
+        headless_val = _parse_bool(headless_raw, False)
+        self.data['headless'] = headless_val
+
+        abas_headless_raw = os.getenv(
+            'ABASTECIMIENTO_HEADLESS',
+            self.data.get('abastecimiento_headless', headless_val),
+        )
+        self.data['abastecimiento_headless'] = _parse_bool(
+            abas_headless_raw,
+            headless_val,
         )
         self.data.setdefault('max_threads', 5)
         self.data.setdefault('batch_size', 50)
@@ -95,6 +121,7 @@ class Config:
         self.data.setdefault('smtp_password', self.data.get('password'))
         self.data.setdefault('compra_bienes', False)
         self.data.setdefault('headless', False)
+        self.data.setdefault('abastecimiento_headless', self.data['headless'])
         self.data.setdefault(
             'abastecimiento_carpeta_descarga', self.data.get('carpeta_destino_local')
         )

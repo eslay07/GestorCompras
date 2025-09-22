@@ -38,3 +38,19 @@ def test_abastecimiento_lists_normalized(tmp_path):
     assert saved['abastecimiento_autorizadores'] == ['Maria']
 
 
+def test_abastecimiento_headless_default(tmp_path):
+    cfg_file = tmp_path / 'config.json'
+    cfg_file.write_text(json.dumps({'headless': True}))
+
+    cfg = Config(path=str(cfg_file))
+
+    assert cfg.headless is True
+    assert cfg.abastecimiento_headless is True
+
+    cfg.data['abastecimiento_headless'] = False
+    cfg.save()
+
+    saved = json.loads(cfg_file.read_text())
+    assert saved['abastecimiento_headless'] is False
+
+
