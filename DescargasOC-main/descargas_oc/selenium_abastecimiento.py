@@ -1,7 +1,9 @@
 """Descarga de órdenes de compra de Abastecimiento vía Selenium."""
 from __future__ import annotations
 
+import re
 import time
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -34,6 +36,16 @@ logger = get_logger(__name__)
 WAIT_TIMEOUT = 30
 
 
+def _normalizar_texto(texto: str) -> str:
+    """Normaliza texto para comparaciones flexibles."""
+
+    if not texto:
+        return ""
+    descompuesto = unicodedata.normalize("NFKD", texto)
+    sin_acentos = "".join(c for c in descompuesto if not unicodedata.combining(c))
+    return sin_acentos.lower().strip()
+
+
 def _normalizar_fecha(valor: str) -> str:
     if not valor:
         return ""
@@ -45,6 +57,52 @@ def _normalizar_fecha(valor: str) -> str:
         except ValueError:
             continue
     return texto
+
+
+def _nombre_archivo(numero: str | None, proveedor: str | None) -> str | None:
+    """Genera el nombre base del PDF como en el módulo Selenium normal."""
+
+    numero_limpio = (numero or "").strip()
+    proveedor_limpio = re.sub(r"\s+", " ", (proveedor or "").strip())
+    proveedor_limpio = re.sub(r"[^\w\- ]", "_", proveedor_limpio)
+    if proveedor_limpio:
+        proveedor_limpio = proveedor_limpio.strip()
+
+    partes: list[str] = []
+    if numero_limpio:
+        partes.append(numero_limpio)
+    if proveedor_limpio:
+        partes.append(f"NOMBRE {proveedor_limpio}")
+    if not partes:
+        return None
+    base = " - ".join(partes)
+    return base[:180].rstrip(" .-_") or None
+
+
+def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
+    """Renombra la descarga reciente asegurando nombres únicos."""
+
+    if not base:
+        return archivo
+    base = base.strip()
+    if not base:
+        return archivo
+
+    destino = archivo.with_name(f"{base}.pdf")
+    intento = 0
+    while True:
+        candidato = destino if intento == 0 else archivo.with_name(f"{base} ({intento}).pdf")
+        if archivo == candidato:
+            return archivo
+        try:
+            archivo.rename(candidato)
+            return candidato
+        except FileExistsError:
+            intento += 1
+            continue
+        except OSError as exc:  # pragma: no cover - entorno Windows
+            logger.warning("No se pudo renombrar %s a %s: %s", archivo, candidato, exc)
+            return archivo
 
 
 def descargar_abastecimiento(
@@ -199,7 +257,16 @@ def descargar_abastecimiento(
         def seleccionar_combo(nombre: str, locator, texto: str):
             if not texto:
                 return
-            campo = limpiar_y_escribir(nombre, locator, texto)
+
+            variantes = [
+                parte.strip()
+                for parte in re.split(r"[;|,\n]+", texto)
+                if parte.strip()
+            ]
+            if not variantes:
+                variantes = [texto.strip()]
+
+            campo = limpiar_y_escribir(nombre, locator, variantes[0])
             opciones_locator = (
                 By.XPATH,
                 "//div[contains(@class,'cdk-overlay-pane')]//mat-option[not(@aria-disabled='true')]",
@@ -213,9 +280,14 @@ def descargar_abastecimiento(
                     "%s: no se encontraron opciones para '%s'", nombre, texto
                 )
                 campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
+                campo.send_keys(Keys.TAB)
                 return
+
             opciones = driver.find_elements(*opciones_locator)
-            objetivo = texto.strip().lower()
+            patrones = {_normalizar_texto(v) for v in variantes if v}
+            patrones.add(_normalizar_texto(texto))
+            patrones.discard("")
+
             seleccionada = False
             for opcion in opciones:
                 try:
@@ -224,22 +296,42 @@ def descargar_abastecimiento(
                     continue
                 if not texto_opcion:
                     continue
-                texto_normalizado = texto_opcion.lower()
-                if objetivo in texto_normalizado or texto_normalizado in objetivo:
+                texto_normalizado = _normalizar_texto(texto_opcion)
+                if not texto_normalizado:
+                    continue
+                coincidencia = any(
+                    patron in texto_normalizado or texto_normalizado in patron
+                    or all(token in texto_normalizado for token in patron.split())
+                    for patron in patrones
+                )
+                if coincidencia:
+                    try:
+                        driver.execute_script(
+                            "arguments[0].scrollIntoView({block: 'center'});", opcion
+                        )
+                    except Exception:
+                        pass
                     try:
                         opcion.click()
                     except (ElementClickInterceptedException, StaleElementReferenceException):
                         driver.execute_script("arguments[0].click();", opcion)
                     seleccionada = True
                     break
+
             if not seleccionada:
                 campo.send_keys(Keys.ARROW_DOWN, Keys.ENTER)
+
             try:
                 WebDriverWait(driver, 5).until(
                     EC.invisibility_of_element_located(opciones_locator)
                 )
             except TimeoutException:
                 pass
+
+            valor_final = (campo.get_attribute("value") or "").strip()
+            if not valor_final and variantes:
+                campo.send_keys(variantes[0])
+            campo.send_keys(Keys.TAB)
             time.sleep(0.2)
 
         driver.get(
@@ -342,6 +434,9 @@ def descargar_abastecimiento(
                 driver.execute_script("arguments[0].click();", btn)
             try:
                 archivo_descargado = esperar_descarga_pdf(destino, existentes)
+                base_nombre = _nombre_archivo(numero, proveedor)
+                if base_nombre:
+                    archivo_descargado = _renombrar_descarga(archivo_descargado, base_nombre)
                 logger.info("OC %s descargada en %s", numero, archivo_descargado)
             except Exception as exc:
                 logger.error("No se pudo descargar la OC %s: %s", numero, exc)
