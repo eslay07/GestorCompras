@@ -478,18 +478,17 @@ def descargar_abastecimiento(
             time.sleep(0.1)
 
             campo.send_keys(texto)
-            time.sleep(0.3)
+            time.sleep(2)
 
-            opciones = _esperar_opciones_visibles(driver)
-            if opciones:
-                try:
-                    opciones[0].click()
-                except Exception:
-                    campo.send_keys(Keys.ENTER)
-                _esperar_cierre_opciones(driver)
-            else:
+            try:
                 campo.send_keys(Keys.ENTER)
+            except StaleElementReferenceException:
+                campo = obtener_autocomplete(nombre, indice)
+                campo.send_keys(Keys.ENTER)
+            except Exception as exc:
+                logger.debug("%s: no se pudo enviar Enter directamente: %s", nombre, exc)
 
+            _esperar_cierre_opciones(driver)
             time.sleep(0.2)
 
             def valor_seleccionado() -> str:
@@ -501,17 +500,36 @@ def descargar_abastecimiento(
                 except StaleElementReferenceException:
                     return ""
 
+            seleccionado = False
             try:
                 WebDriverWait(driver, 5).until(lambda _d: bool(valor_seleccionado()))
+                seleccionado = True
             except TimeoutException:
-                logger.warning(
-                    "%s: no se confirmó la selección para '%s'", nombre, texto
-                )
-            else:
+                seleccionado = False
+
+            if not seleccionado:
+                try:
+                    campo = obtener_autocomplete(nombre, indice)
+                    campo.send_keys(Keys.ARROW_DOWN)
+                    time.sleep(0.5)
+                    campo.send_keys(Keys.ENTER)
+                    _esperar_cierre_opciones(driver)
+                    WebDriverWait(driver, 3).until(
+                        lambda _d: bool(valor_seleccionado())
+                    )
+                    seleccionado = True
+                except Exception:
+                    seleccionado = False
+
+            if seleccionado:
                 logger.info(
                     "%s seleccionado: %s",
                     nombre.capitalize(),
                     valor_seleccionado(),
+                )
+            else:
+                logger.warning(
+                    "%s: no se confirmó la selección para '%s'", nombre, texto
                 )
 
             try:
