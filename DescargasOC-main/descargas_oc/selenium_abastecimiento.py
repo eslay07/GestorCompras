@@ -1,6 +1,7 @@
 """Descarga de órdenes de compra de Abastecimiento vía Selenium."""
 from __future__ import annotations
 
+import os
 import re
 import time
 import unicodedata
@@ -25,14 +26,22 @@ try:  # permitir la ejecución como script
     from .reporter import enviar_reporte
     from .selenium_modulo import esperar_descarga_pdf
     from .logger import get_logger
-    from .pdf_info import actualizar_proveedores_desde_pdfs
+    from .pdf_info import (
+        actualizar_proveedores_desde_pdfs,
+        nombre_archivo_orden,
+        proveedor_desde_pdf,
+    )
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
     from reporter import enviar_reporte
     from selenium_modulo import esperar_descarga_pdf
     from logger import get_logger
-    from pdf_info import actualizar_proveedores_desde_pdfs
+    from pdf_info import (
+        actualizar_proveedores_desde_pdfs,
+        nombre_archivo_orden,
+        proveedor_desde_pdf,
+    )
 
 
 logger = get_logger(__name__)
@@ -43,6 +52,35 @@ AUTOCOMPLETE_LABELS: dict[str, list[str]] = {
     "solicitante": ["solicitante", "solicita", "solicitante:"],
     "autoriza": ["autoriza", "autoriza:", "autoriza por"],
 }
+
+
+def _renombrar_pdf_descargado(pdf: Path, numero: str, proveedor: str) -> Path:
+    """Renombra el PDF descargado usando número y proveedor."""
+
+    nombre_deseado = nombre_archivo_orden(numero, proveedor, pdf.suffix or ".pdf")
+    destino = pdf.with_name(nombre_deseado)
+    if destino == pdf:
+        return pdf
+
+    base, ext = os.path.splitext(nombre_deseado)
+    if destino.exists():
+        i = 1
+        while True:
+            candidato = pdf.with_name(f"{base} ({i}){ext}")
+            if not candidato.exists():
+                destino = candidato
+                break
+            i += 1
+
+    try:
+        pdf.rename(destino)
+        logger.info("Archivo %s renombrado a %s", pdf.name, destino.name)
+        return destino
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning(
+            "No se pudo renombrar '%s' a '%s': %s", pdf.name, destino.name, exc
+        )
+        return pdf
 
 
 def _normalizar_texto(texto: str) -> str:
@@ -777,9 +815,12 @@ def descargar_abastecimiento(
             time.sleep(0.2)
             numero, proveedor = _extraer_datos_orden(btn, idx)
 
-            ordenes.append(
-                {"numero": numero, "proveedor": proveedor, "categoria": "abastecimiento"}
-            )
+            orden = {
+                "numero": numero,
+                "proveedor": proveedor,
+                "categoria": "abastecimiento",
+            }
+            ordenes.append(orden)
             existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
             try:
                 btn.click()
@@ -788,6 +829,14 @@ def descargar_abastecimiento(
             try:
                 archivo_descargado = esperar_descarga_pdf(destino, existentes)
                 logger.info("OC %s descargada en %s", numero, archivo_descargado)
+                proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
+                if proveedor_pdf:
+                    orden["proveedor"] = proveedor_pdf
+                _renombrar_pdf_descargado(
+                    Path(archivo_descargado),
+                    str(numero),
+                    orden.get("proveedor", ""),
+                )
             except Exception as exc:
                 logger.error("No se pudo descargar la OC %s: %s", numero, exc)
             esperar_toast()

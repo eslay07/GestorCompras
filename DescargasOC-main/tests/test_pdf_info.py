@@ -26,3 +26,25 @@ def test_actualizar_proveedores_desde_pdfs(tmp_path, monkeypatch):
 
     assert actualizados == {"123456": "004465 - PROVEEDOR"}
     assert ordenes[0]["proveedor"] == "004465 - PROVEEDOR"
+
+
+def test_nombre_archivo_orden_formatea_y_respeta_extension():
+    modulo = importlib.import_module("descargas_oc.pdf_info")
+
+    nombre = modulo.nombre_archivo_orden("123456", "Proveedor / Test", "pdf")
+    assert nombre.startswith("123456 - Proveedor _ Test")
+    assert nombre.endswith(".pdf")
+
+    nombre_sin_datos = modulo.nombre_archivo_orden(None, None, None)
+    assert nombre_sin_datos == "archivo.pdf"
+
+
+def test_proveedor_desde_pdf_normaliza(monkeypatch):
+    modulo = importlib.import_module("descargas_oc.pdf_info")
+
+    monkeypatch.setattr(
+        modulo, "extraer_proveedor_desde_pdf", lambda ruta: "Nombre: 001 - TEST"
+    )
+
+    proveedor = modulo.proveedor_desde_pdf("dummy.pdf")
+    assert proveedor == "001 - TEST"
