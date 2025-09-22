@@ -24,12 +24,16 @@ try:  # permitir la ejecución como script
     from .mover_pdf import mover_oc
     from .reporter import enviar_reporte
     from .selenium_modulo import esperar_descarga_pdf
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
     from .logger import get_logger
+#=======
+#>>>>>>> master
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
     from reporter import enviar_reporte
     from selenium_modulo import esperar_descarga_pdf
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
     from logger import get_logger
 
 
@@ -397,6 +401,8 @@ def _valor_coincide(valor: str, variantes: list[str], consultas: list[str]) -> b
                 return True
 
     return False
+#=======
+#>>>>>>> master
 
 
 def descargar_abastecimiento(
@@ -722,6 +728,7 @@ def descargar_abastecimiento(
             "https://sites.telconet.ec/naf/compras/sso/check"
         )
         try:
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             WebDriverWait(driver, WAIT_TIMEOUT).until(
                 EC.presence_of_element_located(elements["usuario"])
             )
@@ -810,6 +817,24 @@ def descargar_abastecimiento(
         for idx in range(total_botones):
             botones = driver.find_elements(*elements["descargar_orden"])
             if idx >= len(botones):
+#=======
+            row = btn.find_element(By.XPATH, "./ancestor::tr")
+            celdas = row.find_elements(By.TAG_NAME, "td")
+            numero = celdas[0].text.strip() if celdas else str(idx)
+            proveedor = celdas[1].text.strip() if len(celdas) > 1 else ""
+        except Exception:
+            numero = str(idx)
+            proveedor = ""
+        existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
+        try:
+            btn.click()
+        except ElementClickInterceptedException:
+            driver.execute_script("arguments[0].click();", btn)
+        archivo_descargado = esperar_descarga_pdf(destino, existentes)
+        ordenes.append({"numero": numero, "proveedor": proveedor})
+        for _ in range(5):
+            if not driver.find_elements(*elements["toast"]):
+#>>>>>>> master
                 break
             btn = botones[idx]
             try:
@@ -842,9 +867,13 @@ def descargar_abastecimiento(
     finally:
         driver.quit()
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
     subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
     for err in errores_mov:
         logger.error("Mover OC: %s", err)
+#=======
+    subidos, faltantes, _errores_mov = mover_oc(cfg, ordenes)
+#>>>>>>> master
     enviar_reporte(
         subidos,
         faltantes,

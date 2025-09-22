@@ -293,6 +293,7 @@ class MainMenu(tk.Frame):
             option_win.destroy()
 
         def open_abastecimiento():
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             if _DESCARGAS_ROOT is None:
                 messagebox.showerror(
                     "Descargas OC",
@@ -311,6 +312,15 @@ class MainMenu(tk.Frame):
                     ),
                 )
                 return
+#=======
+            script = (
+                Path(__file__).resolve().parents[2]
+                / "DescargasOC-main"
+                / "descargas_oc"
+                / "ui_abastecimiento.py"
+            )
+            subprocess.Popen([sys.executable, str(script)])
+#>>>>>>> master
             option_win.destroy()
 
         option_win = tk.Toplevel(self.master)

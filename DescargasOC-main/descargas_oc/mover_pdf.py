@@ -23,6 +23,10 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
 MAX_NOMBRE = 180
 REINTENTOS = 5
 ESPERA_INICIAL = 0.3
@@ -41,7 +45,11 @@ def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
     if proveedor:
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
         prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
         base = f"{base} - {prov_clean}" if base else prov_clean
+#=======
+        base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+#>>>>>>> master
     base = re.sub(r"\s+", " ", base).strip()
     if not base:
         base = "archivo"
@@ -169,6 +177,25 @@ def _carpetas_origen(config: Config) -> list[Path]:
         if path not in rutas:
             rutas.append(path)
     return rutas
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#=======
+MAX_PROV_LEN = 50
+
+
+def sanitize_filename(nombre: str, max_len: int = MAX_PROV_LEN) -> str:
+    """Sanitize *nombre* to be safe for filesystem usage.
+
+    Replaces problematic characters and truncates the text to ``max_len``
+    to avoid errors such as ``File name too long``.
+    """
+    limpio = re.sub(r"[^\w\- ]", "_", nombre).strip()
+    limpio = re.sub(r"\s+", " ", limpio)
+    if len(limpio) > max_len:
+        limpio = limpio[:max_len].rstrip()
+    return limpio
+#>>>>>>> master
+#>>>>>>> master
 
 
 def mover_oc(config: Config, ordenes=None):
@@ -249,6 +276,32 @@ def mover_oc(config: Config, ordenes=None):
             prov = extraer_proveedor_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+# codex/fix-email-scanning-for-descarga-normal
+#=======
+        if prov:
+            prov_clean = sanitize_filename(prov)
+            nuevo_nombre = os.path.join(
+                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+            )
+            if ruta != nuevo_nombre:
+                try:
+                    os.rename(ruta, nuevo_nombre)
+                    ruta = nuevo_nombre
+                except Exception as e:
+                    logger.warning('No se pudo renombrar %s: %s', ruta, e)
+                    prov_clean = sanitize_filename(prov, max_len=20)
+                    nuevo_nombre = os.path.join(
+                        carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+                    )
+                    try:
+                        os.rename(ruta, nuevo_nombre)
+                        ruta = nuevo_nombre
+                    except Exception:
+                        pass
+#>>>>>>> master
+#>>>>>>> master
 
         tarea = None
         if es_bienes:

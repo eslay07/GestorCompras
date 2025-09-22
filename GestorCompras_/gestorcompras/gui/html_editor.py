@@ -434,21 +434,31 @@ class HtmlEditor(ttk.Frame):
             self.text.tag_add(tag, start, end)
         if self.current_font:
             font_tag = f"font_{self.current_font.replace(' ', '_')}"
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("font_", font_tag, start, end)
+#=======
+#>>>>>>> master
             self.text.tag_add(font_tag, start, end)
             self.text.tag_raise(font_tag)
         if self.current_size:
             size_tag = f"size_{self.current_size}"
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("size_", size_tag, start, end)
+#=======
+#>>>>>>> master
             self.text.tag_add(size_tag, start, end)
             self.text.tag_raise(size_tag)
         if self.current_color:
             color_tag = f"color_{self.current_color.lstrip('#')}"
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("color_", color_tag, start, end)
+#=======
+#>>>>>>> master
             self.text.tag_add(color_tag, start, end)
             self.text.tag_raise(color_tag)
         if getattr(self, "current_bg", None):
             bg_tag = f"bg_{self.current_bg.lstrip('#')}"
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("bg_", bg_tag, start, end)
             self.text.tag_add(bg_tag, start, end)
             self.text.tag_raise(bg_tag)
@@ -457,6 +467,10 @@ class HtmlEditor(ttk.Frame):
         for tag in self.text.tag_names(start):
             if tag.startswith(prefix) and tag != keep_tag:
                 self.text.tag_remove(tag, start, end)
+#=======
+            self.text.tag_add(bg_tag, start, end)
+            self.text.tag_raise(bg_tag)
+#>>>>>>> master
 
     def _handle_paste(self, event=None):
         try:
