@@ -31,6 +31,17 @@ fuente_entry = ("Segoe UI", 14)
 email_session = {}
 
 
+def _find_descargas_root() -> Path | None:
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "DescargasOC-main"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+_DESCARGAS_ROOT = _find_descargas_root()
+
+
 def center_window(win: tk.Tk | tk.Toplevel):
     win.update_idletasks()
     w = win.winfo_width()
@@ -271,16 +282,37 @@ class MainMenu(tk.Frame):
 
     def open_descargas_oc(self):
         def launch_normal():
-            script = (
-                Path(__file__).resolve().parents[2]
-                / "DescargasOC-main"
-                / "descargas_oc"
-                / "ui.py"
-            )
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui.py"
             subprocess.Popen([sys.executable, str(script)])
             option_win.destroy()
 
         def open_abastecimiento():
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui_abastecimiento.py"
+            try:
+                subprocess.Popen([sys.executable, str(script)])
+            except OSError as exc:
+                messagebox.showerror(
+                    "Error",
+                    (
+                        "No se pudo abrir el módulo de Abastecimiento. "
+                        f"Detalle: {exc}"
+                    ),
+                )
+                return
+#=======
             script = (
                 Path(__file__).resolve().parents[2]
                 / "DescargasOC-main"
@@ -288,6 +320,7 @@ class MainMenu(tk.Frame):
                 / "ui_abastecimiento.py"
             )
             subprocess.Popen([sys.executable, str(script)])
+#>>>>>>> master
             option_win.destroy()
 
         option_win = tk.Toplevel(self.master)

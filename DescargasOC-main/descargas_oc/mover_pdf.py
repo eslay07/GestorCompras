@@ -23,7 +23,10 @@ except ImportError:  # pragma: no cover
 
 logger = get_logger(__name__)
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
 #codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
 MAX_NOMBRE = 180
 REINTENTOS = 5
 ESPERA_INICIAL = 0.3
@@ -42,7 +45,11 @@ def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
     if proveedor:
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
         prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+        base = f"{base} - {prov_clean}" if base else prov_clean
+#=======
         base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+#>>>>>>> master
     base = re.sub(r"\s+", " ", base).strip()
     if not base:
         base = "archivo"
@@ -170,7 +177,9 @@ def _carpetas_origen(config: Config) -> list[Path]:
         if path not in rutas:
             rutas.append(path)
     return rutas
-=======
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#=======
 MAX_PROV_LEN = 50
 
 
@@ -185,6 +194,7 @@ def sanitize_filename(nombre: str, max_len: int = MAX_PROV_LEN) -> str:
     if len(limpio) > max_len:
         limpio = limpio[:max_len].rstrip()
     return limpio
+#>>>>>>> master
 #>>>>>>> master
 
 
@@ -266,6 +276,8 @@ def mover_oc(config: Config, ordenes=None):
             prov = extraer_proveedor_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
 # codex/fix-email-scanning-for-descarga-normal
 #=======
         if prov:
@@ -288,6 +300,7 @@ def mover_oc(config: Config, ordenes=None):
                         ruta = nuevo_nombre
                     except Exception:
                         pass
+#>>>>>>> master
 #>>>>>>> master
 
         tarea = None

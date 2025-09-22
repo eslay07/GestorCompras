@@ -332,7 +332,10 @@ def descargar_oc(
                 except ElementClickInterceptedException:
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
                 archivo = esperar_descarga_pdf(download_dir, existentes)
                 if not getattr(cfg, "compra_bienes", False):
                     prov_clean = None
@@ -348,6 +351,8 @@ def descargar_oc(
                         partes.append(prov_clean)
                     base_nombre = " - ".join(partes) if partes else None
                     archivo = _renombrar_descarga(archivo, base_nombre)
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
 #=======
                 antes = set(download_dir.glob("*.pdf"))
                 for _ in range(120):  # esperar hasta 60 s
@@ -372,6 +377,7 @@ def descargar_oc(
                             archivo = nuevo_nombre
                         except Exception:
                             pass
+#>>>>>>> master
 #>>>>>>> master
                 try:
                     cliente.upload_file(

@@ -106,6 +106,19 @@ def get_suppliers():
     conn.close()
     return rows
 
+
+def get_supplier(supplier_id):
+    """Obtiene un proveedor específico por su identificador."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, name, ruc, email, COALESCE(email_alt, '') FROM suppliers WHERE id=?",
+        (supplier_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return row
+
 def add_supplier(name, ruc, email, email_alt=None):
     """
     Agrega o actualiza un proveedor en la tabla.

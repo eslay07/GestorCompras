@@ -41,6 +41,22 @@ class Config:
             except (TypeError, ValueError):
                 return default
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+        def _parse_bool(value, default):
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in {"1", "true", "t", "yes", "si", "sí"}:
+                    return True
+                if lowered in {"0", "false", "f", "no"}:
+                    return False
+            if isinstance(value, (int, float)):
+                return bool(value)
+            return default
+
+#=======
+#>>>>>>> master
         self.data['pop_port'] = _parse_int(
             os.getenv('POP_PORT', self.data.get('pop_port', 995)), 995
         )
@@ -64,6 +80,22 @@ class Config:
             'SMTP_PASSWORD',
             self.data.get('smtp_password', self.data.get('password')),
         )
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+
+        headless_raw = os.getenv('HEADLESS', self.data.get('headless'))
+        headless_val = _parse_bool(headless_raw, False)
+        self.data['headless'] = headless_val
+
+        abas_headless_raw = os.getenv(
+            'ABASTECIMIENTO_HEADLESS',
+            self.data.get('abastecimiento_headless', headless_val),
+        )
+        self.data['abastecimiento_headless'] = _parse_bool(
+            abas_headless_raw,
+            headless_val,
+        )
+#=======
+#>>>>>>> master
         self.data.setdefault('max_threads', 5)
         self.data.setdefault('batch_size', 50)
 
@@ -95,6 +127,7 @@ class Config:
         self.data.setdefault('smtp_password', self.data.get('password'))
         self.data.setdefault('compra_bienes', False)
         self.data.setdefault('headless', False)
+        self.data.setdefault('abastecimiento_headless', self.data['headless'])
         self.data.setdefault(
             'abastecimiento_carpeta_descarga', self.data.get('carpeta_destino_local')
         )
@@ -103,6 +136,27 @@ class Config:
         )
         self.data.setdefault('abastecimiento_solicitantes', [])
         self.data.setdefault('abastecimiento_autorizadores', [])
+
+        def _normalize_list(key: str) -> None:
+            raw = self.data.get(key)
+            normalized: list[str] = []
+            if raw is None:
+                pass
+            elif isinstance(raw, str):
+                normalized = [part.strip() for part in raw.split(',') if part.strip()]
+            else:
+                try:
+                    iterable = list(raw)
+                except TypeError:
+                    iterable = [raw]
+                for item in iterable:
+                    text = str(item).strip()
+                    if text:
+                        normalized.append(text)
+            self.data[key] = normalized
+
+        _normalize_list('abastecimiento_solicitantes')
+        _normalize_list('abastecimiento_autorizadores')
         # persist values so configuration survives between executions
         self.save()
         return self

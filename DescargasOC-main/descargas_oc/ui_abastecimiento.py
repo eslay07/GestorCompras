@@ -5,11 +5,9 @@ from tkinter import messagebox
 from tkinter import ttk
 
 try:  # allow running as script
-    from .configurador import configurar_abastecimiento
     from .selenium_abastecimiento import descargar_abastecimiento
     from .config import Config
 except ImportError:  # pragma: no cover
-    from configurador import configurar_abastecimiento
     from selenium_abastecimiento import descargar_abastecimiento
     from config import Config
 
@@ -33,7 +31,9 @@ def ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):
 
     def tarea():
         try:
-            descargar_abastecimiento(fd, fh, sol, aut, headless=cfg.headless)
+            descargar_abastecimiento(
+                fd, fh, sol, aut, headless=cfg.abastecimiento_headless
+            )
             messagebox.showinfo("Finalizado", "Proceso completado")
         except Exception as exc:
             messagebox.showerror("Error", str(exc))
@@ -111,6 +111,8 @@ def main():
     )
     btn_ejecutar.grid(row=5, column=0, columnspan=2, pady=10)
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
     def abrir_config():
         configurar_abastecimiento()
         nuevo = Config()
@@ -126,6 +128,7 @@ def main():
     btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
     btn_cfg.grid(row=6, column=0, columnspan=2, pady=(0, 10))
 
+#>>>>>>> master
     def center_window(win):
         win.update_idletasks()
         w = win.winfo_width()

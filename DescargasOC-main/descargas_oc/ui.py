@@ -6,14 +6,12 @@ from datetime import datetime
 from tkinter import messagebox
 
 try:  # allow running as script
-    from .configurador import configurar
     from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from .selenium_modulo import descargar_oc
     from .reporter import enviar_reporte
     from .config import Config
     from .logger import get_logger
 except ImportError:  # pragma: no cover
-    from configurador import configurar
     from escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from selenium_modulo import descargar_oc
     from reporter import enviar_reporte
@@ -303,20 +301,6 @@ def main():
     btn_manual.pack(side=tk.LEFT, padx=5)
     btn_ejecutar = tk.Button(frame, text="Ejecutar descarga", command=ejecutar_manual, state=tk.DISABLED)
     btn_ejecutar.pack(side=tk.LEFT, padx=5)
-
-    def abrir_config():
-        configurar()
-        cfg.load()
-        var_bienes.set(bool(cfg.compra_bienes))
-        var_visible.set(not bool(cfg.headless))
-        try:
-            entry_interval.delete(0, tk.END)
-            entry_interval.insert(0, str(cfg.scan_interval))
-        except tk.TclError:
-            logger.error("Campo de intervalo no disponible", exc_info=True)
-
-    btn_config = tk.Button(frame, text="Configuración", command=abrir_config)
-    btn_config.pack(side=tk.LEFT, padx=5)
 
     var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
 

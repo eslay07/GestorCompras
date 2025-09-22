@@ -151,3 +151,75 @@ def test_enviar_reporte_retries_with_additional_usernames(monkeypatch):
     assert init_calls == [("smtp.telconet.ec", 587), ("smtp.telconet.ec", 587)]
     assert login_attempts == ["first", "second@domain.test"]
     assert len(sent_messages) == 1
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+
+
+def test_enviar_reporte_abastecimiento_incluye_categoria(monkeypatch):
+    pop_instance = DummyPOP("pop.telconet.ec", 995)
+
+    def fake_pop(host, port):
+        assert (host, port) == ("pop.telconet.ec", 995)
+        return pop_instance
+
+    monkeypatch.setattr(reporter.poplib, "POP3_SSL", fake_pop)
+
+    init_calls: list[tuple[str, int]] = []
+    login_calls: list[tuple[str, str]] = []
+    sent_messages = []
+
+    class DummySMTP:
+        def __init__(self, host, port):
+            init_calls.append((host, port))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return False
+
+        def ehlo(self):
+            return None
+
+        def starttls(self):
+            return None
+
+        def login(self, username, password):
+            login_calls.append((username, password))
+
+        def send_message(self, message):
+            sent_messages.append(message)
+
+    monkeypatch.setattr(reporter.smtplib, "SMTP", DummySMTP)
+    monkeypatch.setattr(
+        reporter.smtplib,
+        "SMTP_SSL",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("SSL fallback no esperado")),
+    )
+
+    cfg = _base_cfg()
+    ordenes = [
+        {"numero": "456", "proveedor": "Proveedor Uno", "categoria": "abastecimiento"}
+    ]
+
+    resultado = reporter.enviar_reporte(["456"], [], ordenes, cfg, categoria="abastecimiento")
+
+    assert resultado is True
+    assert init_calls == [("smtp.telconet.ec", 587)]
+    assert login_calls == [("smtpuser@example.com", "smtp-pass")]
+    assert pop_instance.quit_called is True
+    assert len(sent_messages) == 1
+
+    mensaje = sent_messages[0]
+    cuerpo_texto = mensaje.get_body(preferencelist=("plain",)).get_content()
+    cuerpo_html = mensaje.get_body(preferencelist=("html",)).get_content()
+
+    assert "Categoría: abastecimiento" in cuerpo_texto
+    assert "Categoría" in cuerpo_texto
+    assert "Proveedor Uno" in cuerpo_texto
+    assert "abastecimiento" in cuerpo_texto
+
+    assert "Categoría" in cuerpo_html
+    assert "Proveedor Uno" in cuerpo_html
+    assert "abastecimiento" in cuerpo_html
+#=======
+#>>>>>>> master
