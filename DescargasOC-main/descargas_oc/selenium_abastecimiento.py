@@ -105,6 +105,183 @@ def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
             return archivo
 
 
+_SCRIPT_BUSCAR_AUTOCOMPLETE = r"""
+const normalizar = (texto) => (texto || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const needle = normalizar(arguments[0] || '');
+if (!needle) {
+  return null;
+}
+
+const visibles = [];
+const campos = Array.from(document.querySelectorAll('mat-form-field, .mat-form-field'));
+for (const campo of campos) {
+  const label = normalizar(campo.innerText);
+  if (label && label.includes(needle)) {
+    const input = campo.querySelector('input[aria-autocomplete="list"]');
+    if (input && input.offsetParent !== null && !input.disabled) {
+      visibles.push(input);
+    }
+  }
+}
+
+if (!visibles.length) {
+  const inputs = Array.from(document.querySelectorAll('input[aria-autocomplete="list"]'));
+  for (const input of inputs) {
+    if (!input || input.offsetParent === null || input.disabled) {
+      continue;
+    }
+    const attrs = [
+      input.getAttribute('placeholder'),
+      input.getAttribute('aria-label'),
+      input.getAttribute('name'),
+      input.id
+    ].join(' ');
+    if (normalizar(attrs).includes(needle)) {
+      visibles.push(input);
+    }
+  }
+}
+
+return visibles.length ? visibles[0] : null;
+"""
+
+
+def _buscar_autocomplete_por_texto(driver, etiqueta: str):
+    """Localiza el input de autocompletado usando la etiqueta visible."""
+
+    etiqueta = etiqueta or ""
+
+    def _resolver(drv):
+        try:
+            elemento = drv.execute_script(_SCRIPT_BUSCAR_AUTOCOMPLETE, etiqueta)
+        except Exception:
+            return None
+        if not elemento:
+            return None
+        try:
+            if elemento.is_displayed() and elemento.is_enabled():
+                return elemento
+        except StaleElementReferenceException:
+            return None
+        return None
+
+    try:
+        return WebDriverWait(driver, WAIT_TIMEOUT).until(_resolver)
+    except TimeoutException as exc:  # pragma: no cover - entorno con cambios de UI
+        raise RuntimeError(f"No se pudo localizar '{etiqueta}'") from exc
+
+
+def _extraer_variantes(texto: str) -> list[str]:
+    if not texto:
+        return []
+    variantes = [
+        parte.strip()
+        for parte in re.split(r"[;|,\n]+", texto)
+        if parte.strip()
+    ]
+    if not variantes:
+        variantes = [texto.strip()]
+    return variantes
+
+
+def _construir_consultas(variantes: list[str], original: str) -> list[str]:
+    consultas: list[str] = []
+    for variante in variantes:
+        match = re.search(r"\d+", variante)
+        if match:
+            consultas.append(match.group(0))
+    consultas.extend(variantes)
+    if original:
+        consultas.append(original)
+    vistas: set[str] = set()
+    ordenadas: list[str] = []
+    for consulta in consultas:
+        limpia = consulta.strip()
+        if limpia and limpia not in vistas:
+            vistas.add(limpia)
+            ordenadas.append(limpia)
+    return ordenadas
+
+
+def _esperar_opciones_visibles(driver, timeout: int = 5) -> list:
+    opciones_locator = (By.CSS_SELECTOR, "mat-option")
+
+    try:
+        return WebDriverWait(driver, timeout).until(
+            lambda d: [
+                opcion
+                for opcion in d.find_elements(*opciones_locator)
+                if opcion.is_displayed()
+            ]
+        )
+    except TimeoutException:
+        return []
+
+
+def _esperar_cierre_opciones(driver, timeout: int = 5):
+    opciones_locator = (By.CSS_SELECTOR, "mat-option")
+
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda d: not any(
+                opcion.is_displayed() for opcion in d.find_elements(*opciones_locator)
+            )
+        )
+    except TimeoutException:
+        pass
+
+
+def _seleccionar_opcion_visible(opciones, variantes: list[str]) -> bool:
+    if not opciones:
+        return False
+
+    variantes_norm = [_normalizar_texto(variante) for variante in variantes if variante]
+
+    for variante_norm in variantes_norm:
+        if not variante_norm:
+            continue
+        for opcion in list(opciones):
+            try:
+                texto_opcion = opcion.text
+            except StaleElementReferenceException:
+                continue
+            if _normalizar_texto(texto_opcion).find(variante_norm) != -1:
+                opcion.click()
+                return True
+    return False
+
+
+def _valor_coincide(valor: str, variantes: list[str], consultas: list[str]) -> bool:
+    valor_norm = _normalizar_texto(valor)
+    if not valor_norm:
+        return False
+
+    for variante in variantes:
+        variante_norm = _normalizar_texto(variante)
+        if variante_norm and variante_norm in valor_norm:
+            return True
+
+    for consulta in consultas:
+        consulta_norm = _normalizar_texto(consulta)
+        if consulta_norm and consulta_norm in valor_norm:
+            return True
+
+    valor_digitos = re.sub(r"\D", "", valor_norm)
+    if valor_digitos:
+        for consulta in consultas:
+            consulta_digitos = re.sub(r"\D", "", _normalizar_texto(consulta))
+            if consulta_digitos and valor_digitos.startswith(consulta_digitos):
+                return True
+
+    return False
+
+
 def descargar_abastecimiento(
     fecha_desde: str,
     fecha_hasta: str,
@@ -160,33 +337,6 @@ def descargar_abastecimiento(
         except Exception:  # pragma: no cover - depende de Chrome
             pass
 
-        etiqueta_normalizada = (
-            "translate(normalize-space(.), 'ÁÉÍÓÚÜABCDEFGHIJKLMNOPQRSTUVWXYZ', "
-            "'áéíóúüabcdefghijklmnopqrstuvwxyz')"
-        )
-
-        # Localizadores flexibles que toleran cambios en las etiquetas visibles
-        campo_por_etiqueta = (
-            "//mat-form-field[.//*[contains({normalizador}, '{{texto}}')]]"
-            "//input[@aria-autocomplete='list']"
-        )
-        campo_por_etiqueta_div = (
-            "//div[contains(@class,'mat-form-field')][.//*[contains({normalizador}, '{{texto}}')]]"
-            "//input[@aria-autocomplete='list']"
-        )
-
-        def _selector_autocomplete(busqueda: str) -> tuple[str, str]:
-            consulta = busqueda.lower()
-            xpath = (
-                "(" +
-                " | ".join(
-                    patron.format(normalizador=etiqueta_normalizada).replace("{texto}", consulta)
-                    for patron in (campo_por_etiqueta, campo_por_etiqueta_div)
-                ) +
-                ")[1]"
-            )
-            return (By.XPATH, xpath)
-
         elements = {
             "usuario": (By.ID, "username"),
             "contrasena": (By.ID, "password"),
@@ -223,8 +373,6 @@ def descargar_abastecimiento(
             ),
             "fecha_desde": (By.ID, "mat-input-2"),
             "fecha_hasta": (By.ID, "mat-input-3"),
-            "solicitante": _selector_autocomplete("solicitante"),
-            "autoriza": _selector_autocomplete("autoriza"),
             "btnbuscarorden": (
                 By.XPATH,
                 "//button[.//span[text()='Aplicar filtros']]",
@@ -270,66 +418,106 @@ def descargar_abastecimiento(
             except TimeoutException:
                 pass
 
-        def seleccionar_combo(nombre: str, locator, texto: str):
+        def seleccionar_autocomplete(nombre: str, etiqueta: str | tuple[str, ...], texto: str):
             if not texto:
                 return
 
-            variantes = [
-                parte.strip()
-                for parte in re.split(r"[;|,\n]+", texto)
-                if parte.strip()
-            ]
-            if not variantes:
-                variantes = [texto.strip()]
+            variantes = _extraer_variantes(texto)
+            consultas = _construir_consultas(variantes, texto)
+            if not consultas:
+                consultas = variantes or [texto]
 
-            consulta = ""
-            for variante in variantes:
-                match = re.search(r"\d+", variante)
-                if match:
-                    consulta = match.group(0)
-                    break
-            if not consulta:
-                consulta = variantes[0]
-
-            campo = limpiar_y_escribir(nombre, locator, consulta)
-            opciones_locator = (
-                By.XPATH,
-                "//div[contains(@class,'cdk-overlay-pane')]//mat-option[not(@aria-disabled='true')]",
-            )
-            opciones_visibles = False
-            try:
-                WebDriverWait(driver, 5).until(
-                    EC.visibility_of_element_located(opciones_locator)
-                )
-                opciones_visibles = True
-            except TimeoutException:
-                logger.warning(
-                    "%s: no se encontraron opciones visibles para '%s'", nombre, consulta
-                )
-
-            campo.send_keys(Keys.ENTER)
-
-            if opciones_visibles:
-                try:
-                    WebDriverWait(driver, 5).until(
-                        EC.invisibility_of_element_located(opciones_locator)
+            for consulta in consultas:
+                for intento in range(3):
+                    etiquetas_busqueda = (
+                        (etiqueta,) if isinstance(etiqueta, str) else etiqueta
                     )
-                except TimeoutException:
-                    campo.send_keys(Keys.ARROW_DOWN)
-                    campo.send_keys(Keys.ENTER)
+                    campo = None
+                    ultima_exc: RuntimeError | None = None
+                    for etiqueta_actual in etiquetas_busqueda:
+                        try:
+                            campo = _buscar_autocomplete_por_texto(
+                                driver, etiqueta_actual
+                            )
+                            if campo:
+                                break
+                        except RuntimeError as exc:
+                            ultima_exc = exc
 
-            valor_final = (campo.get_attribute("value") or "").strip()
-            if not valor_final:
-                campo.send_keys(Keys.ARROW_DOWN)
-                campo.send_keys(Keys.ENTER)
-                valor_final = (campo.get_attribute("value") or "").strip()
+                    if campo is None:
+                        if ultima_exc is not None:
+                            logger.error("%s: %s", nombre, ultima_exc)
+                        else:
+                            logger.error(
+                                "%s: no se encontró un campo visible para %s",
+                                nombre,
+                                etiqueta,
+                            )
+                        return
 
-            if not valor_final and consulta:
-                campo.send_keys(consulta)
-                campo.send_keys(Keys.ENTER)
+                    try:
+                        driver.execute_script(
+                            "arguments[0].scrollIntoView({block: 'center'});", campo
+                        )
+                    except Exception:
+                        pass
 
-            campo.send_keys(Keys.TAB)
-            time.sleep(0.2)
+                    try:
+                        WebDriverWait(driver, 5).until(
+                            lambda d: campo.is_displayed() and campo.is_enabled()
+                        )
+                    except StaleElementReferenceException:
+                        time.sleep(0.2)
+                        continue
+
+                    try:
+                        campo.click()
+                    except Exception:
+                        driver.execute_script("arguments[0].focus();", campo)
+
+                    campo.send_keys(Keys.CONTROL, "a")
+                    campo.send_keys(Keys.DELETE)
+                    time.sleep(0.1)
+
+                    if consulta:
+                        campo.send_keys(consulta)
+                    else:
+                        campo.send_keys(Keys.ARROW_DOWN)
+
+                    time.sleep(0.2)
+                    opciones = _esperar_opciones_visibles(driver)
+
+                    if opciones:
+                        if not _seleccionar_opcion_visible(opciones, variantes):
+                            try:
+                                opciones[0].click()
+                            except Exception:
+                                campo.send_keys(Keys.ENTER)
+                        _esperar_cierre_opciones(driver)
+                    else:
+                        campo.send_keys(Keys.ENTER)
+
+                    time.sleep(0.2)
+                    try:
+                        valor_final = (campo.get_attribute("value") or "").strip()
+                    except StaleElementReferenceException:
+                        time.sleep(0.2)
+                        continue
+
+                    if _valor_coincide(valor_final, variantes, consultas):
+                        campo.send_keys(Keys.TAB)
+                        time.sleep(0.1)
+                        return
+
+                    # Intentar una vez más con la misma consulta si el elemento se volvió inestable
+                    if intento < 2:
+                        time.sleep(0.2)
+                        continue
+                # probar con la siguiente consulta disponible
+
+            logger.warning(
+                "%s: no se pudo confirmar la selección para '%s'", nombre, texto
+            )
 
         driver.get(
             "https://cas.telconet.ec/cas/login?service="
@@ -387,8 +575,16 @@ def descargar_abastecimiento(
             Keys.TAB
         )
 
-        seleccionar_combo("solicitante", elements["solicitante"], solicitante)
-        seleccionar_combo("autoriza", elements["autoriza"], autoriza)
+        seleccionar_autocomplete(
+            "solicitante",
+            ("solicitante", "solicita", "solicitante:"),
+            solicitante,
+        )
+        seleccionar_autocomplete(
+            "autoriza",
+            ("autoriza", "autoriza:", "autoriza por", "autoriza por:"),
+            autoriza,
+        )
 
         hacer_click("btnbuscarorden", elements["btnbuscarorden"])
         esperar_toast()
