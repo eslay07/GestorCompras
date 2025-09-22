@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import (
     ElementClickInterceptedException,
+    ElementNotInteractableException,
     TimeoutException,
     StaleElementReferenceException,
 )
@@ -388,11 +389,11 @@ def descargar_abastecimiento(
             pass
 
         elements = {
-            "usuario": (By.ID, "username"),
-            "contrasena": (By.ID, "password"),
+            "usuario": (By.CSS_SELECTOR, "input#username"),
+            "contrasena": (By.CSS_SELECTOR, "input#password"),
             "iniciar_sesion": (
                 By.CSS_SELECTOR,
-                "button[type='submit'], input[type='submit']",
+                "input.btn.btn-block.btn-submit[name='submit']",
             ),
             "menu_hamburguesa": (By.CSS_SELECTOR, "button.simple-sidenav__toggle"),
             "lista_accesos": (
@@ -435,13 +436,17 @@ def descargar_abastecimiento(
         }
 
         def esperar_clickable(nombre: str, locator, timeout: int = WAIT_TIMEOUT):
-            try:
-                return WebDriverWait(driver, timeout).until(
-                    EC.element_to_be_clickable(locator)
-                )
-            except TimeoutException as exc:
-                logger.error("No se encontró el elemento '%s'", nombre)
-                raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
+            ultimo_error: TimeoutException | None = None
+            for condicion in (EC.element_to_be_clickable, EC.presence_of_element_located):
+                try:
+                    condicion_eval = condicion(locator)
+                    elemento = WebDriverWait(driver, timeout).until(condicion_eval)
+                    if elemento:
+                        return elemento
+                except TimeoutException as exc:
+                    ultimo_error = exc
+            logger.error("No se encontró el elemento '%s'", nombre)
+            raise RuntimeError(f"No se pudo localizar '{nombre}'") from ultimo_error
 
         def limpiar_y_escribir(nombre: str, locator, texto: str):
             elemento = esperar_clickable(nombre, locator)
@@ -456,7 +461,7 @@ def descargar_abastecimiento(
             elemento = esperar_clickable(nombre, locator)
             try:
                 elemento.click()
-            except ElementClickInterceptedException:
+            except (ElementClickInterceptedException, ElementNotInteractableException):
                 driver.execute_script("arguments[0].click();", elemento)
             return elemento
 
@@ -627,54 +632,11 @@ def descargar_abastecimiento(
                 campo.send_keys(Keys.ENTER)
             except Exception as exc:
                 logger.debug("%s: no se pudo enviar Enter directamente: %s", nombre, exc)
-                try:
-                    campo = refrescar_campo()
-                    campo.send_keys(Keys.ENTER)
-                except Exception:
-                    pass
 
             _esperar_cierre_opciones(driver)
             time.sleep(0.2)
 
-            def valor_seleccionado() -> str:
-                actual = refrescar_campo()
-                try:
-                    return (actual.get_attribute("value") or "").strip()
-                except StaleElementReferenceException:
-                    return ""
-
-            seleccionado = False
-            try:
-                WebDriverWait(driver, 5).until(lambda _d: bool(valor_seleccionado()))
-                seleccionado = True
-            except TimeoutException:
-                seleccionado = False
-
-            if not seleccionado:
-                try:
-                    campo = refrescar_campo()
-                    campo.send_keys(Keys.ARROW_DOWN)
-                    time.sleep(0.5)
-                    campo = refrescar_campo()
-                    campo.send_keys(Keys.ENTER)
-                    _esperar_cierre_opciones(driver)
-                    WebDriverWait(driver, 3).until(
-                        lambda _d: bool(valor_seleccionado())
-                    )
-                    seleccionado = True
-                except Exception:
-                    seleccionado = False
-
-            if seleccionado:
-                logger.info(
-                    "%s seleccionado: %s",
-                    nombre.capitalize(),
-                    valor_seleccionado(),
-                )
-            else:
-                logger.warning(
-                    "%s: no se confirmó la selección para '%s'", nombre, texto
-                )
+            logger.info("%s ingresado: %s", nombre.capitalize(), texto)
 
             if avanzar_tab:
                 try:
@@ -687,6 +649,13 @@ def descargar_abastecimiento(
             "https://cas.telconet.ec/cas/login?service="
             "https://sites.telconet.ec/naf/compras/sso/check"
         )
+        try:
+            WebDriverWait(driver, WAIT_TIMEOUT).until(
+                EC.presence_of_element_located(elements["usuario"])
+            )
+        except TimeoutException as exc:
+            logger.error("No se encontró el elemento '%s'", "usuario")
+            raise RuntimeError("No se pudo localizar 'usuario'") from exc
         limpiar_y_escribir("usuario", elements["usuario"], user)
         limpiar_y_escribir("contrasena", elements["contrasena"], pwd)
         try:
