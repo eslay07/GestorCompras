@@ -410,114 +410,114 @@ def descargar_abastecimiento(
                 driver.execute_script("arguments[0].click();", elemento)
             return elemento
 
+        def _hay_toast_visible() -> bool:
+            for elemento in driver.find_elements(*elements["toast"]):
+                try:
+                    if elemento.is_displayed():
+                        return True
+                except StaleElementReferenceException:
+                    continue
+            return False
+
         def esperar_toast():
             try:
-                WebDriverWait(driver, 10).until(
-                    lambda d: not d.find_elements(*elements["toast"])
-                )
+                # Esperar a que aparezca un toast (si corresponde)
+                WebDriverWait(driver, 3).until(lambda _d: _hay_toast_visible())
             except TimeoutException:
                 pass
 
-        def seleccionar_autocomplete(nombre: str, etiqueta: str | tuple[str, ...], texto: str):
+            try:
+                WebDriverWait(driver, 10).until(lambda _d: not _hay_toast_visible())
+            except TimeoutException:
+                pass
+
+            time.sleep(0.5)
+
+        def _autocompletes_visibles():
+            campos = []
+            for campo in driver.find_elements(By.CSS_SELECTOR, "input[aria-autocomplete='list']"):
+                try:
+                    if campo.is_displayed() and campo.is_enabled():
+                        campos.append(campo)
+                except StaleElementReferenceException:
+                    continue
+            return campos
+
+        def obtener_autocomplete(nombre: str, indice: int):
+            def _resolver(_driver):
+                visibles = _autocompletes_visibles()
+                if len(visibles) > indice:
+                    return visibles[indice]
+                return False
+
+            try:
+                return WebDriverWait(driver, WAIT_TIMEOUT).until(_resolver)
+            except TimeoutException as exc:
+                logger.error("%s: no se encontró un campo visible", nombre)
+                raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
+
+        def completar_autocomplete(nombre: str, indice: int, texto: str):
             if not texto:
+                logger.warning("%s sin valor configurado; se omite", nombre.capitalize())
                 return
 
-            variantes = _extraer_variantes(texto)
-            consultas = _construir_consultas(variantes, texto)
-            if not consultas:
-                consultas = variantes or [texto]
+            campo = obtener_autocomplete(nombre, indice)
 
-            for consulta in consultas:
-                for intento in range(3):
-                    etiquetas_busqueda = (
-                        (etiqueta,) if isinstance(etiqueta, str) else etiqueta
-                    )
-                    campo = None
-                    ultima_exc: RuntimeError | None = None
-                    for etiqueta_actual in etiquetas_busqueda:
-                        try:
-                            campo = _buscar_autocomplete_por_texto(
-                                driver, etiqueta_actual
-                            )
-                            if campo:
-                                break
-                        except RuntimeError as exc:
-                            ultima_exc = exc
+            try:
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", campo)
+            except Exception:
+                pass
 
-                    if campo is None:
-                        if ultima_exc is not None:
-                            logger.error("%s: %s", nombre, ultima_exc)
-                        else:
-                            logger.error(
-                                "%s: no se encontró un campo visible para %s",
-                                nombre,
-                                etiqueta,
-                            )
-                        return
+            try:
+                campo.click()
+            except Exception:
+                driver.execute_script("arguments[0].focus();", campo)
 
-                    try:
-                        driver.execute_script(
-                            "arguments[0].scrollIntoView({block: 'center'});", campo
-                        )
-                    except Exception:
-                        pass
+            campo.send_keys(Keys.CONTROL, "a")
+            campo.send_keys(Keys.DELETE)
+            time.sleep(0.1)
 
-                    try:
-                        WebDriverWait(driver, 5).until(
-                            lambda d: campo.is_displayed() and campo.is_enabled()
-                        )
-                    except StaleElementReferenceException:
-                        time.sleep(0.2)
-                        continue
+            campo.send_keys(texto)
+            time.sleep(0.3)
 
-                    try:
-                        campo.click()
-                    except Exception:
-                        driver.execute_script("arguments[0].focus();", campo)
+            opciones = _esperar_opciones_visibles(driver)
+            if opciones:
+                try:
+                    opciones[0].click()
+                except Exception:
+                    campo.send_keys(Keys.ENTER)
+                _esperar_cierre_opciones(driver)
+            else:
+                campo.send_keys(Keys.ENTER)
 
-                    campo.send_keys(Keys.CONTROL, "a")
-                    campo.send_keys(Keys.DELETE)
-                    time.sleep(0.1)
+            time.sleep(0.2)
 
-                    if consulta:
-                        campo.send_keys(consulta)
-                    else:
-                        campo.send_keys(Keys.ARROW_DOWN)
+            def valor_seleccionado() -> str:
+                visibles = _autocompletes_visibles()
+                if len(visibles) <= indice:
+                    return ""
+                try:
+                    return (visibles[indice].get_attribute("value") or "").strip()
+                except StaleElementReferenceException:
+                    return ""
 
-                    time.sleep(0.2)
-                    opciones = _esperar_opciones_visibles(driver)
+            try:
+                WebDriverWait(driver, 5).until(lambda _d: bool(valor_seleccionado()))
+            except TimeoutException:
+                logger.warning(
+                    "%s: no se confirmó la selección para '%s'", nombre, texto
+                )
+            else:
+                logger.info(
+                    "%s seleccionado: %s",
+                    nombre.capitalize(),
+                    valor_seleccionado(),
+                )
 
-                    if opciones:
-                        if not _seleccionar_opcion_visible(opciones, variantes):
-                            try:
-                                opciones[0].click()
-                            except Exception:
-                                campo.send_keys(Keys.ENTER)
-                        _esperar_cierre_opciones(driver)
-                    else:
-                        campo.send_keys(Keys.ENTER)
-
-                    time.sleep(0.2)
-                    try:
-                        valor_final = (campo.get_attribute("value") or "").strip()
-                    except StaleElementReferenceException:
-                        time.sleep(0.2)
-                        continue
-
-                    if _valor_coincide(valor_final, variantes, consultas):
-                        campo.send_keys(Keys.TAB)
-                        time.sleep(0.1)
-                        return
-
-                    # Intentar una vez más con la misma consulta si el elemento se volvió inestable
-                    if intento < 2:
-                        time.sleep(0.2)
-                        continue
-                # probar con la siguiente consulta disponible
-
-            logger.warning(
-                "%s: no se pudo confirmar la selección para '%s'", nombre, texto
-            )
+            try:
+                campo.send_keys(Keys.TAB)
+            except StaleElementReferenceException:
+                pass
 
         driver.get(
             "https://cas.telconet.ec/cas/login?service="
@@ -575,16 +575,8 @@ def descargar_abastecimiento(
             Keys.TAB
         )
 
-        seleccionar_autocomplete(
-            "solicitante",
-            ("solicitante", "solicita", "solicitante:"),
-            solicitante,
-        )
-        seleccionar_autocomplete(
-            "autoriza",
-            ("autoriza", "autoriza:", "autoriza por", "autoriza por:"),
-            autoriza,
-        )
+        completar_autocomplete("solicitante", 0, solicitante)
+        completar_autocomplete("autoriza", 1, autoriza)
 
         hacer_click("btnbuscarorden", elements["btnbuscarorden"])
         esperar_toast()
@@ -634,6 +626,7 @@ def descargar_abastecimiento(
             except Exception as exc:
                 logger.error("No se pudo descargar la OC %s: %s", numero, exc)
             esperar_toast()
+            time.sleep(0.5)
 
         logger.info("Total de órdenes detectadas: %s", len(ordenes))
     finally:
