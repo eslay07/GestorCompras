@@ -182,18 +182,83 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
     assert any(name.endswith("(1).pdf") for name in nombres)
 
 
-def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
-    cfg, origen, _destino = _config(tmp_path, bienes=False)
+def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path):
+    cfg, origen, destino = _config(tmp_path, bienes=False)
 
     pdf = origen / "ORDEN # 123456.pdf"
     pdf.write_bytes(b"%PDF-1.4")
 
-    monkeypatch.setattr(mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: None)
-
     subidos, faltantes, errores = mover_pdf.mover_oc(
-        cfg, [{"numero": "123456", "proveedor": None}]
+        cfg, [{"numero": "123456", "proveedor": "Proveedor X"}]
     )
 
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
+    archivos = list(destino.glob("*.pdf"))
+    assert len(archivos) == 1
+    assert archivos[0].name == "123456 - proveedor_x.pdf"
+    assert not any(origen.glob("*.pdf"))
+
+
+def test_mover_oc_no_bienes_renombra_en_origen_si_no_hay_destino(tmp_path):
+    cfg, origen, destino = _config(tmp_path, bienes=False)
+    cfg.carpeta_analizar = str(origen)
+
+    pdf = origen / "ORDEN # 654321.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "654321", "proveedor": "Proveedor Y"}]
+    )
+
+    assert subidos == ["654321"]
+    assert faltantes == []
+    assert errores == []
+    archivos = list(origen.glob("*.pdf"))
+    assert len(archivos) == 1
+    assert archivos[0].name == "654321 - proveedor_y.pdf"
+
+
+def test_mover_oc_no_bienes_registra_error_si_no_puede_mover(tmp_path, monkeypatch):
+    cfg, origen, destino = _config(tmp_path, bienes=False)
+
+    pdf = origen / "ORDEN # 999999.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(
+        mover_pdf,
+        "_mover_archivo",
+        lambda ruta, dest, nombre: (None, "fallo de movimiento"),
+    )
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "999999", "proveedor": "Proveedor Z"}]
+    )
+
+    assert subidos == []
+    assert faltantes == ["999999"]
+    assert any("fallo de movimiento" in err for err in errores)
+    assert (origen / "ORDEN # 999999.pdf").exists()
+
+
+def test_mover_oc_no_bienes_registra_error_si_no_puede_renombrar(tmp_path, monkeypatch):
+    cfg, origen, _destino = _config(tmp_path, bienes=False)
+    cfg.carpeta_analizar = str(origen)
+
+    pdf = origen / "ORDEN # 777777.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    def failing_rename(self, target):  # pragma: no cover - comportamiento forzado
+        raise PermissionError("bloqueado")
+
+    monkeypatch.setattr(mover_pdf.Path, "rename", failing_rename)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "777777", "proveedor": "Proveedor W"}]
+    )
+
+    assert subidos == []
+    assert faltantes == ["777777"]
+    assert any("renombrar" in err for err in errores)
+    assert any(p.name == "ORDEN # 777777.pdf" for p in origen.iterdir())

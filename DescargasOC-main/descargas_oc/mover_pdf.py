@@ -182,7 +182,6 @@ def mover_oc(config: Config, ordenes=None):
         archivos.extend(p for p in carpeta.glob("*.pdf"))
 
     encontrados: dict[str, Path] = {}
-    procesados_en_origen: set[Path] = set()
 
     # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for ruta_path in archivos:
@@ -289,15 +288,31 @@ def mover_oc(config: Config, ordenes=None):
 
             logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
         else:
-            procesados_en_origen.add(ruta_path)
+            destino_dir = None
+            try:
+                destino_dir = Path(carpeta_destino) if carpeta_destino else None
+            except (TypeError, ValueError):  # pragma: no cover - rutas inválidas
+                destino_dir = None
+
+            if destino_dir and destino_dir != ruta_path.parent:
+                destino_dir.mkdir(parents=True, exist_ok=True)
+                destino_path, error_mov = _mover_archivo(
+                    ruta_path, destino_dir, nombre_deseado
+                )
+                if destino_path is None:
+                    errores.append(f"OC {numero}: {error_mov}")
+                    faltantes.append(numero)
+                    continue
+                ruta_path = destino_path
+            else:
+                ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+                if ruta_path is None:
+                    errores.append(f"OC {numero}: {error_nombre}")
+                    faltantes.append(numero)
+                    continue
+
+            logger.info("%s listo en %s", ruta_path.name, ruta_path.parent)
 
         subidos.append(numero)
-
-    # limpiar carpeta de origen después del proceso
-    for ruta in procesados_en_origen:
-        try:
-            ruta.unlink()
-        except Exception:
-            pass
     return subidos, faltantes, errores
 
