@@ -262,3 +262,41 @@ def test_mover_oc_no_bienes_registra_error_si_no_puede_renombrar(tmp_path, monke
     assert faltantes == ["777777"]
     assert any("renombrar" in err for err in errores)
     assert any(p.name == "ORDEN # 777777.pdf" for p in origen.iterdir())
+
+
+def test_mover_oc_abastecimiento_permanecen_en_descarga(tmp_path):
+    origen_normal = tmp_path / "descargas_normales"
+    origen_abas = tmp_path / "descargas_abastecimiento"
+    destino_general = tmp_path / "destino_general"
+
+    origen_normal.mkdir()
+    origen_abas.mkdir()
+    destino_general.mkdir()
+
+    cfg = SimpleNamespace(
+        compra_bienes=False,
+        carpeta_destino_local=str(origen_normal),
+        carpeta_analizar=str(destino_general),
+        abastecimiento_carpeta_descarga=str(origen_abas),
+    )
+
+    pdf = origen_abas / "ORDEN # 555555.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    orden = {
+        "numero": "555555",
+        "proveedor": "Proveedor Uno",
+        "categoria": "abastecimiento",
+    }
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(cfg, [orden])
+
+    assert subidos == ["555555"]
+    assert faltantes == []
+    assert errores == []
+
+    archivos_abas = list(origen_abas.glob("*.pdf"))
+    assert len(archivos_abas) == 1
+    assert archivos_abas[0].name.startswith("555555 - proveedor_uno")
+    # no se debe mover a la carpeta general
+    assert not list(destino_general.glob("*.pdf"))

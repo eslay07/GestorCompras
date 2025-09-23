@@ -3,6 +3,7 @@ import re
 import shutil
 import time
 from pathlib import Path
+from typing import Any, Mapping
 
 import PyPDF2
 
@@ -152,6 +153,37 @@ def _carpetas_origen(config: Config) -> list[Path]:
     return rutas
 
 
+def _destino_no_bienes(
+    config: Config, orden: Mapping[str, Any] | None
+) -> Path | None:
+    """Determina la carpeta destino apropiada para una OC que no es de bienes."""
+
+    categoria = ""
+    if isinstance(orden, Mapping):
+        valor = orden.get("categoria")
+        if valor:
+            categoria = str(valor).strip().lower()
+
+    rutas_preferidas: list[Any] = []
+    if categoria == "abastecimiento":
+        rutas_preferidas.extend(
+            [
+                getattr(config, "abastecimiento_carpeta_descarga", None),
+                getattr(config, "carpeta_destino_local", None),
+            ]
+        )
+    rutas_preferidas.append(getattr(config, "carpeta_analizar", None))
+
+    for ruta in rutas_preferidas:
+        if not ruta:
+            continue
+        try:
+            return Path(ruta)
+        except (TypeError, ValueError, OSError):  # pragma: no cover - ruta inválida
+            continue
+    return None
+
+
 def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
 
@@ -172,7 +204,7 @@ def mover_oc(config: Config, ordenes=None):
         errores.append("Carpetas de descarga no configuradas")
         return [], numeros_oc, errores
 
-    carpeta_destino = config.carpeta_analizar
+    carpeta_destino_bienes = getattr(config, "carpeta_analizar", None)
 
     archivos: list[Path] = []
     for carpeta in carpetas_origen:
@@ -243,10 +275,12 @@ def mover_oc(config: Config, ordenes=None):
         origen_descarga = ruta_path.parent
 
         if es_bienes:
+            base_bienes = carpeta_destino_bienes or str(ruta_path.parent)
+
             if tarea:
                 # buscar carpeta existente que comience con el número de tarea
                 destino = None
-                for root, dirs, _files in os.walk(carpeta_destino):
+                for root, dirs, _files in os.walk(base_bienes):
                     for d in dirs:
                         if d.startswith(tarea):
                             destino = os.path.join(root, d)
@@ -254,10 +288,10 @@ def mover_oc(config: Config, ordenes=None):
                     if destino:
                         break
                 if not destino:
-                    destino = os.path.join(carpeta_destino, tarea)
+                    destino = os.path.join(base_bienes, tarea)
                     os.makedirs(destino, exist_ok=True)
             else:
-                destino = os.path.join(carpeta_destino, "ordenes sin tarea")
+                destino = os.path.join(base_bienes, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
             destino_dir = Path(destino)
             destino_path, error_mov = _mover_archivo(ruta_path, destino_dir, nombre_original)
@@ -288,11 +322,7 @@ def mover_oc(config: Config, ordenes=None):
 
             logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
         else:
-            destino_dir = None
-            try:
-                destino_dir = Path(carpeta_destino) if carpeta_destino else None
-            except (TypeError, ValueError):  # pragma: no cover - rutas inválidas
-                destino_dir = None
+            destino_dir = _destino_no_bienes(config, indice_ordenes.get(numero))
 
             if destino_dir and destino_dir != ruta_path.parent:
                 destino_dir.mkdir(parents=True, exist_ok=True)
