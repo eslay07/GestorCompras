@@ -293,6 +293,37 @@ class MainMenu(tk.Frame):
             option_win.destroy()
 
         def open_abastecimiento():
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui_abastecimiento.py"
+            try:
+                subprocess.Popen([sys.executable, str(script)])
+            except OSError as exc:
+                messagebox.showerror(
+                    "Error",
+                    (
+                        "No se pudo abrir el módulo de Abastecimiento. "
+                        f"Detalle: {exc}"
+                    ),
+                )
+                return
+#=======
+            script = (
+                Path(__file__).resolve().parents[2]
+                / "DescargasOC-main"
+                / "descargas_oc"
+                / "ui_abastecimiento.py"
+            )
+            subprocess.Popen([sys.executable, str(script)])
+#>>>>>>> master
+            option_win.destroy()
+
+        def open_abastecimiento():
             if _DESCARGAS_ROOT is None:
                 messagebox.showerror(
                     "Descargas OC",

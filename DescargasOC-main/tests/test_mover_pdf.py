@@ -152,6 +152,7 @@ def test_mover_oc_bienes_mueve_a_carpeta_existente(tmp_path, monkeypatch):
     archivos = list(carpeta_tarea.glob("*.pdf"))
     assert len(archivos) == 1
     assert "proveedor_x" in archivos[0].stem
+    assert "Proveedor X" in archivos[0].stem
     assert not any(origen.glob("*.pdf"))
 
 
@@ -164,6 +165,11 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
     carpeta_tarea = destino / "140144463"
     carpeta_tarea.mkdir()
     conflicto = carpeta_tarea / "123456 - proveedor_x.pdf"
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+    conflicto = carpeta_tarea / "123456 - Proveedor X.pdf"
+#=======
+    conflicto = carpeta_tarea / "123456 - NOMBRE Proveedor X.pdf"
+#>>>>>>> master
     conflicto.write_text("existing")
 
     pdf = origen / "123456.pdf"
@@ -300,3 +306,18 @@ def test_mover_oc_abastecimiento_permanecen_en_descarga(tmp_path):
     assert archivos_abas[0].name.startswith("555555 - proveedor_uno")
     # no se debe mover a la carpeta general
     assert not list(destino_general.glob("*.pdf"))
+def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
+    cfg, origen, _destino = _config(tmp_path, bienes=False)
+
+    pdf = origen / "ORDEN # 123456.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+
+    monkeypatch.setattr(mover_pdf, "extraer_proveedor_desde_pdf", lambda ruta: None)
+
+    subidos, faltantes, errores = mover_pdf.mover_oc(
+        cfg, [{"numero": "123456", "proveedor": None}]
+    )
+
+    assert subidos == ["123456"]
+    assert faltantes == []
+    assert errores == []

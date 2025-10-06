@@ -41,6 +41,7 @@ class Config:
             except (TypeError, ValueError):
                 return default
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
         def _parse_bool(value, default):
             if isinstance(value, bool):
                 return value
@@ -54,6 +55,8 @@ class Config:
                 return bool(value)
             return default
 
+#=======
+#>>>>>>> master
         self.data['pop_port'] = _parse_int(
             os.getenv('POP_PORT', self.data.get('pop_port', 995)), 995
         )
@@ -77,6 +80,7 @@ class Config:
             'SMTP_PASSWORD',
             self.data.get('smtp_password', self.data.get('password')),
         )
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
 
         headless_raw = os.getenv('HEADLESS', self.data.get('headless'))
         headless_val = _parse_bool(headless_raw, False)
@@ -90,6 +94,8 @@ class Config:
             abas_headless_raw,
             headless_val,
         )
+#=======
+#>>>>>>> master
         self.data.setdefault('max_threads', 5)
         self.data.setdefault('batch_size', 50)
 

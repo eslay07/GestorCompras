@@ -32,6 +32,10 @@ try:  # permitir la ejecución como script
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+    from .logger import get_logger
+#=======
+#>>>>>>> master
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
@@ -44,6 +48,8 @@ except ImportError:  # pragma: no cover
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+    from logger import get_logger
 
 
 logger = get_logger(__name__)
@@ -145,6 +151,50 @@ def _normalizar_fecha(valor: str) -> str:
     return texto
 
 
+def _nombre_archivo(numero: str | None, proveedor: str | None) -> str | None:
+    """Genera el nombre base del PDF utilizando número y proveedor."""
+
+    numero_limpio = (numero or "").strip()
+    proveedor_limpio = re.sub(r"\s+", " ", (proveedor or "").strip())
+    proveedor_limpio = re.sub(r"[^\w\- ]", "_", proveedor_limpio).strip()
+
+    partes: list[str] = []
+    if numero_limpio:
+        partes.append(numero_limpio)
+    if proveedor_limpio:
+        partes.append(proveedor_limpio)
+    if not partes:
+        return None
+    base = " - ".join(partes)
+    return base[:180].rstrip(" .-_") or None
+
+
+def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
+    """Renombra la descarga reciente asegurando nombres únicos."""
+
+    if not base:
+        return archivo
+    base = base.strip()
+    if not base:
+        return archivo
+
+    destino = archivo.with_name(f"{base}.pdf")
+    intento = 0
+    while True:
+        candidato = destino if intento == 0 else archivo.with_name(f"{base} ({intento}).pdf")
+        if archivo == candidato:
+            return archivo
+        try:
+            archivo.rename(candidato)
+            return candidato
+        except FileExistsError:
+            intento += 1
+            continue
+        except OSError as exc:  # pragma: no cover - entorno Windows
+            logger.warning("No se pudo renombrar %s a %s: %s", archivo, candidato, exc)
+            return archivo
+
+
 def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
     """Obtiene el número y proveedor asociados a un botón de descarga."""
 
@@ -184,6 +234,8 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
         for parte in fila_texto.splitlines():
             _agregar(parte)
 
+    if fila is not None:
+        textos: list[str] = []
         for locator in (".//mat-cell", ".//td"):
             try:
                 celdas = fila.find_elements(By.XPATH, locator)
@@ -218,6 +270,39 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
             numero = numero_candidato
             numero_texto = texto
             break
+                    texto = celda.text.strip()
+                except Exception:
+                    texto = ""
+                if texto:
+                    textos.append(texto)
+            if textos:
+                break
+
+        if textos:
+            numero = textos[0]
+            if len(textos) > 1:
+                proveedor = textos[1]
+
+        if not numero or not proveedor:
+            try:
+                spans = fila.find_elements(By.XPATH, ".//span")
+            except Exception:
+                spans = []
+            span_textos: list[str] = []
+            for span in spans:
+                try:
+                    texto = span.text.strip()
+                except Exception:
+                    texto = ""
+                if texto:
+                    span_textos.append(texto)
+            if not numero and span_textos:
+                numero = span_textos[0]
+            if not proveedor and span_textos:
+                for texto in span_textos:
+                    if texto != numero:
+                        proveedor = texto
+                        break
 
     if not numero:
         numero = str(indice + 1)
@@ -458,6 +543,8 @@ def _valor_coincide(valor: str, variantes: list[str], consultas: list[str]) -> b
                 return True
 
     return False
+#=======
+#>>>>>>> master
 
 
 def descargar_abastecimiento(
@@ -639,6 +726,31 @@ def descargar_abastecimiento(
                 return False
 
             return WebDriverWait(driver, WAIT_TIMEOUT).until(_resolver)
+
+        def obtener_autocomplete(nombre: str, indice: int):
+            etiquetas = AUTOCOMPLETE_LABELS.get(nombre, [])
+            for etiqueta in etiquetas:
+                try:
+                    campo = _buscar_autocomplete_por_texto(driver, etiqueta)
+                    if campo:
+                        return campo, ("label", etiqueta)
+                except RuntimeError:
+                    continue
+
+            try:
+                campo = _obtener_por_indice(indice)
+                return campo, ("index", indice)
+            except TimeoutException as exc:
+                logger.error("%s: no se encontró un campo visible", nombre)
+                raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
+
+        def _es_campo_autocomplete(elemento) -> bool:
+            try:
+                if elemento.tag_name.lower() != "input":
+                    return False
+            except Exception:
+                return False
+            try:
 
         def obtener_autocomplete(nombre: str, indice: int):
             etiquetas = AUTOCOMPLETE_LABELS.get(nombre, [])
@@ -871,6 +983,176 @@ def descargar_abastecimiento(
         for idx in range(total_botones):
             botones = driver.find_elements(*elements["descargar_orden"])
             if idx >= len(botones):
+
+                if origen_info[0] == "label":
+                    try:
+                        nuevo = _buscar_autocomplete_por_texto(driver, origen_info[1])
+                        if nuevo:
+                            campo = nuevo
+                            return campo
+                    except RuntimeError:
+                        pass
+
+                try:
+                    nuevo = _obtener_por_indice(indice)
+                    campo = nuevo
+                    origen_info = ("index", indice)
+                except Exception:
+                    pass
+                return campo
+
+            campo = refrescar_campo()
+
+            try:
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", campo)
+            except Exception:
+                pass
+
+            campo = refrescar_campo()
+            try:
+                campo.click()
+            except Exception:
+                driver.execute_script("arguments[0].focus();", campo)
+
+            campo = refrescar_campo()
+            campo.send_keys(Keys.CONTROL, "a")
+            campo.send_keys(Keys.DELETE)
+            time.sleep(0.1)
+
+            campo = refrescar_campo()
+            campo.send_keys(texto)
+            time.sleep(2)
+
+            campo = refrescar_campo()
+            try:
+                campo.send_keys(Keys.ENTER)
+            except Exception as exc:
+                logger.debug("%s: no se pudo enviar Enter directamente: %s", nombre, exc)
+
+            _esperar_cierre_opciones(driver)
+            time.sleep(0.2)
+
+            logger.info("%s ingresado: %s", nombre.capitalize(), texto)
+
+            if avanzar_tab:
+                try:
+                    campo = refrescar_campo()
+                    campo.send_keys(Keys.TAB)
+                except StaleElementReferenceException:
+                    pass
+
+        driver.get(
+            "https://cas.telconet.ec/cas/login?service="
+            "https://sites.telconet.ec/naf/compras/sso/check"
+        )
+        try:
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+            WebDriverWait(driver, WAIT_TIMEOUT).until(
+                EC.presence_of_element_located(elements["usuario"])
+            )
+        except TimeoutException as exc:
+            logger.error("No se encontró el elemento '%s'", "usuario")
+            raise RuntimeError("No se pudo localizar 'usuario'") from exc
+        limpiar_y_escribir("usuario", elements["usuario"], user)
+        limpiar_y_escribir("contrasena", elements["contrasena"], pwd)
+        try:
+            hacer_click("iniciar_sesion", elements["iniciar_sesion"])
+        except RuntimeError:
+            try:
+                campo_pwd = esperar_clickable("contrasena", elements["contrasena"])
+                campo_pwd.send_keys(Keys.RETURN)
+            except RuntimeError:
+                try:
+                    driver.execute_script(
+                        "const f=document.querySelector('form'); if(f) f.submit();"
+                    )
+                except Exception:
+                    raise
+
+        time.sleep(2)
+        for _ in range(3):
+            try:
+                driver.switch_to.window(driver.window_handles[-1])
+            except Exception:
+                pass
+            if driver.find_elements(*elements["lista_accesos"]):
+                break
+            try:
+                menu = driver.find_elements(*elements["menu_hamburguesa"])
+                if menu:
+                    menu[0].click()
+            except Exception:
+                pass
+            time.sleep(2)
+        else:
+            raise RuntimeError("No se pudo localizar 'lista_accesos'")
+
+        hacer_click("lista_accesos", elements["lista_accesos"])
+        hacer_click("seleccion_compania", elements["seleccion_compania"])
+        limpiar_y_escribir("lista_companias", elements["lista_companias"], "TELCONET")
+        hacer_click("telconet_sa", elements["telconet_sa"])
+        hacer_click("boton_elegir", elements["boton_elegir"])
+        hacer_click("companias_boton_ok", elements["companias_boton_ok"])
+        hacer_click("lista_consultas", elements["lista_consultas"])
+        hacer_click("consulta_ordenes", elements["consulta_ordenes"])
+
+        fecha_desde_fmt = _normalizar_fecha(fecha_desde)
+        fecha_hasta_fmt = _normalizar_fecha(fecha_hasta)
+        campo_fecha_desde = limpiar_y_escribir(
+            "fecha_desde", elements["fecha_desde"], fecha_desde_fmt
+        )
+        campo_fecha_desde.send_keys(Keys.TAB)
+
+        campo_fecha_hasta = limpiar_y_escribir(
+            "fecha_hasta", elements["fecha_hasta"], fecha_hasta_fmt
+        )
+        campo_fecha_hasta.send_keys(Keys.TAB)
+        _enviar_tabs(1)
+
+        completar_autocomplete(
+            "solicitante", 0, solicitante, usar_activo=True, avanzar_tab=False
+        )
+        _enviar_tabs(1)
+
+        completar_autocomplete(
+            "autoriza", 1, autoriza, usar_activo=True, avanzar_tab=False
+        )
+
+        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+        esperar_toast()
+
+        try:
+            WebDriverWait(driver, 20).until(
+                lambda d: d.find_elements(*elements["descargar_orden"]) or not d.find_elements(*elements["toast"])
+            )
+        except TimeoutException:
+            logger.info("No se encontraron órdenes para los filtros proporcionados.")
+            total_botones = 0
+        else:
+            total_botones = len(driver.find_elements(*elements["descargar_orden"]))
+
+        ordenes: list[dict[str, str]] = []
+        for idx in range(total_botones):
+            botones = driver.find_elements(*elements["descargar_orden"])
+            if idx >= len(botones):
+#=======
+            row = btn.find_element(By.XPATH, "./ancestor::tr")
+            celdas = row.find_elements(By.TAG_NAME, "td")
+            numero = celdas[0].text.strip() if celdas else str(idx)
+            proveedor = celdas[1].text.strip() if len(celdas) > 1 else ""
+        except Exception:
+            numero = str(idx)
+            proveedor = ""
+        existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
+        try:
+            btn.click()
+        except ElementClickInterceptedException:
+            driver.execute_script("arguments[0].click();", btn)
+        archivo_descargado = esperar_descarga_pdf(destino, existentes)
+        ordenes.append({"numero": numero, "proveedor": proveedor})
+        for _ in range(5):
+            if not driver.find_elements(*elements["toast"]):
+#>>>>>>> master
                 break
             btn = botones[idx]
             try:
@@ -886,6 +1168,9 @@ def descargar_abastecimiento(
                 "categoria": "abastecimiento",
             }
             ordenes.append(orden)
+            ordenes.append(
+                {"numero": numero, "proveedor": proveedor, "categoria": "abastecimiento"}
+            )
             existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
             try:
                 btn.click()
@@ -907,6 +1192,10 @@ def descargar_abastecimiento(
                     str(numero),
                     orden.get("proveedor", ""),
                 )
+                base_nombre = _nombre_archivo(numero, proveedor)
+                if base_nombre:
+                    archivo_descargado = _renombrar_descarga(archivo_descargado, base_nombre)
+                logger.info("OC %s descargada en %s", numero, archivo_descargado)
             except Exception as exc:
                 logger.error("No se pudo descargar la OC %s: %s", numero, exc)
             esperar_toast()
@@ -922,6 +1211,13 @@ def descargar_abastecimiento(
     subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
     for err in errores_mov:
         logger.error("Mover OC: %s", err)
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+    for err in errores_mov:
+        logger.error("Mover OC: %s", err)
+#=======
+    subidos, faltantes, _errores_mov = mover_oc(cfg, ordenes)
+#>>>>>>> master
     enviar_reporte(
         subidos,
         faltantes,

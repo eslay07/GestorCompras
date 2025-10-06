@@ -151,6 +151,7 @@ def test_enviar_reporte_retries_with_additional_usernames(monkeypatch):
     assert init_calls == [("smtp.telconet.ec", 587), ("smtp.telconet.ec", 587)]
     assert login_attempts == ["first", "second@domain.test"]
     assert len(sent_messages) == 1
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
 
 
 def test_enviar_reporte_abastecimiento_incluye_categoria(monkeypatch):
@@ -220,3 +221,5 @@ def test_enviar_reporte_abastecimiento_incluye_categoria(monkeypatch):
     assert "Categoría" in cuerpo_html
     assert "Proveedor Uno" in cuerpo_html
     assert "abastecimiento" in cuerpo_html
+#=======
+#>>>>>>> master

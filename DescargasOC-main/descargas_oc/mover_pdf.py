@@ -183,6 +183,180 @@ def _destino_no_bienes(
             continue
     return None
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
+MAX_NOMBRE = 180
+REINTENTOS = 5
+ESPERA_INICIAL = 0.3
+
+
+def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
+    if not nombre or not numero:
+        return False
+    patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
+    return re.search(patron, nombre) is not None
+
+
+def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
+    numero = (numero or "").strip()
+    base = numero
+    if proveedor:
+        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+        base = f"{base} - {prov_clean}" if base else prov_clean
+#=======
+        base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
+#>>>>>>> master
+    base = re.sub(r"\s+", " ", base).strip()
+    if not base:
+        base = "archivo"
+    if len(base) > MAX_NOMBRE:
+        base = base[:MAX_NOMBRE].rstrip(" .-_")
+        if not base:
+            base = "archivo"
+    if not ext.startswith("."):
+        ext = f".{ext}" if ext else ".pdf"
+    return f"{base}{ext}"
+
+
+def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
+    destino_dir.mkdir(parents=True, exist_ok=True)
+    destino = destino_dir / nombre
+    if not destino.exists():
+        return destino
+    base, ext = os.path.splitext(nombre)
+    i = 1
+    while True:
+        candidato = destino_dir / f"{base} ({i}){ext}"
+        if not candidato.exists():
+            return candidato
+        i += 1
+
+
+def _asegurar_nombre(ruta_path: Path, nombre_deseado: str) -> tuple[Path | None, str | None]:
+    if ruta_path.name == nombre_deseado:
+        return ruta_path, None
+    ultimo_error: Exception | None = None
+    destino_final: Path | None = None
+    for intento in range(REINTENTOS):
+        destino = _resolver_conflicto(ruta_path.parent, nombre_deseado)
+        destino_final = destino
+        try:
+            ruta_path.rename(destino)
+            return destino, None
+        except PermissionError as exc:
+            ultimo_error = exc
+        except OSError as exc:
+            ultimo_error = exc
+            break
+        if intento < REINTENTOS - 1:
+            time.sleep(ESPERA_INICIAL * (intento + 1))
+    if ultimo_error:
+        logger.warning(
+            "No se pudo renombrar '%s' como '%s': %s",
+            ruta_path,
+            destino_final or (ruta_path.parent / nombre_deseado),
+            ultimo_error,
+        )
+        mensaje = (
+            f"No se pudo renombrar '{ruta_path.name}' a "
+            f"'{(destino_final or Path(nombre_deseado)).name}': {ultimo_error}"
+        )
+    else:
+        mensaje = (
+            f"No se pudo renombrar '{ruta_path.name}' a '{nombre_deseado}'"
+        )
+    return None, mensaje
+
+
+def _mover_archivo(
+    ruta_path: Path, destino_dir: Path, nombre_final: str
+) -> tuple[Path | None, str | None]:
+    ultimo_error: Exception | None = None
+    destino_final: Path | None = None
+    for intento in range(REINTENTOS):
+        destino = _resolver_conflicto(destino_dir, nombre_final)
+        destino_final = destino
+        try:
+            resultado = Path(shutil.move(str(ruta_path), destino))
+            return resultado, None
+        except PermissionError as exc:
+            ultimo_error = exc
+        except OSError as exc:
+            ultimo_error = exc
+        if intento < REINTENTOS - 1:
+            time.sleep(ESPERA_INICIAL * (intento + 1))
+
+    if ruta_path.exists():
+        destino_final = _resolver_conflicto(destino_dir, nombre_final)
+        try:
+            shutil.copy2(str(ruta_path), str(destino_final))
+            try:
+                ruta_path.unlink()
+            except Exception as exc:  # pragma: no cover - best effort cleanup
+                logger.warning(
+                    "No se pudo eliminar '%s' tras copiarlo a '%s': %s",
+                    ruta_path,
+                    destino_final,
+                    exc,
+                )
+            return destino_final, None
+        except Exception as exc:
+            ultimo_error = exc
+
+    if ultimo_error:
+        logger.warning(
+            "No se pudo mover '%s' a '%s': %s",
+            ruta_path,
+            destino_final.parent if destino_final else destino_dir,
+            ultimo_error,
+        )
+        return (
+            None,
+            f"No se pudo mover '{ruta_path.name}' a "
+            f"'{destino_final or destino_dir}': {ultimo_error}",
+        )
+    return None, f"No se pudo mover '{ruta_path.name}' a '{destino_dir}'"
+
+
+def _carpetas_origen(config: Config) -> list[Path]:
+    """Obtiene las carpetas de descarga configuradas sin duplicados."""
+
+    rutas: list[Path] = []
+    for attr in ("carpeta_destino_local", "abastecimiento_carpeta_descarga"):
+        valor = getattr(config, attr, None)
+        if not valor:
+            continue
+        try:
+            path = Path(valor)
+        except (TypeError, ValueError, OSError):  # pragma: no cover - rutas inválidas
+            continue
+        if path not in rutas:
+            rutas.append(path)
+    return rutas
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#=======
+MAX_PROV_LEN = 50
+
+
+def sanitize_filename(nombre: str, max_len: int = MAX_PROV_LEN) -> str:
+    """Sanitize *nombre* to be safe for filesystem usage.
+
+    Replaces problematic characters and truncates the text to ``max_len``
+    to avoid errors such as ``File name too long``.
+    """
+    limpio = re.sub(r"[^\w\- ]", "_", nombre).strip()
+    limpio = re.sub(r"\s+", " ", limpio)
+    if len(limpio) > max_len:
+        limpio = limpio[:max_len].rstrip()
+    return limpio
+#>>>>>>> master
+#>>>>>>> master
+
 
 def mover_oc(config: Config, ordenes=None):
     """Renombra y mueve los PDF de las órdenes descargadas.
@@ -205,6 +379,7 @@ def mover_oc(config: Config, ordenes=None):
         return [], numeros_oc, errores
 
     carpeta_destino_bienes = getattr(config, "carpeta_analizar", None)
+    carpeta_destino = config.carpeta_analizar
 
     archivos: list[Path] = []
     for carpeta in carpetas_origen:
@@ -214,6 +389,7 @@ def mover_oc(config: Config, ordenes=None):
         archivos.extend(p for p in carpeta.glob("*.pdf"))
 
     encontrados: dict[str, Path] = {}
+    procesados_en_origen: set[Path] = set()
 
     # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for ruta_path in archivos:
@@ -261,6 +437,32 @@ def mover_oc(config: Config, ordenes=None):
             prov = extraer_proveedor_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None and prov:
                 indice_ordenes[numero]["proveedor"] = prov
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+# codex/fix-email-scanning-for-descarga-normal
+#=======
+        if prov:
+            prov_clean = sanitize_filename(prov)
+            nuevo_nombre = os.path.join(
+                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+            )
+            if ruta != nuevo_nombre:
+                try:
+                    os.rename(ruta, nuevo_nombre)
+                    ruta = nuevo_nombre
+                except Exception as e:
+                    logger.warning('No se pudo renombrar %s: %s', ruta, e)
+                    prov_clean = sanitize_filename(prov, max_len=20)
+                    nuevo_nombre = os.path.join(
+                        carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+                    )
+                    try:
+                        os.rename(ruta, nuevo_nombre)
+                        ruta = nuevo_nombre
+                    except Exception:
+                        pass
+#>>>>>>> master
+#>>>>>>> master
 
         tarea = None
         if es_bienes:
@@ -271,6 +473,7 @@ def mover_oc(config: Config, ordenes=None):
 
         ext = ruta_path.suffix or ".pdf"
         nombre_deseado = nombre_archivo_orden(numero, prov, ext)
+        nombre_deseado = _nombre_destino(numero, prov, ext)
         nombre_original = ruta_path.name
         origen_descarga = ruta_path.parent
 
@@ -322,6 +525,33 @@ def mover_oc(config: Config, ordenes=None):
 
             logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
         else:
+            ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+            if ruta_path is None:
+                errores.append(f"OC {numero}: {error_nombre}")
+                faltantes.append(numero)
+                continue
+
+            procesados_en_origen.add(ruta_path)
+
+            ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
+            if ruta_path is None:
+                errores.append(f"OC {numero}: {error_nombre}")
+                faltantes.append(numero)
+                if origen_descarga is not None:
+                    try:
+                        regreso = _resolver_conflicto(origen_descarga, nombre_original)
+                        shutil.move(str(destino_path), regreso)
+                    except Exception as exc:  # pragma: no cover - best effort recovery
+                        logger.warning(
+                            "No se pudo regresar '%s' a '%s' tras fallo de renombre: %s",
+                            destino_path,
+                            origen_descarga,
+                            exc,
+                        )
+                continue
+
+            logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
+        else:
             destino_dir = _destino_no_bienes(config, indice_ordenes.get(numero))
 
             if destino_dir and destino_dir != ruta_path.parent:
@@ -344,5 +574,11 @@ def mover_oc(config: Config, ordenes=None):
             logger.info("%s listo en %s", ruta_path.name, ruta_path.parent)
 
         subidos.append(numero)
+    # limpiar carpeta de origen después del proceso
+    for ruta in procesados_en_origen:
+        try:
+            ruta.unlink()
+        except Exception:
+            pass
     return subidos, faltantes, errores
 

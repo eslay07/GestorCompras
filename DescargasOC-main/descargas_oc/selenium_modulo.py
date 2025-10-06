@@ -24,14 +24,55 @@ except ImportError:  # pragma: no cover
 
 try:  # allow running as script
     from .config import Config
-    from .mover_pdf import mover_oc
+    from .mover_pdf import mover_oc, sanitize_filename
     from .organizador_bienes import organizar as organizar_bienes
     from .pdf_info import actualizar_proveedores_desde_pdfs
 except ImportError:  # pragma: no cover
     from config import Config
-    from mover_pdf import mover_oc
+    from mover_pdf import mover_oc, sanitize_filename
     from organizador_bienes import organizar as organizar_bienes
     from pdf_info import actualizar_proveedores_desde_pdfs
+
+
+def esperar_descarga_pdf(
+    directory: Path,
+    existentes: dict[Path, float],
+    timeout: float = 60.0,
+    intervalo: float = 0.5,
+) -> Path:
+    """Espera a que aparezca un PDF nuevo o actualizado en ``directory``."""
+
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        time.sleep(intervalo)
+        candidatos: list[tuple[float, Path]] = []
+        for pdf in directory.glob("*.pdf"):
+            try:
+                mtime = pdf.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            anterior = existentes.get(pdf)
+            if anterior is None or mtime > anterior:
+                candidatos.append((mtime, pdf))
+        if not candidatos:
+            continue
+        candidatos.sort()
+        candidato = candidatos[-1][1]
+        crdownload = candidato.with_suffix(candidato.suffix + ".crdownload")
+        if crdownload.exists():
+            continue
+        try:
+            size = candidato.stat().st_size
+        except FileNotFoundError:
+            continue
+        time.sleep(min(intervalo / 2, 0.5))
+        try:
+            if candidato.stat().st_size != size:
+                continue
+        except FileNotFoundError:
+            continue
+        return candidato
+    raise RuntimeError("No se descargó archivo")
 
 
 def esperar_descarga_pdf(
@@ -102,6 +143,25 @@ def descargar_oc(
     cfg = Config()
     download_dir = Path(cfg.carpeta_destino_local or Path.home() / "Documentos")
     download_dir.mkdir(parents=True, exist_ok=True)
+
+    def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
+        if not base:
+            return archivo
+        destino = download_dir / f"{base}.pdf"
+        if archivo == destino:
+            return archivo
+        intento = 0
+        while True:
+            candidato = destino if intento == 0 else download_dir / f"{base} ({intento}).pdf"
+            try:
+                archivo.rename(candidato)
+                return candidato
+            except FileExistsError:
+                intento += 1
+                continue
+            except OSError:
+                break
+        return archivo
 
     user = username if username is not None else cfg.usuario
     if user:
@@ -316,6 +376,53 @@ def descargar_oc(
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
                 archivo = esperar_descarga_pdf(download_dir, existentes)
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
+                archivo = esperar_descarga_pdf(download_dir, existentes)
+                if not getattr(cfg, "compra_bienes", False):
+                    prov_clean = None
+                    if proveedor:
+                        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+                        if not prov_clean:
+                            prov_clean = None
+                    partes: list[str] = []
+                    if numero:
+                        partes.append(str(numero))
+                    if prov_clean:
+                        partes.append(prov_clean)
+                    base_nombre = " - ".join(partes) if partes else None
+                    archivo = _renombrar_descarga(archivo, base_nombre)
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#=======
+                antes = set(download_dir.glob("*.pdf"))
+                for _ in range(120):  # esperar hasta 60 s
+                    time.sleep(0.5)
+                    nuevos = set(download_dir.glob("*.pdf")) - antes
+                    if nuevos:
+                        archivo = nuevos.pop()
+                        break
+                else:
+                    raise RuntimeError("No se descargó archivo")
+                if not getattr(cfg, "compra_bienes", False) and proveedor:
+                    prov_clean = sanitize_filename(proveedor)
+                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    try:
+                        archivo.rename(nuevo_nombre)
+                        archivo = nuevo_nombre
+                    except Exception:
+                        prov_clean = sanitize_filename(proveedor, max_len=20)
+                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                        try:
+                            archivo.rename(nuevo_nombre)
+                            archivo = nuevo_nombre
+                        except Exception:
+                            pass
+#>>>>>>> master
+#>>>>>>> master
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder
