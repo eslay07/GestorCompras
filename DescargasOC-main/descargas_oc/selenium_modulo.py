@@ -26,10 +26,53 @@ try:  # allow running as script
     from .config import Config
     from .mover_pdf import mover_oc, sanitize_filename
     from .organizador_bienes import organizar as organizar_bienes
+    from .pdf_info import actualizar_proveedores_desde_pdfs
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc, sanitize_filename
     from organizador_bienes import organizar as organizar_bienes
+    from pdf_info import actualizar_proveedores_desde_pdfs
+
+
+def esperar_descarga_pdf(
+    directory: Path,
+    existentes: dict[Path, float],
+    timeout: float = 60.0,
+    intervalo: float = 0.5,
+) -> Path:
+    """Espera a que aparezca un PDF nuevo o actualizado en ``directory``."""
+
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        time.sleep(intervalo)
+        candidatos: list[tuple[float, Path]] = []
+        for pdf in directory.glob("*.pdf"):
+            try:
+                mtime = pdf.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            anterior = existentes.get(pdf)
+            if anterior is None or mtime > anterior:
+                candidatos.append((mtime, pdf))
+        if not candidatos:
+            continue
+        candidatos.sort()
+        candidato = candidatos[-1][1]
+        crdownload = candidato.with_suffix(candidato.suffix + ".crdownload")
+        if crdownload.exists():
+            continue
+        try:
+            size = candidato.stat().st_size
+        except FileNotFoundError:
+            continue
+        time.sleep(min(intervalo / 2, 0.5))
+        try:
+            if candidato.stat().st_size != size:
+                continue
+        except FileNotFoundError:
+            continue
+        return candidato
+    raise RuntimeError("No se descargó archivo")
 
 
 def esperar_descarga_pdf(
@@ -332,6 +375,7 @@ def descargar_oc(
                 except ElementClickInterceptedException:
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
+                archivo = esperar_descarga_pdf(download_dir, existentes)
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
 #=======
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal
@@ -389,6 +433,9 @@ def descargar_oc(
                 errores.append(f"OC {numero}: {exc}")
     finally:
         driver.quit()
+
+    if ordenes:
+        actualizar_proveedores_desde_pdfs(ordenes, download_dir)
 
     numeros = [oc.get("numero") for oc in ordenes]
     subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)

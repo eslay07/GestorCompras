@@ -434,6 +434,7 @@ class HtmlEditor(ttk.Frame):
             self.text.tag_add(tag, start, end)
         if self.current_font:
             font_tag = f"font_{self.current_font.replace(' ', '_')}"
+            self._remove_conflicting_tags("font_", font_tag, start, end)
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("font_", font_tag, start, end)
 #=======
@@ -442,6 +443,7 @@ class HtmlEditor(ttk.Frame):
             self.text.tag_raise(font_tag)
         if self.current_size:
             size_tag = f"size_{self.current_size}"
+            self._remove_conflicting_tags("size_", size_tag, start, end)
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("size_", size_tag, start, end)
 #=======
@@ -450,6 +452,7 @@ class HtmlEditor(ttk.Frame):
             self.text.tag_raise(size_tag)
         if self.current_color:
             color_tag = f"color_{self.current_color.lstrip('#')}"
+            self._remove_conflicting_tags("color_", color_tag, start, end)
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
             self._remove_conflicting_tags("color_", color_tag, start, end)
 #=======

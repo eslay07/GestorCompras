@@ -323,6 +323,27 @@ class MainMenu(tk.Frame):
 #>>>>>>> master
             option_win.destroy()
 
+        def open_abastecimiento():
+            if _DESCARGAS_ROOT is None:
+                messagebox.showerror(
+                    "Descargas OC",
+                    "No se encontró la carpeta 'DescargasOC-main'.",
+                )
+                return
+            script = _DESCARGAS_ROOT / "descargas_oc" / "ui_abastecimiento.py"
+            try:
+                subprocess.Popen([sys.executable, str(script)])
+            except OSError as exc:
+                messagebox.showerror(
+                    "Error",
+                    (
+                        "No se pudo abrir el módulo de Abastecimiento. "
+                        f"Detalle: {exc}"
+                    ),
+                )
+                return
+            option_win.destroy()
+
         option_win = tk.Toplevel(self.master)
         option_win.title("Descargas OC")
         option_win.transient(self.master)
