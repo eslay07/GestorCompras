@@ -166,7 +166,9 @@ def _nombre_archivo(numero: str | None, proveedor: str | None) -> str | None:
     if not partes:
         return None
     base = " - ".join(partes)
-    return base[:180].rstrip(" .-_") or None
+    base = base[:180].rstrip(" .-_") or ""
+    base = base.upper()
+    return base or None
 
 
 def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
@@ -177,11 +179,12 @@ def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
     base = base.strip()
     if not base:
         return archivo
+    base = base.upper()
 
-    destino = archivo.with_name(f"{base}.pdf")
+    destino = archivo.with_name(f"{base}.PDF")
     intento = 0
     while True:
-        candidato = destino if intento == 0 else archivo.with_name(f"{base} ({intento}).pdf")
+        candidato = destino if intento == 0 else archivo.with_name(f"{base} ({intento}).PDF")
         if archivo == candidato:
             return archivo
         try:
@@ -1143,7 +1146,9 @@ def descargar_abastecimiento(
         except Exception:
             numero = str(idx)
             proveedor = ""
-        existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
+        existentes = {
+            pdf: pdf.stat().st_mtime for pdf in destino.glob("*.[Pp][Dd][Ff]")
+        }
         try:
             btn.click()
         except ElementClickInterceptedException:
@@ -1171,7 +1176,9 @@ def descargar_abastecimiento(
             ordenes.append(
                 {"numero": numero, "proveedor": proveedor, "categoria": "abastecimiento"}
             )
-            existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
+            existentes = {
+                pdf: pdf.stat().st_mtime for pdf in destino.glob("*.[Pp][Dd][Ff]")
+            }
             try:
                 btn.click()
             except (ElementClickInterceptedException, StaleElementReferenceException):

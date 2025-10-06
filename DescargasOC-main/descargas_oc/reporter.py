@@ -31,7 +31,7 @@ def _buscar_tarea(numero: str, cfg: Config) -> str | None:
     if not carpeta:
         return None
     # Buscar recursivamente por si los archivos fueron movidos a subcarpetas
-    for pdf in Path(carpeta).rglob(f"{numero}*.pdf"):
+    for pdf in Path(carpeta).rglob(f"{numero}*.[Pp][Dd][Ff]"):
         tarea = extraer_numero_tarea_desde_pdf(str(pdf))
         if tarea:
             return tarea

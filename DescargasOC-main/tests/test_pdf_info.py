@@ -32,10 +32,10 @@ def test_nombre_archivo_orden_formatea_y_respeta_extension():
     modulo = importlib.import_module("descargas_oc.pdf_info")
 
     nombre = modulo.nombre_archivo_orden("123456", "Proveedor / Test", "pdf")
-    assert nombre == "123456 - proveedor_test.pdf"
+    assert nombre == "123456 - PROVEEDOR_TEST.PDF"
 
     nombre_sin_datos = modulo.nombre_archivo_orden(None, None, None)
-    assert nombre_sin_datos == "archivo.pdf"
+    assert nombre_sin_datos == "ARCHIVO.PDF"
 
 
 def test_proveedor_desde_pdf_normaliza(monkeypatch):

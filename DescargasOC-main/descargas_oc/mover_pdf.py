@@ -217,8 +217,12 @@ def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
         base = base[:MAX_NOMBRE].rstrip(" .-_")
         if not base:
             base = "archivo"
-    if not ext.startswith("."):
-        ext = f".{ext}" if ext else ".pdf"
+    base = base.upper()
+    if not ext:
+        ext = ".PDF"
+    elif not ext.startswith("."):
+        ext = f".{ext}"
+    ext = ext.upper()
     return f"{base}{ext}"
 
 
@@ -386,7 +390,7 @@ def mover_oc(config: Config, ordenes=None):
         if not carpeta.exists():
             logger.warning("Carpeta origen inexistente: %s", carpeta)
             continue
-        archivos.extend(p for p in carpeta.glob("*.pdf"))
+        archivos.extend(p for p in carpeta.glob("*.[Pp][Dd][Ff]"))
 
     encontrados: dict[str, Path] = {}
     procesados_en_origen: set[Path] = set()
@@ -443,8 +447,10 @@ def mover_oc(config: Config, ordenes=None):
 #=======
         if prov:
             prov_clean = sanitize_filename(prov)
+            if prov_clean:
+                prov_clean = prov_clean.upper()
             nuevo_nombre = os.path.join(
-                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+                carpeta_origen, f"{numero} - NOMBRE {prov_clean}.PDF"
             )
             if ruta != nuevo_nombre:
                 try:
@@ -453,8 +459,10 @@ def mover_oc(config: Config, ordenes=None):
                 except Exception as e:
                     logger.warning('No se pudo renombrar %s: %s', ruta, e)
                     prov_clean = sanitize_filename(prov, max_len=20)
+                    if prov_clean:
+                        prov_clean = prov_clean.upper()
                     nuevo_nombre = os.path.join(
-                        carpeta_origen, f"{numero} - NOMBRE {prov_clean}.pdf"
+                        carpeta_origen, f"{numero} - NOMBRE {prov_clean}.PDF"
                     )
                     try:
                         os.rename(ruta, nuevo_nombre)
@@ -471,7 +479,7 @@ def mover_oc(config: Config, ordenes=None):
             if indice_ordenes.get(numero) is not None:
                 indice_ordenes[numero]["tarea"] = tarea
 
-        ext = ruta_path.suffix or ".pdf"
+        ext = (ruta_path.suffix or ".PDF").upper()
         nombre_deseado = nombre_archivo_orden(numero, prov, ext)
         nombre_deseado = _nombre_destino(numero, prov, ext)
         nombre_original = ruta_path.name

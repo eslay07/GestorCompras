@@ -46,17 +46,19 @@ def nombre_archivo_orden(
         prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
         prov_clean = re.sub(r"\s+", "_", prov_clean)
         prov_clean = re.sub(r"_+", "_", prov_clean)
-        prov_clean = prov_clean.lstrip("_").lower()
+        prov_clean = prov_clean.lstrip("_").upper()
         base = f"{base} - {prov_clean}" if base else prov_clean
     base = re.sub(r"\s+", " ", base).strip()
     if not base:
         base = "archivo"
     if len(base) > MAX_NOMBRE_ARCHIVO:
         base = base[:MAX_NOMBRE_ARCHIVO].rstrip(" .-_") or "archivo"
+    base = base.upper()
     if not extension:
         extension = ".pdf"
     if not extension.startswith("."):
         extension = f".{extension}"
+    extension = extension.upper()
     return f"{base}{extension}"
 
 
@@ -108,7 +110,7 @@ def actualizar_proveedores_desde_pdfs(
     if not ordenes_dict:
         return {}
 
-    pdfs = sorted(carpeta.glob("*.pdf"))
+    pdfs = sorted(carpeta.glob("*.[Pp][Dd][Ff]"))
     if not pdfs:
         logger.debug("No se encontraron PDFs en %s", carpeta)
         return {}

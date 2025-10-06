@@ -15,11 +15,11 @@ def test_nombre_archivo_normaliza_datos():
 
     assert (
         modulo._nombre_archivo("123456", "Proveedor S.A.")
-        == "123456 - Proveedor S_A"
+        == "123456 - PROVEEDOR S_A"
     )
     assert (
         modulo._nombre_archivo("", "Proveedor Especial")
-        == "Proveedor Especial"
+        == "PROVEEDOR ESPECIAL"
     )
     assert modulo._nombre_archivo(None, None) is None
 
@@ -63,5 +63,5 @@ def test_renombrar_pdf_respeta_nombre_original(tmp_path):
 
     renombrado = modulo._renombrar_pdf_descargado(pdf, "342050", "Electroleg S.A.")
 
-    assert renombrado.name.startswith("ORDEN #342050 - electroleg_s_a_")
-    assert renombrado.suffix == ".pdf"
+    assert renombrado.name.startswith("ORDEN #342050 - ELECTROLEG_S_A_")
+    assert renombrado.suffix == ".PDF"

@@ -46,7 +46,7 @@ def esperar_descarga_pdf(
     while time.monotonic() < limite:
         time.sleep(intervalo)
         candidatos: list[tuple[float, Path]] = []
-        for pdf in directory.glob("*.pdf"):
+        for pdf in directory.glob("*.[Pp][Dd][Ff]"):
             try:
                 mtime = pdf.stat().st_mtime
             except FileNotFoundError:
@@ -87,7 +87,7 @@ def esperar_descarga_pdf(
     while time.monotonic() < limite:
         time.sleep(intervalo)
         candidatos: list[tuple[float, Path]] = []
-        for pdf in directory.glob("*.pdf"):
+        for pdf in directory.glob("*.[Pp][Dd][Ff]"):
             try:
                 mtime = pdf.stat().st_mtime
             except FileNotFoundError:
@@ -147,12 +147,16 @@ def descargar_oc(
     def _renombrar_descarga(archivo: Path, base: str | None) -> Path:
         if not base:
             return archivo
-        destino = download_dir / f"{base}.pdf"
+        base = base.strip()
+        if not base:
+            return archivo
+        base = base.upper()
+        destino = download_dir / f"{base}.PDF"
         if archivo == destino:
             return archivo
         intento = 0
         while True:
-            candidato = destino if intento == 0 else download_dir / f"{base} ({intento}).pdf"
+            candidato = destino if intento == 0 else download_dir / f"{base} ({intento}).PDF"
             try:
                 archivo.rename(candidato)
                 return candidato
@@ -368,7 +372,8 @@ def descargar_oc(
                     time.sleep(2)
                 boton_descarga = _find("descargar_orden", elements["descargar_orden"])
                 existentes = {
-                    pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
+                    pdf: pdf.stat().st_mtime
+                    for pdf in download_dir.glob("*.[Pp][Dd][Ff]")
                 }
                 try:
                     boton_descarga.click()
@@ -398,10 +403,10 @@ def descargar_oc(
 #<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
 #=======
 #=======
-                antes = set(download_dir.glob("*.pdf"))
+                antes = set(download_dir.glob("*.[Pp][Dd][Ff]"))
                 for _ in range(120):  # esperar hasta 60 s
                     time.sleep(0.5)
-                    nuevos = set(download_dir.glob("*.pdf")) - antes
+                    nuevos = set(download_dir.glob("*.[Pp][Dd][Ff]")) - antes
                     if nuevos:
                         archivo = nuevos.pop()
                         break
@@ -409,13 +414,17 @@ def descargar_oc(
                     raise RuntimeError("No se descargó archivo")
                 if not getattr(cfg, "compra_bienes", False) and proveedor:
                     prov_clean = sanitize_filename(proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    if prov_clean:
+                        prov_clean = prov_clean.upper()
+                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.PDF"
                     try:
                         archivo.rename(nuevo_nombre)
                         archivo = nuevo_nombre
                     except Exception:
                         prov_clean = sanitize_filename(proveedor, max_len=20)
-                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                        if prov_clean:
+                            prov_clean = prov_clean.upper()
+                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.PDF"
                         try:
                             archivo.rename(nuevo_nombre)
                             archivo = nuevo_nombre
