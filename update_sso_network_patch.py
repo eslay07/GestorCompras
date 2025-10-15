@@ -195,7 +195,7 @@ def inject_stealth_and_helpers(content: str) -> Tuple[str, bool]:
 
 
         def _esperar_documento_completo(driver, timeout: float = 20.0) -> bool:
-            "Refuerzo para esperar a ``document.readyState == \"complete\"``."
+            '''Refuerzo para esperar a ``document.readyState == "complete"``.'''
             if driver is None:
                 return False
             limite = time.monotonic() + timeout
