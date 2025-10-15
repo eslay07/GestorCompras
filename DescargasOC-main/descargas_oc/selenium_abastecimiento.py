@@ -8,6 +8,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
+import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -603,7 +604,7 @@ def descargar_abastecimiento(
     if headless_flag:
         options.add_argument("--headless=new")
 
-    driver = webdriver.Chrome(options=options)
+    driver = uc.Chrome(options=options)
     instalar_ganchos_naf(driver)
     try:
         try:

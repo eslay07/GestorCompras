@@ -3,6 +3,7 @@ pdfplumber
 pandas 
 openpyxl
 selenium
+undetected-chromedriver
 
 webdriver_manager
 gspread

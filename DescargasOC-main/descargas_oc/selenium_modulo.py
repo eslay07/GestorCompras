@@ -12,6 +12,7 @@ import sys
 import time
 from pathlib import Path
 
+import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
@@ -559,7 +560,7 @@ def descargar_oc(
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--log-level=3")
-    driver = webdriver.Chrome(options=options)
+    driver = uc.Chrome(options=options)
     instalar_ganchos_naf(driver)
     try:
         driver.execute_cdp_cmd(

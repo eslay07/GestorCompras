@@ -3,6 +3,7 @@
 
 Resumen de acciones:
 - Inyecta un script anti detección vía CDP que camufla Selenium y monitorea la red.
+- Cambia la creación del driver a ``undetected_chromedriver`` y mantiene las ChromeOptions endurecidas.
 - Añade utilidades para esperar la red, forzar la redirección del ticket SSO y simular actividad humana.
 - Refuerza el flujo de login y las búsquedas con reintentos y ``page_load_strategy = 'eager'``.
 
@@ -67,6 +68,39 @@ def ensure_page_load_strategy(content: str) -> Tuple[str, bool]:
         "options = webdriver.ChromeOptions()\n    options.page_load_strategy = \"eager\"\n",
         1,
     ), True
+
+
+def ensure_uc_integration(content: str) -> Tuple[str, bool]:
+    updated = content
+    changed = False
+    import_line = "import undetected_chromedriver as uc"
+    if import_line not in updated:
+        inserted = False
+        target = "from selenium import webdriver"
+        if target in updated:
+            updated = updated.replace(target, f"{import_line}\n{target}", 1)
+            inserted = True
+        else:
+            for anchor in (
+                "import time\n",
+                "import sys\n",
+                "import subprocess\n",
+                "from pathlib import Path\n",
+            ):
+                if anchor in updated:
+                    updated = updated.replace(anchor, anchor + import_line + "\n", 1)
+                    inserted = True
+                    break
+        if not inserted:
+            prefix = "" if updated.startswith("\n") else "\n"
+            updated = f"{import_line}{prefix}{updated}"
+        changed = True
+
+    if "webdriver.Chrome(" in updated and "uc.Chrome(" not in updated:
+        updated = updated.replace("webdriver.Chrome(", "uc.Chrome(")
+        changed = True
+
+    return updated, changed
 
 
 def inject_stealth_and_helpers(content: str) -> Tuple[str, bool]:
@@ -452,6 +486,13 @@ def patch_selenium_modulo(text: str) -> Tuple[str, List[str]]:
     notes: List[str] = []
     updated = text
 
+    updated_tmp, changed = ensure_uc_integration(updated)
+    if changed:
+        updated = updated_tmp
+        notes.append(
+            "Se actualizó el módulo para usar undetected_chromedriver y su import correspondiente."
+        )
+
     updated, changed = inject_stealth_and_helpers(updated)
     if changed:
         notes.append("Se añadieron utilidades anti detección y de espera de red.")
@@ -461,14 +502,20 @@ def patch_selenium_modulo(text: str) -> Tuple[str, List[str]]:
         notes.append("Se fuerza page_load_strategy='eager' en ChromeOptions.")
 
     if "instalar_ganchos_naf(driver)\n" not in updated:
-        needle = "    driver = webdriver.Chrome(options=options)\n"
-        if needle in updated:
-            updated = updated.replace(
-                needle,
-                "    driver = webdriver.Chrome(options=options)\n    instalar_ganchos_naf(driver)\n",
-                1,
-            )
-            notes.append("Se instala el script anti detección justo tras crear el driver.")
+        for needle in (
+            "    driver = uc.Chrome(options=options)\n",
+            "    driver = webdriver.Chrome(options=options)\n",
+        ):
+            if needle in updated:
+                updated = updated.replace(
+                    needle,
+                    f"{needle}    instalar_ganchos_naf(driver)\n",
+                    1,
+                )
+                notes.append(
+                    "Se instala el script anti detección justo tras crear el driver."
+                )
+                break
 
     handle_snippet = "        time.sleep(2)\n        for _ in range(3):"
     if (
@@ -546,6 +593,13 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
     notes: List[str] = []
     updated = text
 
+    updated_tmp, changed = ensure_uc_integration(updated)
+    if changed:
+        updated = updated_tmp
+        notes.append(
+            "Se cambió la creación del driver a undetected_chromedriver en Abastecimiento."
+        )
+
     multi_import = textwrap.dedent(
         """
     from .selenium_modulo import (
@@ -603,14 +657,20 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
         notes.append("Se establece page_load_strategy='eager' en las ChromeOptions de Abastecimiento.")
 
     if "instalar_ganchos_naf(driver)\n" not in updated:
-        needle = "    driver = webdriver.Chrome(options=options)\n"
-        if needle in updated:
-            updated = updated.replace(
-                needle,
-                "    driver = webdriver.Chrome(options=options)\n    instalar_ganchos_naf(driver)\n",
-                1,
-            )
-            notes.append("Se instala el script anti detección justo tras crear el driver de Abastecimiento.")
+        for needle in (
+            "    driver = uc.Chrome(options=options)\n",
+            "    driver = webdriver.Chrome(options=options)\n",
+        ):
+            if needle in updated:
+                updated = updated.replace(
+                    needle,
+                    f"{needle}    instalar_ganchos_naf(driver)\n",
+                    1,
+                )
+                notes.append(
+                    "Se instala el script anti detección justo tras crear el driver de Abastecimiento."
+                )
+                break
 
     anchor = "        time.sleep(2)\n        for _ in range(3):"
     reemplazos_handle = 0
@@ -691,6 +751,29 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
     return updated, notes
 
 
+def patch_requirements(text: str) -> Tuple[str, List[str]]:
+    lines = text.splitlines()
+    stripped = [line.strip() for line in lines]
+    objetivo = "undetected-chromedriver"
+    if objetivo in stripped:
+        return text, []
+
+    notes = ["Se añadió undetected-chromedriver a requirements.txt."]
+
+    try:
+        idx = stripped.index("selenium")
+        insert_at = idx + 1
+    except ValueError:
+        insert_at = len(lines)
+
+    lines.insert(insert_at, objetivo)
+
+    if lines and lines[-1] != "":
+        lines.append("")
+
+    return "\n".join(lines), notes
+
+
 def run_patch(root: Path) -> List[PatchReport]:
     reports: List[PatchReport] = []
     modulo = root / "DescargasOC-main" / "descargas_oc" / "selenium_modulo.py"
@@ -698,6 +781,9 @@ def run_patch(root: Path) -> List[PatchReport]:
 
     abastecimiento = root / "DescargasOC-main" / "descargas_oc" / "selenium_abastecimiento.py"
     reports.append(apply_transform(abastecimiento, patch_selenium_abastecimiento))
+
+    requirements = root / "requirements.txt"
+    reports.append(apply_transform(requirements, patch_requirements))
 
     return reports
 
@@ -712,6 +798,10 @@ def smoke_test_patch(root: Path = ROOT) -> Tuple[bool, List[str]]:
         mensajes.append("No se detectó handle_sso_after_login en selenium_modulo.py")
     if "Page.addScriptToEvaluateOnNewDocument" not in contenido:
         mensajes.append("El bloque de inyección CDP no está presente en selenium_modulo.py")
+    if "uc.Chrome" not in contenido:
+        mensajes.append(
+            "selenium_modulo.py no usa undetected_chromedriver tras aplicar el parche"
+        )
 
     login_refs: List[Path] = []
     objetivo = "https://cas.telconet.ec/cas/login?service="
