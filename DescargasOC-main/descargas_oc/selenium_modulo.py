@@ -132,19 +132,37 @@ def instalar_ganchos_naf(driver) -> None:
             }
             window.__nafStealthInstalled = true;
 
+            const patchProperty = (object, property, value) => {
+                try {
+                    Object.defineProperty(object, property, {
+                        get: () => value,
+                        configurable: true,
+                    });
+                } catch (err) {}
+            };
+
+            patchProperty(navigator, 'webdriver', undefined);
+
             try {
-                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                const ua = navigator.userAgent
+                    .replace(/HeadlessChrome\//gi, 'Chrome/')
+                    .replace(/\(Headless\)/gi, '')
+                    .replace(/Chrome\/\d+/i, (match) => match.replace(/\d+/, '122'));
+                patchProperty(navigator, 'userAgent', ua);
+                patchProperty(navigator, 'appVersion', ua);
             } catch (err) {}
+
+            patchProperty(navigator, 'vendor', 'Google Inc.');
+            patchProperty(navigator, 'platform', 'Win32');
+            patchProperty(navigator, 'languages', ['es-EC', 'es', 'en-US']);
+            patchProperty(navigator, 'maxTouchPoints', 1);
+            patchProperty(navigator, 'hardwareConcurrency', 8);
+            patchProperty(navigator, 'deviceMemory', 8);
 
             try {
                 Object.defineProperty(navigator, 'plugins', {
                     get: () => [{ name: 'PDF Viewer' }, { name: 'Chrome PDF Plugin' }],
-                });
-            } catch (err) {}
-
-            try {
-                Object.defineProperty(navigator, 'languages', {
-                    get: () => ['es-EC', 'es', 'en'],
+                    configurable: true,
                 });
             } catch (err) {}
 
@@ -165,6 +183,71 @@ def instalar_ganchos_naf(driver) -> None:
                         return originalQuery(parameters);
                     };
                 }
+            } catch (err) {}
+
+            try {
+                if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                    const originalHighEntropy = navigator.userAgentData.getHighEntropyValues.bind(navigator.userAgentData);
+                    navigator.userAgentData.getHighEntropyValues = (hints) => originalHighEntropy(hints).then((values) => ({
+                        ...values,
+                        platform: 'Windows',
+                        architecture: 'x86',
+                        bitness: '64',
+                        model: '',
+                    }));
+                } else if (!navigator.userAgentData) {
+                    const data = {
+                        brands: [
+                            { brand: 'Chromium', version: '122' },
+                            { brand: 'Google Chrome', version: '122' },
+                            { brand: 'Not A(Brand)', version: '24' },
+                        ],
+                        mobile: false,
+                        platform: 'Windows',
+                        getHighEntropyValues: () => Promise.resolve({
+                            platform: 'Windows',
+                            architecture: 'x86',
+                            bitness: '64',
+                            model: '',
+                            uaFullVersion: '122.0.6261.111',
+                        }),
+                    };
+                    patchProperty(navigator, 'userAgentData', data);
+                }
+            } catch (err) {}
+
+            try {
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (connection) {
+                    const clone = Object.assign({}, connection, { downlink: 10, effectiveType: '4g', rtt: 50 });
+                    patchProperty(navigator, 'connection', clone);
+                }
+            } catch (err) {}
+
+            try {
+                const originalGetParameter = WebGLRenderingContext.prototype.getParameter;
+                WebGLRenderingContext.prototype.getParameter = function (parameter) {
+                    if (parameter === 37445) {
+                        return 'Intel Open Source Technology Center';
+                    }
+                    if (parameter === 37446) {
+                        return 'Intel(R) UHD Graphics 630';
+                    }
+                    return originalGetParameter.call(this, parameter);
+                };
+            } catch (err) {}
+
+            try {
+                const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+                HTMLCanvasElement.prototype.toDataURL = function (...args) {
+                    const context = this.getContext('2d');
+                    if (context) {
+                        context.fillStyle = '#ffffff';
+                        context.globalAlpha = 0.01;
+                        context.fillRect(0, 0, 1, 1);
+                    }
+                    return origToDataURL.apply(this, args);
+                };
             } catch (err) {}
 
             window.__webdriverActiveRequests = 0;
@@ -209,6 +292,27 @@ def instalar_ganchos_naf(driver) -> None:
             driver.execute_script(script)
         except Exception:
             pass
+    try:
+        driver.execute_cdp_cmd("Network.enable", {})
+    except Exception:
+        pass
+    try:
+        version = driver.execute_cdp_cmd("Browser.getVersion", {})
+    except Exception:
+        version = {}
+    try:
+        user_agent = version.get("userAgent", "")
+        if user_agent:
+            if "HeadlessChrome" in user_agent:
+                user_agent = user_agent.replace("HeadlessChrome", "Chrome")
+            override = {
+                "userAgent": user_agent,
+                "platform": "Windows NT 10.0; Win64; x64",
+                "acceptLanguage": "es-EC,es;q=0.9,en-US;q=0.8,en;q=0.7",
+            }
+            driver.execute_cdp_cmd("Network.setUserAgentOverride", override)
+    except Exception:
+        pass
     driver._naf_stealth = True
 
 
@@ -251,18 +355,27 @@ def _esperar_documento_completo(driver, timeout: float = 20.0) -> bool:
     return False
 
 
-def handle_sso_after_login(driver, timeout: float = 40.0, idle_timeout: float = 25.0) -> bool:
-    'Forza la redirección SSO para evitar esperas innecesarias.'
+def handle_sso_after_login(
+    driver,
+    timeout: float = 60.0,
+    idle_timeout: float = 30.0,
+    dashboard_url: str = "https://sites.telconet.ec/naf/compras/",
+) -> bool:
+    'Forza la redirección SSO y valida que el portal cargue sin esperas artificiales.'
     if driver is None:
         return False
     limite = time.monotonic() + timeout
+    inicio = time.monotonic()
     ultimo_ticket = None
+    forced_dashboard = False
     while time.monotonic() < limite:
         try:
             actual = driver.current_url or ""
         except Exception:
             actual = ""
+
         if "/sso/check" in actual:
+            instalar_ganchos_naf(driver)
             if "ticket=" in actual and actual != ultimo_ticket:
                 ultimo_ticket = actual
                 try:
@@ -279,19 +392,50 @@ def handle_sso_after_login(driver, timeout: float = 40.0, idle_timeout: float = 
                     wait_for_network_idle(driver, timeout=idle_timeout)
                 except TimeoutError:
                     _esperar_documento_completo(driver, timeout=idle_timeout)
-                return True
-        try:
-            ready = driver.execute_script("return document.readyState")
-        except Exception:
-            ready = "loading"
-        if ready == "complete" and "naf/compras" in actual and "ticket=" not in actual:
+                forced_dashboard = False
+                continue
+            if (
+                "ticket=" not in actual
+                and not forced_dashboard
+                and time.monotonic() - inicio > 8
+            ):
+                try:
+                    driver.get(dashboard_url)
+                    forced_dashboard = True
+                    instalar_ganchos_naf(driver)
+                    continue
+                except Exception:
+                    pass
+
+        if "naf/compras" in actual and "ticket=" not in actual:
             try:
-                wait_for_network_idle(driver, timeout=idle_timeout / 2)
+                wait_for_network_idle(driver, timeout=idle_timeout)
             except TimeoutError:
-                pass
+                _esperar_documento_completo(driver, timeout=idle_timeout)
             return True
+
+        if (
+            not forced_dashboard
+            and "naf/compras" not in actual
+            and time.monotonic() - inicio > 15
+        ):
+            try:
+                driver.get(dashboard_url)
+                forced_dashboard = True
+                instalar_ganchos_naf(driver)
+                continue
+            except Exception:
+                pass
+
         time.sleep(0.5)
-    return False
+
+    try:
+        driver.get(dashboard_url)
+        instalar_ganchos_naf(driver)
+        wait_for_network_idle(driver, timeout=min(idle_timeout, 20.0))
+        return True
+    except Exception:
+        return False
 
 
 def simulate_human_activity(driver, etiqueta: str = 'post_login', min_interval: float = 2.0) -> None:
@@ -552,7 +696,11 @@ def descargar_oc(
             except Exception:
                 pass
         time.sleep(2)
-        handle_sso_after_login(driver, timeout=40.0)
+        handle_sso_after_login(driver, timeout=60.0, idle_timeout=30.0)
+        try:
+            wait_for_network_idle(driver, timeout=30.0)
+        except TimeoutError:
+            _esperar_documento_completo(driver, timeout=30.0)
         simulate_human_activity(driver)
         for _ in range(3):
             try:

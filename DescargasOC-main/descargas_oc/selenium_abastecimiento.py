@@ -282,14 +282,6 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
             numero = numero_candidato
             numero_texto = texto
             break
-                    texto = celda.text.strip()
-                except Exception:
-                    texto = ""
-                if texto:
-                    textos.append(texto)
-            if textos:
-                break
-
         if textos:
             numero = textos[0]
             if len(textos) > 1:
@@ -765,31 +757,6 @@ def descargar_abastecimiento(
             except Exception:
                 return False
             try:
-
-        def obtener_autocomplete(nombre: str, indice: int):
-            etiquetas = AUTOCOMPLETE_LABELS.get(nombre, [])
-            for etiqueta in etiquetas:
-                try:
-                    campo = _buscar_autocomplete_por_texto(driver, etiqueta)
-                    if campo:
-                        return campo, ("label", etiqueta)
-                except RuntimeError:
-                    continue
-
-            try:
-                campo = _obtener_por_indice(indice)
-                return campo, ("index", indice)
-            except TimeoutException as exc:
-                logger.error("%s: no se encontró un campo visible", nombre)
-                raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
-
-        def _es_campo_autocomplete(elemento) -> bool:
-            try:
-                if elemento.tag_name.lower() != "input":
-                    return False
-            except Exception:
-                return False
-            try:
                 return (elemento.get_attribute("aria-autocomplete") or "").lower() == "list"
             except Exception:
                 return False
@@ -932,7 +899,18 @@ def descargar_abastecimiento(
                     raise
 
         time.sleep(2)
-        handle_sso_after_login(driver, timeout=40.0)
+        handle_sso_after_login(driver, timeout=60.0, idle_timeout=30.0)
+        try:
+            wait_for_network_idle(driver, timeout=30.0)
+        except TimeoutError:
+            limite_ready = time.monotonic() + 20
+            while time.monotonic() < limite_ready:
+                try:
+                    if driver.execute_script("return document.readyState") == "complete":
+                        break
+                except Exception:
+                    break
+                time.sleep(0.5)
         simulate_human_activity(driver)
         for _ in range(3):
             try:
@@ -1096,7 +1074,18 @@ def descargar_abastecimiento(
                     raise
 
         time.sleep(2)
-        handle_sso_after_login(driver, timeout=40.0)
+        handle_sso_after_login(driver, timeout=60.0, idle_timeout=30.0)
+        try:
+            wait_for_network_idle(driver, timeout=30.0)
+        except TimeoutError:
+            limite_ready = time.monotonic() + 20
+            while time.monotonic() < limite_ready:
+                try:
+                    if driver.execute_script("return document.readyState") == "complete":
+                        break
+                except Exception:
+                    break
+                time.sleep(0.5)
         simulate_human_activity(driver)
         for _ in range(3):
             try:
