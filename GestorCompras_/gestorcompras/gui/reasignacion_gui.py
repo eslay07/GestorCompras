@@ -13,6 +13,8 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+LOGIN_URL = "https://sites.telconet.ec/naf/compras/sso/check"
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
@@ -23,9 +25,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import TimeoutException
-
-
-LOGIN_URL = "https://sites.telconet.ec/naf/compras/sso/check"
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -176,6 +175,7 @@ def wait_for_first_element(driver, locators, timeout=30):
     raise TimeoutException("No se proporcionaron localizadores para la espera.")
 
 
+
 def login_telcos(driver, username, password):
     driver.get(LOGIN_URL)
     wait_for_document_ready(driver, timeout=60)
@@ -230,7 +230,6 @@ def login_telcos(driver, username, password):
         raise Exception(
             "La plataforma Telcos tardó demasiado en cargar después del inicio de sesión."
         ) from exc
-
 
 def wait_clickable_or_error(driver, locator, parent, description, timeout=30, retries=3):
     """Espera que un elemento sea clickeable reintentando varias veces."""
