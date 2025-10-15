@@ -1,0 +1,18 @@
+Parche 4.1 - Ajustes de inicio de sesión Telcos
+=============================================
+
+Este parche introduce mejoras en el flujo de autenticación automatizada para la
+plataforma NAF:
+
+* El inicio de sesión ahora apunta al nuevo enlace oficial de SSO:
+  https://sites.telconet.ec/naf/compras/sso/check.
+* Se agregaron esperas explícitas para garantizar que el documento termine de
+  cargar antes de interactuar con la página. Esto mitiga la lentitud
+  introducida tras la redirección con el parámetro `ticket`.
+* Se ampliaron y flexibilizaron los localizadores de los campos de usuario y
+  contraseña para adaptarse a posibles cambios en el formulario.
+* Se incrementó el tiempo de espera tras la autenticación para asegurar que el
+  panel principal de Telcos esté completamente disponible antes de continuar.
+
+Con estos cambios el script evita falsos negativos durante el proceso de login
+cuando la carga del portal es lenta al ejecutar Selenium.

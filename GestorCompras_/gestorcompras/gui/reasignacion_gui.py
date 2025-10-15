@@ -8,6 +8,7 @@ import imaplib
 import email
 import re
 import logging
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,6 +22,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import TimeoutException
+
+
+LOGIN_URL = "https://sites.telconet.ec/naf/compras/sso/check"
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -142,14 +147,89 @@ def cargar_tareas_correo(email_address, email_password, window):
     mail.logout()
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
 
+
+def wait_for_document_ready(driver, timeout=60):
+    """Espera a que el documento actual termine de cargarse por completo."""
+
+    def _document_complete(drv):
+        try:
+            return drv.execute_script("return document.readyState") == "complete"
+        except Exception:
+            return False
+
+    WebDriverWait(driver, timeout).until(_document_complete)
+
+
+def wait_for_first_element(driver, locators, timeout=30):
+    """Espera el primer locator disponible y devuelve el elemento clickeable."""
+
+    last_exception: Optional[TimeoutException] = None
+    for locator in locators:
+        try:
+            return WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable(locator)
+            )
+        except TimeoutException as exc:
+            last_exception = exc
+    if last_exception is not None:
+        raise last_exception
+    raise TimeoutException("No se proporcionaron localizadores para la espera.")
+
+
 def login_telcos(driver, username, password):
-    driver.get('https://telcos.telconet.ec/inicio/?josso_back_to=http://telcos.telconet.ec/check&josso_partnerapp_host=telcos.telconet.ec')
-    user_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'josso_username')))
+    driver.get(LOGIN_URL)
+    wait_for_document_ready(driver, timeout=60)
+
+    try:
+        user_input = wait_for_first_element(
+            driver,
+            [
+                (By.NAME, "username"),
+                (By.ID, "username"),
+                (By.NAME, "UserName"),
+                (By.ID, "UserName"),
+                (By.NAME, "josso_username"),
+            ],
+            timeout=40,
+        )
+    except TimeoutException as exc:
+        raise Exception(
+            "No se pudo cargar el formulario de usuario en Telcos."
+        ) from exc
+
+    user_input.clear()
     user_input.send_keys(username)
-    password_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'josso_password')))
+
+    try:
+        password_input = wait_for_first_element(
+            driver,
+            [
+                (By.NAME, "password"),
+                (By.ID, "password"),
+                (By.NAME, "Password"),
+                (By.ID, "Password"),
+                (By.NAME, "josso_password"),
+            ],
+            timeout=40,
+        )
+    except TimeoutException as exc:
+        raise Exception(
+            "No se pudo cargar el campo de contraseña en Telcos."
+        ) from exc
+
+    password_input.clear()
     password_input.send_keys(password)
     password_input.send_keys(Keys.RETURN)
-    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
+
+    try:
+        wait_for_document_ready(driver, timeout=90)
+        WebDriverWait(driver, 90).until(
+            EC.presence_of_element_located((By.ID, 'spanTareasPersonales'))
+        )
+    except TimeoutException as exc:
+        raise Exception(
+            "La plataforma Telcos tardó demasiado en cargar después del inicio de sesión."
+        ) from exc
 
 
 def wait_clickable_or_error(driver, locator, parent, description, timeout=30, retries=3):
