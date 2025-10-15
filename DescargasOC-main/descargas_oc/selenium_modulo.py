@@ -116,6 +116,229 @@ def esperar_descarga_pdf(
     raise RuntimeError("No se descargó archivo")
 
 
+
+
+# --- parche naf anti-automatizacion ---
+def instalar_ganchos_naf(driver) -> None:
+    'Instala ajustes anti detección antes de cada navegación.'
+    if driver is None:
+        return
+    if getattr(driver, "_naf_stealth", False):
+        return
+    script = '''
+        (() => {
+            if (window.__nafStealthInstalled) {
+                return;
+            }
+            window.__nafStealthInstalled = true;
+
+            try {
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            } catch (err) {}
+
+            try {
+                Object.defineProperty(navigator, 'plugins', {
+                    get: () => [{ name: 'PDF Viewer' }, { name: 'Chrome PDF Plugin' }],
+                });
+            } catch (err) {}
+
+            try {
+                Object.defineProperty(navigator, 'languages', {
+                    get: () => ['es-EC', 'es', 'en'],
+                });
+            } catch (err) {}
+
+            if (!window.chrome) {
+                window.chrome = { runtime: {} };
+            } else if (!window.chrome.runtime) {
+                window.chrome.runtime = {};
+            }
+
+            try {
+                if (navigator.permissions && navigator.permissions.query) {
+                    const originalQuery = navigator.permissions.query.bind(navigator.permissions);
+                    navigator.permissions.query = (parameters) => {
+                        if (parameters && parameters.name === 'notifications') {
+                            const permission = (typeof Notification !== 'undefined' && Notification.permission) || 'default';
+                            return Promise.resolve({ state: permission });
+                        }
+                        return originalQuery(parameters);
+                    };
+                }
+            } catch (err) {}
+
+            window.__webdriverActiveRequests = 0;
+            const updatePending = (delta) => {
+                const current = window.__webdriverActiveRequests || 0;
+                window.__webdriverActiveRequests = Math.max(0, current + delta);
+            };
+
+            if (!window.__nafFetchPatched && window.fetch) {
+                const origFetch = window.fetch;
+                window.fetch = (...args) => {
+                    updatePending(1);
+                    return origFetch(...args).then(
+                        (value) => { updatePending(-1); return value; },
+                        (error) => { updatePending(-1); throw error; },
+                    );
+                };
+                window.__nafFetchPatched = true;
+            }
+
+            if (!window.__nafXHRPatched && window.XMLHttpRequest) {
+                const proto = XMLHttpRequest.prototype;
+                const origSend = proto.send;
+                proto.send = function (...args) {
+                    try {
+                        updatePending(1);
+                        this.addEventListener('loadend', () => updatePending(-1), { once: true });
+                    } catch (err) {}
+                    return origSend.apply(this, args);
+                };
+                window.__nafXHRPatched = true;
+            }
+        })();
+    '''
+    try:
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {"source": script},
+        )
+    except Exception:
+        try:
+            driver.execute_script(script)
+        except Exception:
+            pass
+    driver._naf_stealth = True
+
+
+def wait_for_network_idle(driver, timeout: float = 25.0, quiet_period: float = 1.5) -> bool:
+    'Espera a que la pestaña quede sin solicitudes activas.'
+    if driver is None:
+        return False
+    limite = time.monotonic() + timeout
+    objetivo_quieto = time.monotonic() + quiet_period
+    while time.monotonic() < limite:
+        try:
+            pending = driver.execute_script("return window.__webdriverActiveRequests || 0;")
+        except Exception:
+            pending = 0
+        try:
+            ready = driver.execute_script("return document.readyState")
+        except Exception:
+            ready = "loading"
+        if pending == 0 and ready in {"interactive", "complete"}:
+            if time.monotonic() >= objetivo_quieto:
+                return True
+        else:
+            objetivo_quieto = time.monotonic() + quiet_period
+        time.sleep(0.5)
+    raise TimeoutError("La página no alcanzó estado inactivo a tiempo")
+
+
+def _esperar_documento_completo(driver, timeout: float = 20.0) -> bool:
+    '''Refuerzo para esperar a ``document.readyState == "complete"``.'''
+    if driver is None:
+        return False
+    limite = time.monotonic() + timeout
+    while time.monotonic() < limite:
+        try:
+            if driver.execute_script("return document.readyState") == "complete":
+                return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return False
+
+
+def handle_sso_after_login(driver, timeout: float = 40.0, idle_timeout: float = 25.0) -> bool:
+    'Forza la redirección SSO para evitar esperas innecesarias.'
+    if driver is None:
+        return False
+    limite = time.monotonic() + timeout
+    ultimo_ticket = None
+    while time.monotonic() < limite:
+        try:
+            actual = driver.current_url or ""
+        except Exception:
+            actual = ""
+        if "/sso/check" in actual:
+            if "ticket=" in actual and actual != ultimo_ticket:
+                ultimo_ticket = actual
+                try:
+                    driver.get(actual)
+                except Exception:
+                    try:
+                        driver.execute_script(
+                            "window.location.replace(arguments[0]);",
+                            actual,
+                        )
+                    except Exception:
+                        pass
+                try:
+                    wait_for_network_idle(driver, timeout=idle_timeout)
+                except TimeoutError:
+                    _esperar_documento_completo(driver, timeout=idle_timeout)
+                return True
+        try:
+            ready = driver.execute_script("return document.readyState")
+        except Exception:
+            ready = "loading"
+        if ready == "complete" and "naf/compras" in actual and "ticket=" not in actual:
+            try:
+                wait_for_network_idle(driver, timeout=idle_timeout / 2)
+            except TimeoutError:
+                pass
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def simulate_human_activity(driver, etiqueta: str = 'post_login', min_interval: float = 2.0) -> None:
+    'Envía eventos ligeros para reducir heurísticas anti bot.'
+    if driver is None:
+        return
+    marca = f"_naf_sim_{etiqueta}"
+    ahora = time.monotonic()
+    ultimo = getattr(driver, marca, 0.0)
+    if ahora - ultimo < min_interval:
+        return
+    script = '''
+        (() => {
+            const target = document.body || document.documentElement;
+            if (!target) {
+                return;
+            }
+            const baseX = Math.floor(window.innerWidth / 2) + Math.floor(Math.random() * 40) - 20;
+            const baseY = Math.floor(window.innerHeight / 2) + Math.floor(Math.random() * 40) - 20;
+            ['mousemove', 'mouseover'].forEach((type) => {
+                const evt = new MouseEvent(type, {
+                    bubbles: true,
+                    cancelable: true,
+                    clientX: baseX,
+                    clientY: baseY,
+                });
+                target.dispatchEvent(evt);
+            });
+            const focusable = document.querySelector('input, button, a, select, textarea');
+            if (focusable && focusable.focus) {
+                focusable.focus({ preventScroll: true });
+            }
+            const keyboardTarget = document.activeElement || target;
+            const keyEvt = new KeyboardEvent('keydown', {
+                key: 'Tab',
+                code: 'Tab',
+                bubbles: true,
+            });
+            keyboardTarget.dispatchEvent(keyEvt);
+        })();
+    '''
+    try:
+        driver.execute_script(script)
+    except Exception:
+        pass
+    setattr(driver, marca, ahora)
+
 def descargar_oc(
     ordenes,
     username: str | None = None,
@@ -173,6 +396,7 @@ def descargar_oc(
     subfolder = cfg.seafile_subfolder or "/"
 
     options = webdriver.ChromeOptions()
+    options.page_load_strategy = "eager"
     prefs = {
         "download.default_directory": str(download_dir),
         "download.prompt_for_download": False,
@@ -192,6 +416,7 @@ def descargar_oc(
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--log-level=3")
     driver = webdriver.Chrome(options=options)
+    instalar_ganchos_naf(driver)
     try:
         driver.execute_cdp_cmd(
             "Page.setDownloadBehavior",
@@ -327,6 +552,8 @@ def descargar_oc(
             except Exception:
                 pass
         time.sleep(2)
+        handle_sso_after_login(driver, timeout=40.0)
+        simulate_human_activity(driver)
         for _ in range(3):
             try:
                 driver.switch_to.window(driver.window_handles[-1])
@@ -343,6 +570,7 @@ def descargar_oc(
             time.sleep(2)
         else:
             raise RuntimeError("Fallo al localizar 'lista_accesos'")
+        simulate_human_activity(driver)
         _click("lista_accesos", elements["lista_accesos"])
         _click("seleccion_compania", elements["seleccion_compania"])
         _find("lista_companias", elements["lista_companias"]).send_keys("TELCONET S.A.")
@@ -359,13 +587,22 @@ def descargar_oc(
                 campo = _find("digitar_oc", elements["digitar_oc"])
                 campo.clear()
                 campo.send_keys(numero)
-                time.sleep(2)
-                _click("btnbuscarorden", elements["btnbuscarorden"])
+                time.sleep(0.5)
+                simulate_human_activity(driver)
+                for intento_busqueda in range(3):
+                    _click("btnbuscarorden", elements["btnbuscarorden"])
+                    try:
+                        wait_for_network_idle(driver, timeout=25.0)
+                        break
+                    except TimeoutError:
+                        if intento_busqueda == 2:
+                            raise RuntimeError("La búsqueda de la OC no respondió a tiempo")
+                        time.sleep(2)
 
                 for _ in range(5):
                     if not driver.find_elements(*elements["toast"]):
                         break
-                    time.sleep(2)
+                    time.sleep(1)
                 boton_descarga = _find("descargar_orden", elements["descargar_orden"])
                 existentes = {
                     pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")

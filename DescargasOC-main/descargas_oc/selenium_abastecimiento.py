@@ -24,7 +24,13 @@ try:  # permitir la ejecución como script
     from .config import Config
     from .mover_pdf import mover_oc
     from .reporter import enviar_reporte
-    from .selenium_modulo import esperar_descarga_pdf
+    from .selenium_modulo import (
+    esperar_descarga_pdf,
+    handle_sso_after_login,
+    simulate_human_activity,
+    instalar_ganchos_naf,
+    wait_for_network_idle,
+)
     from .logger import get_logger
     from .pdf_info import (
         actualizar_proveedores_desde_pdfs,
@@ -40,7 +46,13 @@ except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
     from reporter import enviar_reporte
-    from selenium_modulo import esperar_descarga_pdf
+    from selenium_modulo import (
+    esperar_descarga_pdf,
+    handle_sso_after_login,
+    simulate_human_activity,
+    instalar_ganchos_naf,
+    wait_for_network_idle,
+)
     from logger import get_logger
     from pdf_info import (
         actualizar_proveedores_desde_pdfs,
@@ -579,6 +591,7 @@ def descargar_abastecimiento(
     )
 
     options = webdriver.ChromeOptions()
+    options.page_load_strategy = "eager"
     prefs = {
         "download.default_directory": str(destino),
         "download.prompt_for_download": False,
@@ -599,6 +612,7 @@ def descargar_abastecimiento(
         options.add_argument("--headless=new")
 
     driver = webdriver.Chrome(options=options)
+    instalar_ganchos_naf(driver)
     try:
         try:
             driver.execute_cdp_cmd(
@@ -918,6 +932,8 @@ def descargar_abastecimiento(
                     raise
 
         time.sleep(2)
+        handle_sso_after_login(driver, timeout=40.0)
+        simulate_human_activity(driver)
         for _ in range(3):
             try:
                 driver.switch_to.window(driver.window_handles[-1])
@@ -935,6 +951,7 @@ def descargar_abastecimiento(
         else:
             raise RuntimeError("No se pudo localizar 'lista_accesos'")
 
+        simulate_human_activity(driver)
         hacer_click("lista_accesos", elements["lista_accesos"])
         hacer_click("seleccion_compania", elements["seleccion_compania"])
         limpiar_y_escribir("lista_companias", elements["lista_companias"], "TELCONET")
@@ -966,7 +983,16 @@ def descargar_abastecimiento(
             "autoriza", 1, autoriza, usar_activo=True, avanzar_tab=False
         )
 
-        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+        simulate_human_activity(driver)
+        for intento_busqueda in range(3):
+            hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+            try:
+                wait_for_network_idle(driver, timeout=25.0)
+                break
+            except TimeoutError:
+                if intento_busqueda == 2:
+                    raise RuntimeError("La búsqueda de órdenes no respondió a tiempo")
+                time.sleep(2)
         esperar_toast()
 
         try:
@@ -1070,6 +1096,8 @@ def descargar_abastecimiento(
                     raise
 
         time.sleep(2)
+        handle_sso_after_login(driver, timeout=40.0)
+        simulate_human_activity(driver)
         for _ in range(3):
             try:
                 driver.switch_to.window(driver.window_handles[-1])
@@ -1087,6 +1115,7 @@ def descargar_abastecimiento(
         else:
             raise RuntimeError("No se pudo localizar 'lista_accesos'")
 
+        simulate_human_activity(driver)
         hacer_click("lista_accesos", elements["lista_accesos"])
         hacer_click("seleccion_compania", elements["seleccion_compania"])
         limpiar_y_escribir("lista_companias", elements["lista_companias"], "TELCONET")
@@ -1118,7 +1147,16 @@ def descargar_abastecimiento(
             "autoriza", 1, autoriza, usar_activo=True, avanzar_tab=False
         )
 
-        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+        simulate_human_activity(driver)
+        for intento_busqueda in range(3):
+            hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+            try:
+                wait_for_network_idle(driver, timeout=25.0)
+                break
+            except TimeoutError:
+                if intento_busqueda == 2:
+                    raise RuntimeError("La búsqueda de órdenes no respondió a tiempo")
+                time.sleep(2)
         esperar_toast()
 
         try:

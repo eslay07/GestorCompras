@@ -316,7 +316,7 @@ def patch_selenium_modulo(text: str) -> Tuple[str, List[str]]:
     if changed:
         notes.append("Se fuerza page_load_strategy='eager' en ChromeOptions.")
 
-    if "instalar_ganchos_naf(driver)" not in updated:
+    if "instalar_ganchos_naf(driver)\n" not in updated:
         needle = "    driver = webdriver.Chrome(options=options)\n"
         if needle in updated:
             updated = updated.replace(
@@ -399,6 +399,7 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
         esperar_descarga_pdf,
         handle_sso_after_login,
         simulate_human_activity,
+        instalar_ganchos_naf,
         wait_for_network_idle,
     )
     """
@@ -416,6 +417,7 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
         esperar_descarga_pdf,
         handle_sso_after_login,
         simulate_human_activity,
+        instalar_ganchos_naf,
         wait_for_network_idle,
     )
     """
@@ -424,10 +426,38 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
     if changed:
         notes.append("Se amplían las importaciones para ejecución directa.")
 
+    insertion_variants = [
+        (
+            "    simulate_human_activity,\n    wait_for_network_idle,",
+            "    simulate_human_activity,\n    instalar_ganchos_naf,\n    wait_for_network_idle,",
+        ),
+        (
+            "    simulate_human_activity,\n    wait_for_network_idle",
+            "    simulate_human_activity,\n    instalar_ganchos_naf,\n    wait_for_network_idle",
+        ),
+    ]
+    added_import = False
+    for search, replacement in insertion_variants:
+        while search in updated:
+            updated = updated.replace(search, replacement, 1)
+            added_import = True
+    if added_import:
+        notes.append("Se añade instalar_ganchos_naf a las importaciones de utilidades.")
+
     updated_tmp, changed = ensure_page_load_strategy(updated)
     if changed:
         updated = updated_tmp
         notes.append("Se establece page_load_strategy='eager' en las ChromeOptions de Abastecimiento.")
+
+    if "instalar_ganchos_naf(driver)\n" not in updated:
+        needle = "    driver = webdriver.Chrome(options=options)\n"
+        if needle in updated:
+            updated = updated.replace(
+                needle,
+                "    driver = webdriver.Chrome(options=options)\n    instalar_ganchos_naf(driver)\n",
+                1,
+            )
+            notes.append("Se instala el script anti detección justo tras crear el driver de Abastecimiento.")
 
     anchor = "        time.sleep(2)\n        for _ in range(3):"
     reemplazos_handle = 0
@@ -459,6 +489,13 @@ def patch_selenium_abastecimiento(text: str) -> Tuple[str, List[str]]:
             search_pos = idx + len(menu_anchor)
     if replacements_menu:
         notes.append("Se simula actividad humana antes de abrir los menús principales.")
+
+    dedupe_block = (
+        "        simulate_human_activity(driver)\n"
+        "        simulate_human_activity(driver)\n"
+    )
+    while dedupe_block in updated:
+        updated = updated.replace(dedupe_block, "        simulate_human_activity(driver)\n")
 
     buscar_anchor = (
         "        hacer_click(\"btnbuscarorden\", elements[\"btnbuscarorden\"])\n"
