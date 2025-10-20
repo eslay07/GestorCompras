@@ -127,6 +127,7 @@ class Config:
         self.data.setdefault('smtp_password', self.data.get('password'))
         self.data.setdefault('compra_bienes', False)
         self.data.setdefault('headless', False)
+        self.data.setdefault('abastecimiento_mover_archivos', False)
         self.data.setdefault('abastecimiento_headless', self.data['headless'])
         self.data.setdefault(
             'abastecimiento_carpeta_descarga', self.data.get('carpeta_destino_local')

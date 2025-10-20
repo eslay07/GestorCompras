@@ -187,7 +187,6 @@ def _destino_no_bienes(
 #=======
 #codex/fix-email-scanning-for-descarga-normal
 #>>>>>>> master
-MAX_NOMBRE = 180
 REINTENTOS = 5
 ESPERA_INICIAL = 0.3
 
@@ -197,29 +196,6 @@ def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
         return False
     patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
     return re.search(patron, nombre) is not None
-
-
-def _nombre_destino(numero: str | None, proveedor: str | None, ext: str) -> str:
-    numero = (numero or "").strip()
-    base = numero
-    if proveedor:
-        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-        base = f"{base} - {prov_clean}" if base else prov_clean
-#=======
-        base = f"{base} - NOMBRE {prov_clean}" if base else prov_clean
-#>>>>>>> master
-    base = re.sub(r"\s+", " ", base).strip()
-    if not base:
-        base = "archivo"
-    if len(base) > MAX_NOMBRE:
-        base = base[:MAX_NOMBRE].rstrip(" .-_")
-        if not base:
-            base = "archivo"
-    if not ext.startswith("."):
-        ext = f".{ext}" if ext else ".pdf"
-    return f"{base}{ext}"
 
 
 def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
@@ -473,7 +449,6 @@ def mover_oc(config: Config, ordenes=None):
 
         ext = ruta_path.suffix or ".pdf"
         nombre_deseado = nombre_archivo_orden(numero, prov, ext)
-        nombre_deseado = _nombre_destino(numero, prov, ext)
         nombre_original = ruta_path.name
         origen_descarga = ruta_path.parent
 
