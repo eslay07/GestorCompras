@@ -20,6 +20,7 @@ _DEFAULTS = {
     "servicios": {
         "cadena_asunto_fija": "NOTIFICACION A PROVEEDOR:",
         "zona_horaria": "America/Guayaquil",
+        "remitente_correo": "",
     },
 }
 
@@ -72,7 +73,9 @@ def set_value(section: str, option: str, value: Any) -> None:
 
 def get_servicios_config() -> dict[str, str]:
     _ensure_loaded()
-    return {key: _PARSER.get("servicios", key) for key in _DEFAULTS["servicios"]}
+    section = "servicios"
+    keys = set(_DEFAULTS[section]) | {option for option in _PARSER.options(section)}
+    return {key: _PARSER.get(section, key) for key in keys}
 
 
 def get_user_email() -> str:

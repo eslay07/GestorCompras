@@ -34,17 +34,16 @@ if not logger.handlers:
     logger.setLevel(logging.INFO)
 
 
+SERVICIOS_REMITENTE_KEY = "SERVICIOS_REMITENTE"
+
+
 class ServiciosReasignacion(tk.Toplevel):
     columns = (
+        "seleccion",
         "fecha",
         "asunto",
-        "task_number",
-        "proveedor",
-        "mecanico",
-        "telefono",
-        "inf_vehiculo",
-        "message_id",
-        "estado",
+        "numero_tarea",
+        "taller",
     )
 
     def __init__(self, master: tk.Misc | None, email_session: dict[str, str]):
@@ -55,10 +54,16 @@ class ServiciosReasignacion(tk.Toplevel):
         self.grab_set()
         self.email_session = email_session
         self.records: dict[str, dict[str, object]] = {}
+        self.servicios_cfg = core_config.get_servicios_config()
         self.departamento_var = tk.StringVar(value=db.get_config("SERVICIOS_DEPARTAMENTO", ""))
         self.usuario_var = tk.StringVar(value=db.get_config("SERVICIOS_USUARIO", ""))
         self.headless_var = tk.BooleanVar(value=db.get_config("SERVICIOS_HEADLESS", "1") != "0")
         self.headless_var.trace_add("write", self._persist_headless)
+        remitente_default = db.get_config(
+            SERVICIOS_REMITENTE_KEY,
+            self.servicios_cfg.get("remitente_correo", ""),
+        )
+        self.remitente_var = tk.StringVar(value=remitente_default)
         self._build_ui()
         center_window(self)
 
@@ -72,24 +77,25 @@ class ServiciosReasignacion(tk.Toplevel):
 
         filtros = ttk.LabelFrame(main, text="Filtros", style="MyLabelFrame.TLabelframe", padding=10)
         filtros.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
-        filtros.columnconfigure(5, weight=1)
+        for col in (1, 3):
+            filtros.columnconfigure(col, weight=1)
+        filtros.columnconfigure(4, weight=0)
 
         ttk.Label(filtros, text="Desde (YYYY-MM-DD HH:MM):", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
         self.desde_var = tk.StringVar()
         self.hasta_var = tk.StringVar()
-        cfg = core_config.get_servicios_config()
-        tz = ZoneInfo(cfg.get("zona_horaria", "America/Guayaquil"))
+        tz = ZoneInfo(self.servicios_cfg.get("zona_horaria", "America/Guayaquil"))
         ahora = datetime.now(tz)
         self.desde_var.set((ahora - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M"))
         self.hasta_var.set(ahora.strftime("%Y-%m-%d %H:%M"))
 
-        ttk.Entry(filtros, textvariable=self.desde_var, style="MyEntry.TEntry", width=22).grid(row=0, column=1, padx=5)
+        ttk.Entry(filtros, textvariable=self.desde_var, style="MyEntry.TEntry", width=22).grid(row=0, column=1, padx=5, sticky="ew")
 
         ttk.Label(filtros, text="Hasta (YYYY-MM-DD HH:MM):", style="MyLabel.TLabel").grid(row=0, column=2, sticky="w")
-        ttk.Entry(filtros, textvariable=self.hasta_var, style="MyEntry.TEntry", width=22).grid(row=0, column=3, padx=5)
+        ttk.Entry(filtros, textvariable=self.hasta_var, style="MyEntry.TEntry", width=22).grid(row=0, column=3, padx=5, sticky="ew")
 
         buscar_btn = ttk.Button(filtros, text="Buscar", style="MyButton.TButton", command=self._buscar)
-        buscar_btn.grid(row=0, column=4, padx=10)
+        buscar_btn.grid(row=0, column=4, padx=10, rowspan=2, sticky="n")
         add_hover_effect(buscar_btn)
 
         ttk.Button(
@@ -97,7 +103,14 @@ class ServiciosReasignacion(tk.Toplevel):
             text="Cerrar",
             style="MyButton.TButton",
             command=self.destroy,
-        ).grid(row=0, column=5, sticky="e")
+        ).grid(row=0, column=5, rowspan=2, sticky="ne")
+
+        ttk.Label(filtros, text="Remitente:", style="MyLabel.TLabel").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(
+            filtros,
+            textvariable=self.remitente_var,
+            style="MyEntry.TEntry",
+        ).grid(row=1, column=1, columnspan=3, padx=5, sticky="ew", pady=(8, 0))
 
         asignacion = ttk.LabelFrame(
             main,
@@ -142,11 +155,23 @@ class ServiciosReasignacion(tk.Toplevel):
             style="MyTreeview.Treeview",
             selectmode="browse",
         )
-        for col in self.columns:
-            self.tree.heading(col, text=col.replace("_", " ").title())
-            self.tree.column(col, width=140, anchor="w")
+        headings = {
+            "seleccion": "",
+            "fecha": "Fecha",
+            "asunto": "Asunto",
+            "numero_tarea": "Número de tarea",
+            "taller": "Taller",
+        }
+        for col, label in headings.items():
+            self.tree.heading(col, text=label)
+        self.tree.column("seleccion", width=40, anchor="center")
+        self.tree.column("fecha", width=150, anchor="center")
+        self.tree.column("asunto", width=320, anchor="w")
+        self.tree.column("numero_tarea", width=140, anchor="center")
+        self.tree.column("taller", width=220, anchor="w")
         self.tree.grid(row=0, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
+        self.tree.bind("<Button-1>", self._on_tree_click, add=True)
 
         scrollbar = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -155,12 +180,17 @@ class ServiciosReasignacion(tk.Toplevel):
         acciones = ttk.Frame(main, style="MyFrame.TFrame", padding=5)
         acciones.grid(row=3, column=0, sticky="ew", pady=5)
 
-        self.estado_label = ttk.Label(acciones, text="", style="MyLabel.TLabel")
-        self.estado_label.pack(side="left")
+        self.select_all_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            acciones,
+            text="Marcar todos",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.select_all_var,
+            command=self._toggle_all,
+        ).pack(side="left")
 
-        guardar_btn = ttk.Button(acciones, text="Guardar/Actualizar", style="MyButton.TButton", command=self._guardar)
-        guardar_btn.pack(side="right", padx=5)
-        add_hover_effect(guardar_btn)
+        self.estado_label = ttk.Label(acciones, text="", style="MyLabel.TLabel")
+        self.estado_label.pack(side="left", padx=(10, 0))
 
         reasignar_btn = ttk.Button(acciones, text="Reasignar", style="MyButton.TButton", command=self._reasignar)
         reasignar_btn.pack(side="right", padx=5)
@@ -178,6 +208,43 @@ class ServiciosReasignacion(tk.Toplevel):
         self.preview = tk.Text(preview_frame, wrap="word", state="disabled")
         self.preview.grid(row=0, column=0, sticky="nsew")
 
+    @staticmethod
+    def _checkbox_symbol(checked: bool) -> str:
+        return "☑" if checked else "☐"
+
+    def _toggle_all(self) -> None:
+        new_state = self.select_all_var.get()
+        for message_id, record in self.records.items():
+            record["checked"] = new_state
+            self.tree.set(message_id, "seleccion", self._checkbox_symbol(new_state))
+
+    def _sync_master_check(self) -> None:
+        if not self.records:
+            self.select_all_var.set(False)
+            return
+        all_checked = all(record.get("checked") for record in self.records.values())
+        if self.select_all_var.get() != all_checked:
+            self.select_all_var.set(all_checked)
+
+    def _on_tree_click(self, event) -> str | None:
+        region = self.tree.identify_region(event.x, event.y)
+        if region != "cell":
+            return None
+        column = self.tree.identify_column(event.x)
+        if column != "#1":
+            return None
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return "break"
+        record = self.records.get(item_id)
+        if not record:
+            return "break"
+        nuevo_estado = not record.get("checked", False)
+        record["checked"] = nuevo_estado
+        self.tree.set(item_id, "seleccion", self._checkbox_symbol(nuevo_estado))
+        self._sync_master_check()
+        return "break"
+
     # Helpers
     def _persist_headless(self, *_args) -> None:
         db.set_config("SERVICIOS_HEADLESS", "1" if self.headless_var.get() else "0")
@@ -188,8 +255,7 @@ class ServiciosReasignacion(tk.Toplevel):
         return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M").replace(tzinfo=tz)
 
     @staticmethod
-    def _decode_subject(msg: Message) -> str:
-        raw = msg.get("Subject", "")
+    def _decode_header_value(raw: str) -> str:
         try:
             return str(make_header(decode_header(raw)))
         except Exception:  # pragma: no cover - caso defensivo
@@ -204,6 +270,10 @@ class ServiciosReasignacion(tk.Toplevel):
                 else:
                     partes.append(value)
             return "".join(partes)
+
+    @classmethod
+    def _decode_subject(cls, msg: Message) -> str:
+        return cls._decode_header_value(msg.get("Subject", ""))
 
     @staticmethod
     def _clean_html(text: str) -> str:
@@ -267,18 +337,24 @@ class ServiciosReasignacion(tk.Toplevel):
         cadena_asunto: str,
         dt_desde: datetime,
         dt_hasta: datetime,
+        remitente: str = "",
     ) -> list[dict[str, object]]:
         tz = dt_desde.tzinfo or ZoneInfo("America/Guayaquil")
         cadena_normalizada = cadena_asunto.strip().upper()
         host = "pop.telconet.ec"
         puerto = 993
+        remitente_busqueda = remitente.strip()
+        remitente_normalizado = remitente_busqueda.lower()
 
         conexion = imaplib.IMAP4_SSL(host, puerto)
         try:
             conexion.login(usuario, password)
             conexion.select("INBOX")
             since = dt_desde.strftime("%d-%b-%Y")
-            status, data = conexion.search(None, f'(SINCE "{since}")')
+            criterios: list[str] = ["SINCE", since]
+            if remitente_busqueda:
+                criterios.extend(["FROM", remitente_busqueda])
+            status, data = conexion.search(None, *criterios)
             if status != "OK":
                 raise RuntimeError("No se pudo obtener el listado de correos")
             ids = data[0].split()
@@ -293,6 +369,9 @@ class ServiciosReasignacion(tk.Toplevel):
                     msg = email.message_from_bytes(response[1])
                     subject = self._decode_subject(msg)
                     if cadena_normalizada not in subject.upper():
+                        continue
+                    from_header = self._decode_header_value(msg.get("From", ""))
+                    if remitente_normalizado and remitente_normalizado not in from_header.lower():
                         continue
                     fecha = self._parse_header_date(msg, tz)
                     if not fecha or not (dt_desde <= fecha <= dt_hasta):
@@ -312,6 +391,7 @@ class ServiciosReasignacion(tk.Toplevel):
                         "message_id": mensaje_id,
                         "date": fecha,
                         "subject": subject,
+                        "from": from_header,
                         "task_number": info_tarea.get("task_number", "N/D"),
                         "body": cuerpo,
                         "proveedor": parsed.get("proveedor", "N/D"),
@@ -321,7 +401,10 @@ class ServiciosReasignacion(tk.Toplevel):
                     }
                     resultados.append(registros)
                     logger.info(
-                        "Correo válido encontrado: id=%s tarea=%s", registros["message_id"], registros["task_number"]
+                        "Correo válido encontrado: id=%s tarea=%s remitente=%s",
+                        registros["message_id"],
+                        registros["task_number"],
+                        from_header or "(sin remitente)",
                     )
             return resultados
         finally:
@@ -343,6 +426,7 @@ class ServiciosReasignacion(tk.Toplevel):
             return
 
         cadena = cfg.get("cadena_asunto_fija", "NOTIFICACION A PROVEEDOR:")
+        remitente = self.remitente_var.get().strip()
         try:
             dt_desde = self._parse_datetime(self.desde_var.get())
             dt_hasta = self._parse_datetime(self.hasta_var.get())
@@ -364,12 +448,13 @@ class ServiciosReasignacion(tk.Toplevel):
 
         try:
             registros = self._buscar_correos(
-                correo_usuario,
-                password,
-                cadena,
-                dt_desde,
-                dt_hasta,
-            )
+            correo_usuario,
+            password,
+            cadena,
+            dt_desde,
+            dt_hasta,
+            remitente,
+        )
         except Exception as exc:
             logger.exception("Error durante la lectura de correos")
             messagebox.showerror("Correo", f"No se pudo realizar la búsqueda: {exc}", parent=self)
@@ -377,6 +462,8 @@ class ServiciosReasignacion(tk.Toplevel):
 
         self.tree.delete(*self.tree.get_children())
         self.records.clear()
+        self.select_all_var.set(False)
+        db.set_config(SERVICIOS_REMITENTE_KEY, remitente)
         for item in registros:
             message_id = item["message_id"]
             estado = "Listo"
@@ -386,6 +473,7 @@ class ServiciosReasignacion(tk.Toplevel):
                 "fecha": item["date"],
                 "asunto": item["subject"],
                 "task_number": item.get("task_number", "N/D"),
+                "taller": item.get("proveedor", "N/D"),
                 "proveedor": item.get("proveedor", "N/D"),
                 "mecanico": item.get("mecanico_nombre", "N/D"),
                 "telefono": item.get("mecanico_telefono", "N/D"),
@@ -394,26 +482,38 @@ class ServiciosReasignacion(tk.Toplevel):
                 "raw_hash": raw_hash,
                 "body": item["body"],
                 "estado": estado,
+                "checked": False,
             }
             self.records[message_id] = registro
+            reasignaciones_repo.upsert({
+                key: registro.get(key)
+                for key in (
+                    "message_id",
+                    "fecha",
+                    "asunto",
+                    "task_number",
+                    "proveedor",
+                    "mecanico",
+                    "telefono",
+                    "inf_vehiculo",
+                    "correo_usuario",
+                    "raw_hash",
+                )
+            })
             self.tree.insert(
                 "",
                 "end",
                 iid=message_id,
                 values=(
+                    self._checkbox_symbol(False),
                     item["date"].strftime("%Y-%m-%d %H:%M"),
                     item["subject"],
                     registro["task_number"],
-                    registro["proveedor"],
-                    registro["mecanico"],
-                    registro["telefono"],
-                    registro["inf_vehiculo"],
-                    message_id,
-                    estado,
+                    registro["taller"],
                 ),
             )
             logger.info(
-                "Correo procesado: id=%s task=%s proveedor=%s", message_id, registro["task_number"], registro["proveedor"]
+                "Correo procesado: id=%s task=%s taller=%s", message_id, registro["task_number"], registro["taller"]
             )
         if not registros:
             messagebox.showinfo("Sin resultados", "No se encontraron correos en el rango especificado.", parent=self)
@@ -433,23 +533,12 @@ class ServiciosReasignacion(tk.Toplevel):
         self.preview.delete("1.0", tk.END)
         self.preview.insert(tk.END, record.get("body", ""))
         self.preview.config(state="disabled")
-        self.estado_label.configure(text=f"Estado: {record.get('estado', 'N/D')}")
-
-    def _guardar(self) -> None:
-        if not self.records:
-            messagebox.showinfo("Guardar", "No hay registros para guardar.", parent=self)
-            return
-        for record in self.records.values():
-            reasignaciones_repo.upsert(record)
-        messagebox.showinfo("Guardar", "Registros almacenados correctamente.", parent=self)
+        self.estado_label.configure(text=f"Estado seleccionado: {record.get('estado', 'N/D')}")
 
     def _reasignar(self) -> None:
-        record = self._selected_record()
-        if not record:
-            return
-        task = record.get("task_number")
-        if not task or task == "N/D":
-            messagebox.showwarning("Reasignación", "El correo no contiene número de tarea válido.", parent=self)
+        objetivos = [r for r in self.records.values() if r.get("checked")]
+        if not objetivos:
+            messagebox.showwarning("Reasignación", "Marque al menos un correo para procesar.", parent=self)
             return
         department = self.departamento_var.get().strip()
         employee = self.usuario_var.get().strip()
@@ -461,31 +550,59 @@ class ServiciosReasignacion(tk.Toplevel):
             )
             return
         comentario_template = db.get_config("SERVICIOS_REASIGNACION_MSG", 'Taller Asignado "{proveedor}"')
-        resultado = reassign_bridge.reassign_by_task_number(
-            task,
-            record.get("proveedor", ""),
-            record.get("mecanico", ""),
-            record.get("telefono", ""),
-            record.get("inf_vehiculo", ""),
-            fuente="SERVICIOS",
-            department=department,
-            employee=employee,
-            headless=self.headless_var.get(),
-            comentario_template=comentario_template,
-            email_session=self.email_session,
-        )
-        estado = resultado.get("status", "error")
-        record["estado"] = estado.capitalize()
-        self.tree.set(record["message_id"], "estado", record["estado"])
-        self.estado_label.configure(text=f"Estado: {record['estado']}")
+        exitos = 0
+        fallas = 0
+        no_encontradas = 0
+        for record in objetivos:
+            task = record.get("task_number")
+            if not task or task == "N/D":
+                fallas += 1
+                record["estado"] = "Número inválido"
+                continue
+            resultado = reassign_bridge.reassign_by_task_number(
+                task,
+                record.get("proveedor", ""),
+                record.get("mecanico", ""),
+                record.get("telefono", ""),
+                record.get("inf_vehiculo", ""),
+                fuente="SERVICIOS",
+                department=department,
+                employee=employee,
+                headless=self.headless_var.get(),
+                comentario_template=comentario_template,
+                email_session=self.email_session,
+            )
+            estado = resultado.get("status", "error")
+            record["estado"] = estado.capitalize()
+            if estado == "ok":
+                exitos += 1
+            elif estado == "not_found":
+                no_encontradas += 1
+            else:
+                fallas += 1
+            record["checked"] = False
+            self.tree.set(record["message_id"], "seleccion", self._checkbox_symbol(False))
         db.set_config("SERVICIOS_DEPARTAMENTO", department)
         db.set_config("SERVICIOS_USUARIO", employee)
-        if estado == "ok":
-            messagebox.showinfo("Reasignación", "Tarea reasignada correctamente.", parent=self)
-        elif estado == "not_found":
-            messagebox.showwarning("Reasignación", "No se encontró la tarea en el módulo legado.", parent=self)
+        self._sync_master_check()
+        resumen = []
+        if exitos:
+            resumen.append(f"{exitos} reasignadas")
+        if no_encontradas:
+            resumen.append(f"{no_encontradas} no encontradas")
+        if fallas:
+            resumen.append(f"{fallas} con error")
+        if not resumen:
+            resumen_texto = "Sin cambios"
         else:
-            messagebox.showerror("Reasignación", resultado.get("details", "Error desconocido"), parent=self)
+            resumen_texto = ", ".join(resumen)
+        self.estado_label.configure(text=f"Último resultado: {resumen_texto}")
+        if exitos and not fallas and not no_encontradas:
+            messagebox.showinfo("Reasignación", "Correos procesados correctamente.", parent=self)
+        elif exitos or no_encontradas:
+            messagebox.showwarning("Reasignación", resumen_texto.capitalize(), parent=self)
+        else:
+            messagebox.showerror("Reasignación", "No se pudo procesar ningún correo.", parent=self)
 
     def _reprocesar(self) -> None:
         record = self._selected_record()
@@ -496,15 +613,13 @@ class ServiciosReasignacion(tk.Toplevel):
         record.update(
             {
                 "proveedor": parsed.get("proveedor", "N/D"),
+                "taller": parsed.get("proveedor", "N/D"),
                 "mecanico": parsed.get("mecanico_nombre", "N/D"),
                 "telefono": parsed.get("mecanico_telefono", "N/D"),
                 "inf_vehiculo": parsed.get("inf_vehiculo", "N/D"),
             }
         )
-        self.tree.set(record["message_id"], "proveedor", record["proveedor"])
-        self.tree.set(record["message_id"], "mecanico", record["mecanico"])
-        self.tree.set(record["message_id"], "telefono", record["telefono"])
-        self.tree.set(record["message_id"], "inf_vehiculo", record["inf_vehiculo"])
+        self.tree.set(record["message_id"], "taller", record["taller"])
         messagebox.showinfo("Reprocesado", "Los datos fueron actualizados con la nueva lectura.", parent=self)
 
 

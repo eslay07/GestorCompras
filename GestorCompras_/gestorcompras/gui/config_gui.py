@@ -13,6 +13,7 @@ from html import escape
 SERVICIOS_DEPARTAMENTO_KEY = "SERVICIOS_DEPARTAMENTO"
 SERVICIOS_USUARIO_KEY = "SERVICIOS_USUARIO"
 SERVICIOS_MENSAJE_KEY = "SERVICIOS_REASIGNACION_MSG"
+SERVICIOS_REMITENTE_KEY = "SERVICIOS_REMITENTE"
 
 # Garantiza que el paquete descargas_oc esté disponible incluso cuando la
 # aplicación se ejecute desde el directorio GestorCompras_. Buscamos la carpeta
@@ -68,7 +69,7 @@ class ConfigGUI(tk.Toplevel):
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
-        self.geometry("800x600")
+        self.geometry("900x700")
         self.email_session = email_session
         self.descargas_cfg = DescargasConfig()
         self._oc_entries: dict[str, tk.Widget] = {}
@@ -275,8 +276,20 @@ class ConfigGUI(tk.Toplevel):
             row=0, column=3, padx=5, sticky="ew"
         )
 
-        ttk.Label(servicios_frame, text="Mensaje de reasignación:", style="MyLabel.TLabel").grid(
+        ttk.Label(servicios_frame, text="Correo remitente:", style="MyLabel.TLabel").grid(
             row=1, column=0, sticky="w", pady=(8, 0)
+        )
+        self.servicios_remitente_var = tk.StringVar(
+            value=db.get_config(SERVICIOS_REMITENTE_KEY, "")
+        )
+        ttk.Entry(
+            servicios_frame,
+            textvariable=self.servicios_remitente_var,
+            style="MyEntry.TEntry",
+        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=5, pady=(8, 0))
+
+        ttk.Label(servicios_frame, text="Mensaje de reasignación:", style="MyLabel.TLabel").grid(
+            row=2, column=0, sticky="w", pady=(8, 0)
         )
         self.servicios_mensaje_var = tk.StringVar(
             value=db.get_config(SERVICIOS_MENSAJE_KEY, 'Taller Asignado "{proveedor}"')
@@ -285,14 +298,14 @@ class ConfigGUI(tk.Toplevel):
             servicios_frame,
             textvariable=self.servicios_mensaje_var,
             style="MyEntry.TEntry",
-        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=5, pady=(8, 0))
+        ).grid(row=2, column=1, columnspan=3, sticky="ew", padx=5, pady=(8, 0))
 
         ttk.Button(
             servicios_frame,
             text="Guardar parámetros de Servicios",
             style="MyButton.TButton",
             command=self.save_servicios_params,
-        ).grid(row=2, column=0, columnspan=4, sticky="e", pady=(12, 0))
+        ).grid(row=3, column=0, columnspan=4, sticky="e", pady=(12, 0))
 
         self.load_assignments()
 
@@ -326,6 +339,7 @@ class ConfigGUI(tk.Toplevel):
     def save_servicios_params(self):
         dept = self.servicios_dept_var.get().strip()
         usuario = self.servicios_usuario_var.get().strip()
+        remitente = self.servicios_remitente_var.get().strip()
         mensaje = self.servicios_mensaje_var.get().strip()
         if not dept or not usuario:
             messagebox.showwarning(
@@ -335,6 +349,7 @@ class ConfigGUI(tk.Toplevel):
             return
         db.set_config(SERVICIOS_DEPARTAMENTO_KEY, dept)
         db.set_config(SERVICIOS_USUARIO_KEY, usuario)
+        db.set_config(SERVICIOS_REMITENTE_KEY, remitente)
         db.set_config(SERVICIOS_MENSAJE_KEY, mensaje or 'Taller Asignado "{proveedor}"')
         messagebox.showinfo("Configuración", "Parámetros de Servicios actualizados correctamente.")
 
