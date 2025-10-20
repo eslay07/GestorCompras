@@ -5,9 +5,15 @@ import re
 import unicodedata
 
 RX_TAREA_SUBJECT = re.compile(r'TAREA:\s*["“”]?(\d{6,11})["“”]?', re.I)
-RX_PROVEEDOR = re.compile(r'Estimados\s+"([^"]+)"', re.I)
-RX_MECANICO = re.compile(r'coordinando el mantenimiento con\s+"([^"(]+?)\s*\(([^)]+)\)\.?', re.I)
-RX_OT_LINE = re.compile(r'"\s*([^"\n]*OT[^"\n]+)\s*"', re.I)
+RX_PROVEEDOR = re.compile(r'Estimados\s+(?:"([^"]+)"|([^\n]+))', re.I)
+RX_MECANICO = re.compile(
+    r'coordinando\s+el\s+mantenimiento\s+con\s+"?([^"(]+?)"?\s*\(([^)]+)\)\s*"?\.?',
+    re.I,
+)
+RX_OT_LINE = re.compile(
+    r'^(?:\s*\[[^\]]+\]\s*)*(.*?OT[^\n"]+)',
+    re.I | re.M,
+)
 RX_USERMAIL = re.compile(r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}', re.I)
 
 _MOJI = {
@@ -53,19 +59,19 @@ def parse_body(body_text: str | None, correo_usuario: str) -> dict[str, object]:
     proveedor = "N/D"
     proveedor_match = RX_PROVEEDOR.search(body)
     if proveedor_match:
-        proveedor = proveedor_match.group(1).strip()
+        proveedor = next((g for g in proveedor_match.groups() if g), "N/D").strip()
 
     mecanico_nombre = "N/D"
     mecanico_telefono = "N/D"
     mecanico_match = RX_MECANICO.search(body)
     if mecanico_match:
-        mecanico_nombre = mecanico_match.group(1).strip()
+        mecanico_nombre = mecanico_match.group(1).strip() or "N/D"
         mecanico_telefono = _digits_only(mecanico_match.group(2)) or "N/D"
 
     inf_vehiculo = "N/D"
     ot_match = RX_OT_LINE.search(body)
     if ot_match:
-        inf_vehiculo = ot_match.group(1).strip()
+        inf_vehiculo = ot_match.group(1).strip().strip('"')
 
     correo_usuario_encontrado = False
     if correo_usuario:

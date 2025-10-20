@@ -9,6 +9,11 @@ from pathlib import Path
 from tkinter import ttk, messagebox, simpledialog, filedialog
 from html import escape
 
+# Claves compartidas con los módulos de reasignación
+SERVICIOS_DEPARTAMENTO_KEY = "SERVICIOS_DEPARTAMENTO"
+SERVICIOS_USUARIO_KEY = "SERVICIOS_USUARIO"
+SERVICIOS_MENSAJE_KEY = "SERVICIOS_REASIGNACION_MSG"
+
 # Garantiza que el paquete descargas_oc esté disponible incluso cuando la
 # aplicación se ejecute desde el directorio GestorCompras_. Buscamos la carpeta
 # "DescargasOC-main" ascendiendo en el árbol de directorios para soportar
@@ -244,6 +249,51 @@ class ConfigGUI(tk.Toplevel):
         ttk.Button(btn_frame, text="Eliminar", style="MyButton.TButton",
                    command=self.delete_assignment).pack(side="left", padx=5)
 
+        servicios_frame = ttk.LabelFrame(
+            self.assign_frame,
+            text="Parámetros Servicios",
+            style="MyLabelFrame.TLabelframe",
+            padding=10,
+        )
+        servicios_frame.pack(fill="x", pady=(10, 0))
+        servicios_frame.columnconfigure(1, weight=1)
+        servicios_frame.columnconfigure(3, weight=1)
+
+        ttk.Label(servicios_frame, text="Departamento Telcos:", style="MyLabel.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
+        self.servicios_dept_var = tk.StringVar(value=db.get_config(SERVICIOS_DEPARTAMENTO_KEY, ""))
+        ttk.Entry(servicios_frame, textvariable=self.servicios_dept_var, style="MyEntry.TEntry").grid(
+            row=0, column=1, padx=5, sticky="ew"
+        )
+
+        ttk.Label(servicios_frame, text="Usuario Telcos:", style="MyLabel.TLabel").grid(
+            row=0, column=2, sticky="w"
+        )
+        self.servicios_usuario_var = tk.StringVar(value=db.get_config(SERVICIOS_USUARIO_KEY, ""))
+        ttk.Entry(servicios_frame, textvariable=self.servicios_usuario_var, style="MyEntry.TEntry").grid(
+            row=0, column=3, padx=5, sticky="ew"
+        )
+
+        ttk.Label(servicios_frame, text="Mensaje de reasignación:", style="MyLabel.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(8, 0)
+        )
+        self.servicios_mensaje_var = tk.StringVar(
+            value=db.get_config(SERVICIOS_MENSAJE_KEY, 'Taller Asignado "{proveedor}"')
+        )
+        ttk.Entry(
+            servicios_frame,
+            textvariable=self.servicios_mensaje_var,
+            style="MyEntry.TEntry",
+        ).grid(row=1, column=1, columnspan=3, sticky="ew", padx=5, pady=(8, 0))
+
+        ttk.Button(
+            servicios_frame,
+            text="Guardar parámetros de Servicios",
+            style="MyButton.TButton",
+            command=self.save_servicios_params,
+        ).grid(row=2, column=0, columnspan=4, sticky="e", pady=(12, 0))
+
         self.load_assignments()
 
     def load_assignments(self):
@@ -272,7 +322,22 @@ class ConfigGUI(tk.Toplevel):
         if messagebox.askyesno("Confirmar", "¿Eliminar la asignación seleccionada?"):
             db.delete_assignment(sub)
             self.load_assignments()
-    
+
+    def save_servicios_params(self):
+        dept = self.servicios_dept_var.get().strip()
+        usuario = self.servicios_usuario_var.get().strip()
+        mensaje = self.servicios_mensaje_var.get().strip()
+        if not dept or not usuario:
+            messagebox.showwarning(
+                "Advertencia",
+                "Debe definir el departamento y el usuario de reasignación para Servicios.",
+            )
+            return
+        db.set_config(SERVICIOS_DEPARTAMENTO_KEY, dept)
+        db.set_config(SERVICIOS_USUARIO_KEY, usuario)
+        db.set_config(SERVICIOS_MENSAJE_KEY, mensaje or 'Taller Asignado "{proveedor}"')
+        messagebox.showinfo("Configuración", "Parámetros de Servicios actualizados correctamente.")
+
     def create_tracking_tab(self):
         frame = self.tracking_frame
 

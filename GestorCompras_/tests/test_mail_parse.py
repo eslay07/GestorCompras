@@ -74,3 +74,20 @@ def test_parse_body_valores_por_defecto():
     assert parsed["mecanico_nombre"] == "N/D"
     assert parsed["mecanico_telefono"] == "N/D"
     assert parsed["inf_vehiculo"] == "N/D"
+
+
+def test_parse_body_formato_servicios():
+    cuerpo = (
+        "Estimados MAVESA QUITO\n"
+        "Su ayuda coordinando el mantenimiento con Miguel García (093-558-7896)\n"
+        "[GTI-1566] [107082] OT MG-3363 MANT, GREAT WALL 335 GTI-1566 KM 107082\n"
+        "Agradezco su atención\n"
+        "Sistema Compras - Alex Cárdenas\n"
+        "AVISO IMPORTANTE: Dirija cualquier consulta a acardenas@telconet.ec\n"
+    )
+    parsed = parse_body(cuerpo, "acardenas@telconet.ec")
+    assert parsed["proveedor"] == "MAVESA QUITO"
+    assert parsed["mecanico_nombre"] == "Miguel García"
+    assert parsed["mecanico_telefono"] == "0935587896"
+    assert "OT" in parsed["inf_vehiculo"]
+    assert parsed["correo_usuario_encontrado"] is True

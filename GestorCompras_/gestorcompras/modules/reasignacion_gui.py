@@ -19,7 +19,7 @@ from tkinter import ttk, messagebox
 from gestorcompras.core import config as core_config
 from gestorcompras.core.mail_parse import parse_body, parse_subject
 from gestorcompras.data import reasignaciones_repo
-from gestorcompras.services import reassign_bridge
+from gestorcompras.services import reassign_bridge, db
 from gestorcompras.ui.common import add_hover_effect, center_window
 from gestorcompras.gui import reasignacion_gui as legacy_gui
 
@@ -55,6 +55,10 @@ class ServiciosReasignacion(tk.Toplevel):
         self.grab_set()
         self.email_session = email_session
         self.records: dict[str, dict[str, object]] = {}
+        self.departamento_var = tk.StringVar(value=db.get_config("SERVICIOS_DEPARTAMENTO", ""))
+        self.usuario_var = tk.StringVar(value=db.get_config("SERVICIOS_USUARIO", ""))
+        self.headless_var = tk.BooleanVar(value=db.get_config("SERVICIOS_HEADLESS", "1") != "0")
+        self.headless_var.trace_add("write", self._persist_headless)
         self._build_ui()
         center_window(self)
 
@@ -64,7 +68,7 @@ class ServiciosReasignacion(tk.Toplevel):
         main.pack(fill="both", expand=True)
         main.columnconfigure(0, weight=3)
         main.columnconfigure(1, weight=2)
-        main.rowconfigure(1, weight=1)
+        main.rowconfigure(2, weight=1)
 
         filtros = ttk.LabelFrame(main, text="Filtros", style="MyLabelFrame.TLabelframe", padding=10)
         filtros.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
@@ -95,8 +99,39 @@ class ServiciosReasignacion(tk.Toplevel):
             command=self.destroy,
         ).grid(row=0, column=5, sticky="e")
 
+        asignacion = ttk.LabelFrame(
+            main,
+            text="Datos de reasignación",
+            style="MyLabelFrame.TLabelframe",
+            padding=10,
+        )
+        asignacion.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        asignacion.columnconfigure(1, weight=1)
+        asignacion.columnconfigure(3, weight=1)
+
+        ttk.Label(asignacion, text="Departamento Telcos:", style="MyLabel.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
+        ttk.Entry(asignacion, textvariable=self.departamento_var, style="MyEntry.TEntry", width=28).grid(
+            row=0, column=1, padx=5, sticky="ew"
+        )
+
+        ttk.Label(asignacion, text="Usuario a reasignar:", style="MyLabel.TLabel").grid(
+            row=0, column=2, sticky="w"
+        )
+        ttk.Entry(asignacion, textvariable=self.usuario_var, style="MyEntry.TEntry", width=28).grid(
+            row=0, column=3, padx=5, sticky="ew"
+        )
+
+        ttk.Checkbutton(
+            asignacion,
+            text="Ejecutar navegador en modo oculto (headless)",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.headless_var,
+        ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(8, 0))
+
         tabla_frame = ttk.Frame(main, style="MyFrame.TFrame")
-        tabla_frame.grid(row=1, column=0, sticky="nsew")
+        tabla_frame.grid(row=2, column=0, sticky="nsew")
         tabla_frame.rowconfigure(0, weight=1)
         tabla_frame.columnconfigure(0, weight=1)
 
@@ -118,7 +153,7 @@ class ServiciosReasignacion(tk.Toplevel):
         self.tree.configure(yscrollcommand=scrollbar.set)
 
         acciones = ttk.Frame(main, style="MyFrame.TFrame", padding=5)
-        acciones.grid(row=2, column=0, sticky="ew", pady=5)
+        acciones.grid(row=3, column=0, sticky="ew", pady=5)
 
         self.estado_label = ttk.Label(acciones, text="", style="MyLabel.TLabel")
         self.estado_label.pack(side="left")
@@ -136,7 +171,7 @@ class ServiciosReasignacion(tk.Toplevel):
         add_hover_effect(reprocesar_btn)
 
         preview_frame = ttk.LabelFrame(main, text="Vista previa", style="MyLabelFrame.TLabelframe", padding=10)
-        preview_frame.grid(row=1, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
+        preview_frame.grid(row=2, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
         preview_frame.rowconfigure(0, weight=1)
         preview_frame.columnconfigure(0, weight=1)
 
@@ -144,6 +179,9 @@ class ServiciosReasignacion(tk.Toplevel):
         self.preview.grid(row=0, column=0, sticky="nsew")
 
     # Helpers
+    def _persist_headless(self, *_args) -> None:
+        db.set_config("SERVICIOS_HEADLESS", "1" if self.headless_var.get() else "0")
+
     def _parse_datetime(self, value: str) -> datetime:
         cfg = core_config.get_servicios_config()
         tz = ZoneInfo(cfg.get("zona_horaria", "America/Guayaquil"))
@@ -413,6 +451,16 @@ class ServiciosReasignacion(tk.Toplevel):
         if not task or task == "N/D":
             messagebox.showwarning("Reasignación", "El correo no contiene número de tarea válido.", parent=self)
             return
+        department = self.departamento_var.get().strip()
+        employee = self.usuario_var.get().strip()
+        if not department or not employee:
+            messagebox.showwarning(
+                "Reasignación",
+                "Debe ingresar el departamento y el usuario a quien reasignar.",
+                parent=self,
+            )
+            return
+        comentario_template = db.get_config("SERVICIOS_REASIGNACION_MSG", 'Taller Asignado "{proveedor}"')
         resultado = reassign_bridge.reassign_by_task_number(
             task,
             record.get("proveedor", ""),
@@ -420,11 +468,18 @@ class ServiciosReasignacion(tk.Toplevel):
             record.get("telefono", ""),
             record.get("inf_vehiculo", ""),
             fuente="SERVICIOS",
+            department=department,
+            employee=employee,
+            headless=self.headless_var.get(),
+            comentario_template=comentario_template,
+            email_session=self.email_session,
         )
         estado = resultado.get("status", "error")
         record["estado"] = estado.capitalize()
         self.tree.set(record["message_id"], "estado", record["estado"])
         self.estado_label.configure(text=f"Estado: {record['estado']}")
+        db.set_config("SERVICIOS_DEPARTAMENTO", department)
+        db.set_config("SERVICIOS_USUARIO", employee)
         if estado == "ok":
             messagebox.showinfo("Reasignación", "Tarea reasignada correctamente.", parent=self)
         elif estado == "not_found":
