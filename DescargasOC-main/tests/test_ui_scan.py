@@ -9,10 +9,10 @@ class DummyText:
     def __init__(self):
         self.messages = []
 
-    def insert(self, index, text):  # pragma: no cover - simple storage
+    def insert(self, index, text):  # pragma: no cover - almacenamiento sencillo
         self.messages.append(text)
 
-    def see(self, index):  # pragma: no cover - noop for tests
+    def see(self, index):  # pragma: no cover - sin efecto en pruebas
         pass
 
     def after(self, delay, callback):
@@ -39,7 +39,7 @@ class DummyConfig:
         self.correo_reporte = "report@telconet.ec"
         self.headless = True
 
-    def validate(self):  # pragma: no cover - no validation logic
+    def validate(self):  # pragma: no cover - sin lógica de validación
         return True
 
 

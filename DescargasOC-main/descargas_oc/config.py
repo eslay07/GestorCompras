@@ -27,7 +27,7 @@ class Config:
                 self.data = json.load(f)
         except FileNotFoundError:
             self.data = {}
-        # override credentials with environment variables if present
+        # sobrescribe credenciales con variables de entorno cuando existan
         self.data['usuario'] = os.getenv('USUARIO_OC', self.data.get('usuario'))
         self.data['password'] = os.getenv('PASSWORD_OC', self.data.get('password'))
         self.data['pop_server'] = os.getenv('POP_SERVER', self.data.get('pop_server'))
@@ -41,7 +41,6 @@ class Config:
             except (TypeError, ValueError):
                 return default
 
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
         def _parse_bool(value, default):
             if isinstance(value, bool):
                 return value
@@ -55,8 +54,6 @@ class Config:
                 return bool(value)
             return default
 
-#=======
-#>>>>>>> master
         self.data['pop_port'] = _parse_int(
             os.getenv('POP_PORT', self.data.get('pop_port', 995)), 995
         )
@@ -80,8 +77,6 @@ class Config:
             'SMTP_PASSWORD',
             self.data.get('smtp_password', self.data.get('password')),
         )
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-
         headless_raw = os.getenv('HEADLESS', self.data.get('headless'))
         headless_val = _parse_bool(headless_raw, False)
         self.data['headless'] = headless_val
@@ -94,8 +89,6 @@ class Config:
             abas_headless_raw,
             headless_val,
         )
-#=======
-#>>>>>>> master
         self.data.setdefault('max_threads', 5)
         self.data.setdefault('batch_size', 50)
 
@@ -108,7 +101,7 @@ class Config:
             val = 300
         self.data['scan_interval'] = val
 
-        # default values when config file is empty
+        # valores predeterminados cuando el archivo de configuración está vacío
         self.data.setdefault('pop_server', 'pop.telconet.ec')
         self.data.setdefault('pop_port', 995)
         self.data.setdefault('usuario', 'jotoapanta@telconet.ec')
@@ -158,7 +151,7 @@ class Config:
 
         _normalize_list('abastecimiento_solicitantes')
         _normalize_list('abastecimiento_autorizadores')
-        # persist values so configuration survives between executions
+        # guarda los valores para conservar la configuración entre ejecuciones
         self.save()
         return self
 
@@ -167,11 +160,11 @@ class Config:
         with open(self.path, 'w') as f:
             json.dump(self.data, f, indent=2)
 
-    # convenience property accessors
+    # accesores de conveniencia para las propiedades
     def __getattr__(self, item):
         return self.data.get(item)
 
-    # validations
+    # validaciones
     def validate(self):
         repo_id = self.data.get('seafile_repo_id', '')
         try:
