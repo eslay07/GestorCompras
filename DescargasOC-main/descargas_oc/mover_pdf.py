@@ -182,6 +182,34 @@ def _destino_no_bienes(
             continue
     return None
 
+#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
+#=======
+#codex/fix-email-scanning-for-descarga-normal
+#>>>>>>> master
+REINTENTOS = 5
+ESPERA_INICIAL = 0.3
+
+
+def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
+    if not nombre or not numero:
+        return False
+    patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
+    return re.search(patron, nombre) is not None
+
+
+def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
+    destino_dir.mkdir(parents=True, exist_ok=True)
+    destino = destino_dir / nombre
+    if not destino.exists():
+        return destino
+    base, ext = os.path.splitext(nombre)
+    i = 1
+    while True:
+        candidato = destino_dir / f"{base} ({i}){ext}"
+        if not candidato.exists():
+            return candidato
+        i += 1
+
 
 def normalizar_nombre_archivo(nombre: str, longitud_maxima: int = LONGITUD_MAXIMA_PROVEEDOR) -> str:
     """Normaliza *nombre* para uso en nombres de archivo."""
@@ -271,6 +299,8 @@ def mover_oc(config: Config, ordenes=None):
 
         extension = ruta_path.suffix or ".pdf"
         nombre_deseado = nombre_archivo_orden(numero, proveedor, extension)
+        ext = ruta_path.suffix or ".pdf"
+        nombre_deseado = nombre_archivo_orden(numero, prov, ext)
         nombre_original = ruta_path.name
         origen_descarga = ruta_path.parent
 
