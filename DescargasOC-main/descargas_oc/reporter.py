@@ -5,7 +5,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from html import escape
 
-try:  # allow running as script
+try:  # permite ejecutar como script
     from .config import Config
     from .logger import get_logger
     from .organizador_bienes import extraer_numero_tarea_desde_pdf
