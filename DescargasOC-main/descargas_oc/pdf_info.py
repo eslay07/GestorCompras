@@ -37,6 +37,7 @@ def nombre_archivo_orden(numero: str | None, proveedor: str | None = None, exten
     - Retro-compatible con llamadas (numero), (numero, proveedor), (numero, proveedor, extension) y (numero, ".pdf").
     """
     # Compatibilidad: si 'proveedor' parece extensión, reubicar
+    # Back-compat: si 'proveedor' parece extensión, reubicar
     if proveedor and isinstance(proveedor, str) and proveedor.startswith(".") and (extension is None or extension == ".pdf"):
         extension = proveedor
         proveedor = None
