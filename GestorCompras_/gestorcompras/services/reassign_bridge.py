@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from gestorcompras.services import db
 
@@ -53,37 +53,87 @@ def _build_payload(
     }
 
 
-def _run_selenium_reassign(
-    email_session: Dict[str, str],
-    payload: Dict[str, Any],
-    headless: bool,
-) -> Dict[str, Any]:
+def _create_driver(headless: bool):
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
 
-    from gestorcompras.gui.reasignacion_gui import login_telcos, process_task
-
     service = Service(ChromeDriverManager().install())
     options = Options()
     if headless:
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-extensions")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     prefs = {"profile.managed_default_content_settings.images": 2}
     options.add_experimental_option("prefs", prefs)
+    return webdriver.Chrome(service=service, options=options)
 
-    driver = webdriver.Chrome(service=service, options=options)
+
+def _reanudar_panel(driver) -> None:
+    try:
+        from selenium.webdriver.common.by import By
+
+        from gestorcompras.gui.reasignacion_gui import wait_clickable_or_error
+
+        boton = wait_clickable_or_error(
+            driver,
+            (By.ID, "spanTareasPersonales"),
+            None,
+            "el menú de tareas",
+            timeout=15,
+            retries=1,
+        )
+        driver.execute_script("arguments[0].click();", boton)
+    except Exception as exc:  # pragma: no cover - mejora de resiliencia
+        logger.debug("No se pudo reabrir el panel de tareas: %s", exc)
+
+
+def _run_selenium_batch(
+    email_session: Dict[str, str],
+    payloads: List[Dict[str, Any]],
+    headless: bool,
+) -> List[Dict[str, Any]]:
+    if not payloads:
+        return []
+
+    from gestorcompras.gui.reasignacion_gui import login_telcos, process_task
+
+    driver = None
+    resultados: List[Dict[str, Any]] = []
     try:
         address, password = _ensure_credentials(email_session)
+        driver = _create_driver(headless)
         login_telcos(driver, address.split("@")[0], password)
-        process_task(driver, payload, None)
+
+        for payload in payloads:
+            message_id = payload.get("message_id")
+            try:
+                process_task(driver, payload, None)
+                _reanudar_panel(driver)
+                resultados.append({
+                    "status": "ok",
+                    "details": payload,
+                    "message_id": message_id,
+                })
+            except Exception as exc:  # pragma: no cover - se registra para diagnóstico
+                estado = "not_found" if "No se encontraron las tareas" in str(exc) else "error"
+                resultados.append({
+                    "status": estado,
+                    "details": payload,
+                    "message_id": message_id,
+                    "error": str(exc),
+                })
+                try:
+                    _reanudar_panel(driver)
+                except Exception:
+                    pass
+        return resultados
     finally:
-        driver.quit()
-    return {"status": "ok", "details": payload}
+        if driver:
+            driver.quit()
 
 
 def reassign_by_task_number(
@@ -117,25 +167,96 @@ def reassign_by_task_number(
         employee,
         template,
     )
+    payload["message_id"] = None
+
+    resultados = reassign_tasks(
+        [payload],
+        fuente=fuente,
+        department=department,
+        employee=employee,
+        headless=headless,
+        comentario_template=template,
+        email_session=email_session,
+        _prebuilt_payloads=True,
+    )
+    return resultados[0] if resultados else {"status": "error", "details": "Sin resultado"}
+
+
+def reassign_tasks(
+    records: List[Dict[str, Any]],
+    *,
+    fuente: str = "SERVICIOS",
+    department: str | None = None,
+    employee: str | None = None,
+    headless: bool = True,
+    comentario_template: str | None = None,
+    email_session: Dict[str, str] | None = None,
+    _prebuilt_payloads: bool = False,
+) -> List[Dict[str, Any]]:
+    """Reasigna múltiples tareas reutilizando la misma sesión de navegador."""
+
+    if not records:
+        return []
+
+    template = _normalize_template(comentario_template)
+    payloads: List[Dict[str, Any]] = []
+    if _prebuilt_payloads:
+        payloads = records
+        for payload in payloads:
+            if "comentario_template" not in payload or not payload["comentario_template"]:
+                payload["comentario_template"] = template
+    else:
+        for record in records:
+            task_number = record.get("task_number")
+            payload = _build_payload(
+                str(task_number or ""),
+                record.get("proveedor", ""),
+                record.get("mecanico", ""),
+                record.get("telefono", ""),
+                record.get("inf_vehiculo", ""),
+                fuente,
+                department,
+                employee,
+                template,
+            )
+            payload["message_id"] = record.get("message_id")
+            payloads.append(payload)
 
     try:
-        result = _run_selenium_reassign(email_session or {}, payload, headless)
-        logger.info(
-            "Reasignación completada para tarea %s (%s)",
-            task_number,
-            payload.get("fuente"),
-        )
-        return result
+        resultados = _run_selenium_batch(email_session or {}, payloads, headless)
+        for resultado in resultados:
+            if resultado.get("status") == "ok":
+                detalle = resultado.get("details", {})
+                logger.info(
+                    "Reasignación completada para tarea %s (%s)",
+                    detalle.get("task_number"),
+                    detalle.get("fuente", fuente),
+                )
+        return resultados
     except ValueError as exc:
         logger.warning("Reasignación cancelada: %s", exc)
-        return {"status": "error", "details": str(exc)}
+        return [
+            {
+                "status": "error",
+                "message_id": payload.get("message_id"),
+                "error": str(exc),
+                "details": payload,
+            }
+            for payload in payloads
+        ]
     except Exception as exc:  # pragma: no cover - protección adicional
+        logger.exception("Error durante la reasignación de tareas")
         mensaje = str(exc)
-        logger.exception("Error durante la reasignación de la tarea %s", task_number)
-        if "No se encontraron las tareas" in mensaje:
-            return {"status": "not_found", "details": mensaje}
-        return {"status": "error", "details": mensaje}
+        return [
+            {
+                "status": "error",
+                "message_id": payload.get("message_id"),
+                "error": mensaje,
+                "details": payload,
+            }
+            for payload in payloads
+        ]
 
 
-__all__ = ["reassign_by_task_number"]
+__all__ = ["reassign_by_task_number", "reassign_tasks"]
 

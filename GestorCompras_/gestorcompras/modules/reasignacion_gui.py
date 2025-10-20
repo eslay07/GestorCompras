@@ -42,9 +42,9 @@ class ServiciosReasignacion(tk.Toplevel):
     columns = (
         "seleccion",
         "fecha",
-        "asunto",
         "numero_tarea",
         "taller",
+        "asunto",
     )
 
     def __init__(self, master: tk.Misc | None, email_session: dict[str, str]):
@@ -55,6 +55,7 @@ class ServiciosReasignacion(tk.Toplevel):
         self.grab_set()
         self.email_session = email_session
         self.records: dict[str, dict[str, object]] = {}
+        self._correo_usuario = core_config.get_user_email() or email_session.get("address", "")
         self.servicios_cfg = core_config.get_servicios_config()
         self.departamento_var = tk.StringVar(value=db.get_config("SERVICIOS_DEPARTAMENTO", ""))
         self.usuario_var = tk.StringVar(value=db.get_config("SERVICIOS_USUARIO", ""))
@@ -159,17 +160,17 @@ class ServiciosReasignacion(tk.Toplevel):
         headings = {
             "seleccion": "",
             "fecha": "Fecha",
-            "asunto": "Asunto",
             "numero_tarea": "Número de tarea",
             "taller": "Taller",
+            "asunto": "Asunto",
         }
         for col, label in headings.items():
             self.tree.heading(col, text=label)
         self.tree.column("seleccion", width=40, anchor="center")
         self.tree.column("fecha", width=150, anchor="center")
-        self.tree.column("asunto", width=320, anchor="w")
         self.tree.column("numero_tarea", width=140, anchor="center")
         self.tree.column("taller", width=220, anchor="w")
+        self.tree.column("asunto", width=320, anchor="w")
         self.tree.grid(row=0, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Button-1>", self._on_tree_click, add=True)
@@ -196,10 +197,6 @@ class ServiciosReasignacion(tk.Toplevel):
         reasignar_btn = ttk.Button(acciones, text="Reasignar", style="MyButton.TButton", command=self._reasignar)
         reasignar_btn.pack(side="right", padx=5)
         add_hover_effect(reasignar_btn)
-
-        reprocesar_btn = ttk.Button(acciones, text="Reprocesar este correo", style="MyButton.TButton", command=self._reprocesar)
-        reprocesar_btn.pack(side="right", padx=5)
-        add_hover_effect(reprocesar_btn)
 
         preview_frame = ttk.LabelFrame(main, text="Vista previa", style="MyLabelFrame.TLabelframe", padding=10)
         preview_frame.grid(row=2, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
@@ -426,7 +423,7 @@ class ServiciosReasignacion(tk.Toplevel):
 
     def _buscar(self) -> None:
         cfg = core_config.get_servicios_config()
-        correo_usuario = core_config.get_user_email() or self.email_session.get("address", "")
+        correo_usuario = self._correo_usuario or self.email_session.get("address", "")
         password = self.email_session.get("password", "")
         if not correo_usuario or not password:
             messagebox.showerror(
@@ -435,6 +432,7 @@ class ServiciosReasignacion(tk.Toplevel):
                 parent=self,
             )
             return
+        self._correo_usuario = correo_usuario
 
         cadena = cfg.get("cadena_asunto_fija", "NOTIFICACION A PROVEEDOR:")
         remitente = self.remitente_var.get().strip()
@@ -494,6 +492,7 @@ class ServiciosReasignacion(tk.Toplevel):
                 "body": item["body"],
                 "estado": estado,
                 "checked": False,
+                "error": "",
             }
             self.records[message_id] = registro
             reasignaciones_repo.upsert({
@@ -518,9 +517,9 @@ class ServiciosReasignacion(tk.Toplevel):
                 values=(
                     self._checkbox_symbol(False),
                     item["date"].strftime("%Y-%m-%d %H:%M"),
-                    item["subject"],
                     registro["task_number"],
                     registro["taller"],
+                    item["subject"],
                 ),
             )
             logger.info(
@@ -564,18 +563,22 @@ class ServiciosReasignacion(tk.Toplevel):
         exitos = 0
         fallas = 0
         no_encontradas = 0
+        pendientes: list[dict[str, object]] = []
         for record in objetivos:
             task = record.get("task_number")
             if not task or task == "N/D":
                 fallas += 1
                 record["estado"] = "Número inválido"
+                record["error"] = "Número de tarea no disponible"
+                self.tree.set(record["message_id"], "seleccion", self._checkbox_symbol(False))
+                record["checked"] = False
                 continue
-            resultado = reassign_bridge.reassign_by_task_number(
-                task,
-                record.get("proveedor", ""),
-                record.get("mecanico", ""),
-                record.get("telefono", ""),
-                record.get("inf_vehiculo", ""),
+            pendientes.append(record)
+
+        resultados = []
+        if pendientes:
+            resultados = reassign_bridge.reassign_tasks(
+                pendientes,
                 fuente="SERVICIOS",
                 department=department,
                 employee=employee,
@@ -583,19 +586,34 @@ class ServiciosReasignacion(tk.Toplevel):
                 comentario_template=comentario_template,
                 email_session=self.email_session,
             )
-            estado = resultado.get("status", "error")
-            record["estado"] = estado.capitalize()
-            if estado == "ok":
-                exitos += 1
-            elif estado == "not_found":
-                no_encontradas += 1
-            else:
-                fallas += 1
+        resultado_por_id = {item.get("message_id"): item for item in resultados}
+
+        for record in objetivos:
+            resultado = resultado_por_id.get(record.get("message_id"))
+            if resultado:
+                estado = resultado.get("status", "error")
+                record["estado"] = estado.capitalize()
+                record["error"] = resultado.get("error", "")
             record["checked"] = False
             self.tree.set(record["message_id"], "seleccion", self._checkbox_symbol(False))
+
+            estado_actual = record.get("estado", "")
+            estado_lower = estado_actual.lower()
+            if estado_lower == "ok" or estado_lower == "reasignada":
+                exitos += 1
+            elif estado_lower == "not_found":
+                no_encontradas += 1
+            elif estado_lower in {"número inválido", "numero inválido", "numero invalido", "número invalido"}:
+                fallas += 1
+            elif estado_lower == "error":
+                fallas += 1
+            else:
+                fallas += 1
+
         db.set_config("SERVICIOS_DEPARTAMENTO", department)
         db.set_config("SERVICIOS_USUARIO", employee)
         self._sync_master_check()
+
         resumen = []
         if exitos:
             resumen.append(f"{exitos} reasignadas")
@@ -603,35 +621,45 @@ class ServiciosReasignacion(tk.Toplevel):
             resumen.append(f"{no_encontradas} no encontradas")
         if fallas:
             resumen.append(f"{fallas} con error")
-        if not resumen:
-            resumen_texto = "Sin cambios"
-        else:
-            resumen_texto = ", ".join(resumen)
+        resumen_texto = ", ".join(resumen) if resumen else "Sin cambios"
         self.estado_label.configure(text=f"Último resultado: {resumen_texto}")
+
         if exitos and not fallas and not no_encontradas:
-            messagebox.showinfo("Reasignación", "Correos procesados correctamente.", parent=self)
+            messagebox.showinfo("Reasignación", "Tareas reasignadas correctamente.", parent=self)
         elif exitos or no_encontradas:
             messagebox.showwarning("Reasignación", resumen_texto.capitalize(), parent=self)
         else:
-            messagebox.showerror("Reasignación", "No se pudo procesar ningún correo.", parent=self)
+            messagebox.showerror("Reasignación", "No se pudo reasignar ninguna tarea.", parent=self)
 
-    def _reprocesar(self) -> None:
-        record = self._selected_record()
-        if not record:
-            return
-        correo_usuario = core_config.get_user_email() or self.email_session.get("address", "")
-        parsed = parse_body(record.get("body", ""), correo_usuario)
-        record.update(
-            {
-                "proveedor": parsed.get("proveedor", "N/D"),
-                "taller": parsed.get("proveedor", "N/D"),
-                "mecanico": parsed.get("mecanico_nombre", "N/D"),
-                "telefono": parsed.get("mecanico_telefono", "N/D"),
-                "inf_vehiculo": parsed.get("inf_vehiculo", "N/D"),
+        exitosos: list[dict[str, object]] = []
+        fallidos: list[dict[str, object]] = []
+        for record in objetivos:
+            fila_base = {
+                "fecha": record.get("fecha"),
+                "task_number": record.get("task_number", "N/D"),
+                "taller": record.get("taller", "N/D"),
+                "asunto": record.get("asunto", ""),
             }
-        )
-        self.tree.set(record["message_id"], "taller", record["taller"])
-        messagebox.showinfo("Reprocesado", "Los datos fueron actualizados con la nueva lectura.", parent=self)
+            estado = str(record.get("estado", "")).lower()
+            if estado in {"ok", "reasignada"}:
+                exitosos.append(fila_base)
+            else:
+                error_texto = record.get("error") or record.get("estado", "Error")
+                fila_fallo = dict(fila_base)
+                fila_fallo["error"] = error_texto
+                fallidos.append(fila_fallo)
+
+        try:
+            from gestorcompras.services.reassign_reporter import enviar_reporte_servicios
+
+            enviar_reporte_servicios(
+                self.email_session,
+                self._correo_usuario,
+                exitosos,
+                fallidos,
+            )
+        except Exception:
+            logger.exception("No se pudo enviar el reporte de reasignación")
 
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:

@@ -69,7 +69,7 @@ class ConfigGUI(tk.Toplevel):
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
-        self.geometry("900x700")
+        self.geometry("1100x760")
         self.email_session = email_session
         self.descargas_cfg = DescargasConfig()
         self._oc_entries: dict[str, tk.Widget] = {}
