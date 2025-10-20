@@ -55,7 +55,7 @@ def init_styles() -> None:
     style.configure(
         "MyButton.TButton",
         font=fuente_bold,
-        foreground=color_texto,
+        foreground=color_titulos,
         background=color_primario,
         padding=10,
         relief="raised",
@@ -64,15 +64,21 @@ def init_styles() -> None:
     style.configure(
         "MyButtonHover.TButton",
         font=fuente_bold,
-        foreground=color_texto,
-        background=color_hover,
+        foreground=bg_frame,
+        background=color_acento,
         padding=12,
         relief="raised",
         borderwidth=1,
     )
     style.map(
         "MyButton.TButton",
-        background=[("active", color_hover), ("disabled", color_borde)],
+        background=[("active", color_acento), ("disabled", color_borde)],
+        foreground=[("active", bg_frame)],
+    )
+    style.map(
+        "MyButtonHover.TButton",
+        background=[("active", color_acento)],
+        foreground=[("active", bg_frame)],
     )
     style.configure("MyCheckbutton.TCheckbutton", background=bg_frame, foreground=color_texto, font=fuente_normal)
     style.configure(

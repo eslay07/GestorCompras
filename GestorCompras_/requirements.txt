@@ -5,5 +5,3 @@ openpyxl
 selenium
 webdriver_manager
 psutil
-beautifulsoup4
-imapclient

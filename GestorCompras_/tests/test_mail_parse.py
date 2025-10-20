@@ -19,9 +19,21 @@ def test_parse_subject(subject, expected):
 @pytest.mark.parametrize(
     "body,correo,expect_found",
     [
-        ("Estimados \"Proveedor Uno\"\ncoordinando el mantenimiento con \"Juan Perez (0999999999)\".\n\"OT-12345\"", "user@telconet.ec", False),
-        ("Estimados \"Proveedor Dos\" correo user@telconet.ec\ncoordinando el mantenimiento con \"María López (09-888-7777)\"\n\"OT 98765\"", "user@telconet.ec", True),
-        ("Estimados \"Proveedor Tres\"\ncoordinando el mantenimiento con \"Carlos Gómez (593-2-123456)\"\n\"OT 222\"", "", False),
+        (
+            "Estimados \"Proveedor Uno\"\ncoordinando el mantenimiento con \"Juan Perez (0999999999)\".\n\"OT-12345\"",
+            "user@telconet.ec",
+            False,
+        ),
+        (
+            "Estimados \"Proveedor Dos\" correo user@telconet.ec\ncoordinando el mantenimiento con \"María López (09-888-7777)\"\n\"OT 98765\"",
+            "user@telconet.ec",
+            True,
+        ),
+        (
+            "Estimados \"Proveedor Tres\"\ncoordinando el mantenimiento con \"Carlos Gómez (593-2-123456)\"\n\"OT 222\"",
+            "otro@telconet.ec",
+            False,
+        ),
     ],
 )
 def test_parse_body_identifica_correo(body, correo, expect_found):

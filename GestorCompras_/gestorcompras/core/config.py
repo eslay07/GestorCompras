@@ -20,11 +20,6 @@ _DEFAULTS = {
     "servicios": {
         "cadena_asunto_fija": "NOTIFICACION A PROVEEDOR:",
         "zona_horaria": "America/Guayaquil",
-        "carpeta_correo": "INBOX",
-        "fuente_correo": "IMAP",
-        "imap_host": "",
-        "imap_user": "",
-        "imap_password": "",
     },
 }
 

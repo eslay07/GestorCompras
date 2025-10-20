@@ -1,8 +1,15 @@
 """Punto de entrada unificado para la reasignación de tareas."""
 from __future__ import annotations
 
+import email
 import hashlib
+import html
+import imaplib
 import logging
+import re
+from email.header import decode_header, make_header
+from email.message import Message
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -10,8 +17,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from gestorcompras.core import config as core_config
-from gestorcompras.core import email_search
-from gestorcompras.core.mail_parse import parse_body
+from gestorcompras.core.mail_parse import parse_body, parse_subject
 from gestorcompras.data import reasignaciones_repo
 from gestorcompras.services import reassign_bridge
 from gestorcompras.ui.common import add_hover_effect, center_window
@@ -143,9 +149,161 @@ class ServiciosReasignacion(tk.Toplevel):
         tz = ZoneInfo(cfg.get("zona_horaria", "America/Guayaquil"))
         return datetime.strptime(value.strip(), "%Y-%m-%d %H:%M").replace(tzinfo=tz)
 
+    @staticmethod
+    def _decode_subject(msg: Message) -> str:
+        raw = msg.get("Subject", "")
+        try:
+            return str(make_header(decode_header(raw)))
+        except Exception:  # pragma: no cover - caso defensivo
+            partes: list[str] = []
+            for value, encoding in decode_header(raw):
+                if isinstance(value, bytes):
+                    codec = encoding or "utf-8"
+                    try:
+                        partes.append(value.decode(codec, errors="ignore"))
+                    except Exception:
+                        partes.append(value.decode("utf-8", errors="ignore"))
+                else:
+                    partes.append(value)
+            return "".join(partes)
+
+    @staticmethod
+    def _clean_html(text: str) -> str:
+        cleaned = re.sub(r"(?is)<(script|style).*?>.*?</\\1>", " ", text)
+        cleaned = re.sub(r"(?is)<br\\s*/?>", "\n", cleaned)
+        cleaned = re.sub(r"(?is)</p>", "\n", cleaned)
+        cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
+        cleaned = html.unescape(cleaned)
+        return re.sub(r"\s+", " ", cleaned).strip()
+
+    @classmethod
+    def _extract_text(cls, msg: Message) -> str:
+        partes: list[str] = []
+        if msg.is_multipart():
+            for part in msg.walk():
+                if part.get_content_disposition() == "attachment":
+                    continue
+                payload = part.get_payload(decode=True)
+                if payload is None:
+                    continue
+                charset = part.get_content_charset() or "utf-8"
+                try:
+                    texto = payload.decode(charset, errors="ignore")
+                except Exception:
+                    texto = payload.decode("utf-8", errors="ignore")
+                if part.get_content_type() == "text/html":
+                    texto = cls._clean_html(texto)
+                partes.append(texto)
+        else:
+            payload = msg.get_payload(decode=True)
+            if payload:
+                charset = msg.get_content_charset() or "utf-8"
+                try:
+                    texto = payload.decode(charset, errors="ignore")
+                except Exception:
+                    texto = payload.decode("utf-8", errors="ignore")
+                if msg.get_content_type() == "text/html":
+                    texto = cls._clean_html(texto)
+                partes.append(texto)
+        return "\n".join(filter(None, partes)).strip()
+
+    @staticmethod
+    def _parse_header_date(msg: Message, tz: ZoneInfo) -> datetime | None:
+        header = msg.get("Date")
+        if not header:
+            return None
+        try:
+            dt = parsedate_to_datetime(header)
+        except (TypeError, ValueError):
+            return None
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        return dt.astimezone(tz)
+
+    def _buscar_correos(
+        self,
+        usuario: str,
+        password: str,
+        cadena_asunto: str,
+        dt_desde: datetime,
+        dt_hasta: datetime,
+    ) -> list[dict[str, object]]:
+        tz = dt_desde.tzinfo or ZoneInfo("America/Guayaquil")
+        cadena_normalizada = cadena_asunto.strip().upper()
+        host = "pop.telconet.ec"
+        puerto = 993
+
+        conexion = imaplib.IMAP4_SSL(host, puerto)
+        try:
+            conexion.login(usuario, password)
+            conexion.select("INBOX")
+            since = dt_desde.strftime("%d-%b-%Y")
+            status, data = conexion.search(None, f'(SINCE "{since}")')
+            if status != "OK":
+                raise RuntimeError("No se pudo obtener el listado de correos")
+            ids = data[0].split()
+            resultados: list[dict[str, object]] = []
+            for msg_id in reversed(ids):
+                status, fetch_data = conexion.fetch(msg_id, "(RFC822)")
+                if status != "OK":
+                    continue
+                for response in fetch_data:
+                    if not isinstance(response, tuple):
+                        continue
+                    msg = email.message_from_bytes(response[1])
+                    subject = self._decode_subject(msg)
+                    if cadena_normalizada not in subject.upper():
+                        continue
+                    fecha = self._parse_header_date(msg, tz)
+                    if not fecha or not (dt_desde <= fecha <= dt_hasta):
+                        continue
+                    cuerpo = self._extract_text(msg)
+                    parsed = parse_body(cuerpo, usuario)
+                    if not parsed.get("correo_usuario_encontrado"):
+                        mensaje_id = msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id)
+                        logger.info(
+                            "Correo ignorado por no contener al usuario: id=%s",
+                            mensaje_id,
+                        )
+                        continue
+                    info_tarea = parse_subject(subject)
+                    mensaje_id = msg_id.decode() if isinstance(msg_id, bytes) else str(msg_id)
+                    registros = {
+                        "message_id": mensaje_id,
+                        "date": fecha,
+                        "subject": subject,
+                        "task_number": info_tarea.get("task_number", "N/D"),
+                        "body": cuerpo,
+                        "proveedor": parsed.get("proveedor", "N/D"),
+                        "mecanico_nombre": parsed.get("mecanico_nombre", "N/D"),
+                        "mecanico_telefono": parsed.get("mecanico_telefono", "N/D"),
+                        "inf_vehiculo": parsed.get("inf_vehiculo", "N/D"),
+                    }
+                    resultados.append(registros)
+                    logger.info(
+                        "Correo válido encontrado: id=%s tarea=%s", registros["message_id"], registros["task_number"]
+                    )
+            return resultados
+        finally:
+            try:
+                conexion.logout()
+            except Exception:
+                pass
+
     def _buscar(self) -> None:
         cfg = core_config.get_servicios_config()
         correo_usuario = core_config.get_user_email() or self.email_session.get("address", "")
+        password = self.email_session.get("password", "")
+        if not correo_usuario or not password:
+            messagebox.showerror(
+                "Sesión",
+                "Debe iniciar sesión en el sistema para consultar el correo.",
+                parent=self,
+            )
+            return
+
         cadena = cfg.get("cadena_asunto_fija", "NOTIFICACION A PROVEEDOR:")
         try:
             dt_desde = self._parse_datetime(self.desde_var.get())
@@ -154,31 +312,29 @@ class ServiciosReasignacion(tk.Toplevel):
             messagebox.showerror("Formato incorrecto", "Ingrese fechas en formato YYYY-MM-DD HH:MM", parent=self)
             return
 
-        fuente = cfg.get("fuente_correo", "IMAP").upper()
-        registros = []
+        if dt_desde > dt_hasta:
+            messagebox.showerror("Rango inválido", "La fecha inicial no puede ser mayor a la final.", parent=self)
+            return
+
         logger.info(
-            "Buscando correos: fuente=%s, asunto~%s, rango=%s-%s", fuente, cadena, dt_desde, dt_hasta
+            "Buscando correos: usuario=%s asunto~%s rango=%s-%s",
+            correo_usuario,
+            cadena,
+            dt_desde,
+            dt_hasta,
         )
-        if fuente == "IMAP":
-            try:
-                registros = list(
-                    email_search.search_messages_imap(
-                        cfg.get("imap_host", ""),
-                        cfg.get("imap_user", ""),
-                        cfg.get("imap_password", ""),
-                        cfg.get("carpeta_correo", "INBOX"),
-                        dt_desde,
-                        dt_hasta,
-                        cadena,
-                        correo_usuario,
-                    )
-                )
-            except Exception as exc:
-                logger.exception("Error en búsqueda IMAP")
-                messagebox.showerror("IMAP", f"No se pudo realizar la búsqueda: {exc}", parent=self)
-                return
-        else:
-            messagebox.showwarning("Fuente no implementada", "Actualmente solo se admite IMAP", parent=self)
+
+        try:
+            registros = self._buscar_correos(
+                correo_usuario,
+                password,
+                cadena,
+                dt_desde,
+                dt_hasta,
+            )
+        except Exception as exc:
+            logger.exception("Error durante la lectura de correos")
+            messagebox.showerror("Correo", f"No se pudo realizar la búsqueda: {exc}", parent=self)
             return
 
         self.tree.delete(*self.tree.get_children())
