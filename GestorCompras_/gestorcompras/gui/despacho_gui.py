@@ -17,7 +17,7 @@ def center_window(win: tk.Tk | tk.Toplevel):
 
 def open_despacho(master, email_session):
     window = tk.Toplevel(master)
-    window.title("Solicitud de Despachos")
+    window.title("Correos Masivos")
     window.geometry("600x450")
     window.transient(master)
     window.grab_set()
