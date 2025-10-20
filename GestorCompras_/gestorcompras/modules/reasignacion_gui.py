@@ -7,6 +7,7 @@ import html
 import imaplib
 import logging
 import re
+import unicodedata
 from email.header import decode_header, make_header
 from email.message import Message
 from email.utils import parsedate_to_datetime
@@ -340,7 +341,7 @@ class ServiciosReasignacion(tk.Toplevel):
         remitente: str = "",
     ) -> list[dict[str, object]]:
         tz = dt_desde.tzinfo or ZoneInfo("America/Guayaquil")
-        cadena_normalizada = cadena_asunto.strip().upper()
+        cadena_normalizada = self._normalize_for_search(cadena_asunto)
         host = "pop.telconet.ec"
         puerto = 993
         remitente_busqueda = remitente.strip()
@@ -368,7 +369,8 @@ class ServiciosReasignacion(tk.Toplevel):
                         continue
                     msg = email.message_from_bytes(response[1])
                     subject = self._decode_subject(msg)
-                    if cadena_normalizada not in subject.upper():
+                    subject_normalized = self._normalize_for_search(subject)
+                    if cadena_normalizada not in subject_normalized:
                         continue
                     from_header = self._decode_header_value(msg.get("From", ""))
                     if remitente_normalizado and remitente_normalizado not in from_header.lower():
@@ -412,6 +414,15 @@ class ServiciosReasignacion(tk.Toplevel):
                 conexion.logout()
             except Exception:
                 pass
+
+    @staticmethod
+    def _normalize_for_search(value: str | None) -> str:
+        """Normaliza una cadena removiendo acentos para búsquedas flexibles."""
+        if not value:
+            return ""
+        normalized = unicodedata.normalize("NFD", value)
+        sin_acentos = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        return sin_acentos.upper()
 
     def _buscar(self) -> None:
         cfg = core_config.get_servicios_config()
