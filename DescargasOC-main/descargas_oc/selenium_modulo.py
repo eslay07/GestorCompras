@@ -17,19 +17,19 @@ from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-try:  # allow running as script
+try:  # permite ejecutar como script
     from .seafile_client import SeafileClient
 except ImportError:  # pragma: no cover
     from seafile_client import SeafileClient
 
-try:  # allow running as script
+try:  # permite ejecutar como script
     from .config import Config
-    from .mover_pdf import mover_oc, sanitize_filename
+    from .mover_pdf import mover_oc, normalizar_nombre_archivo
     from .organizador_bienes import organizar as organizar_bienes
     from .pdf_info import actualizar_proveedores_desde_pdfs
 except ImportError:  # pragma: no cover
     from config import Config
-    from mover_pdf import mover_oc, sanitize_filename
+    from mover_pdf import mover_oc, normalizar_nombre_archivo
     from organizador_bienes import organizar as organizar_bienes
     from pdf_info import actualizar_proveedores_desde_pdfs
 
@@ -197,7 +197,7 @@ def descargar_oc(
             "Page.setDownloadBehavior",
             {"behavior": "allow", "downloadPath": str(download_dir)},
         )
-    except Exception:  # pragma: no cover - depends on Chrome implementation
+    except Exception:  # pragma: no cover - depende de la implementación de Chrome
         pass
 
     elements = {
@@ -376,11 +376,6 @@ def descargar_oc(
                     driver.execute_script("arguments[0].click();", boton_descarga)
 
                 archivo = esperar_descarga_pdf(download_dir, existentes)
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-#=======
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal
-#>>>>>>> master
-                archivo = esperar_descarga_pdf(download_dir, existentes)
                 if not getattr(cfg, "compra_bienes", False):
                     prov_clean = None
                     if proveedor:
@@ -395,9 +390,6 @@ def descargar_oc(
                         partes.append(prov_clean)
                     base_nombre = " - ".join(partes) if partes else None
                     archivo = _renombrar_descarga(archivo, base_nombre)
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-#=======
-#=======
                 antes = set(download_dir.glob("*.pdf"))
                 for _ in range(120):  # esperar hasta 60 s
                     time.sleep(0.5)
@@ -408,28 +400,26 @@ def descargar_oc(
                 else:
                     raise RuntimeError("No se descargó archivo")
                 if not getattr(cfg, "compra_bienes", False) and proveedor:
-                    prov_clean = sanitize_filename(proveedor)
+                    prov_clean = normalizar_nombre_archivo(proveedor)
                     nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
                     try:
                         archivo.rename(nuevo_nombre)
                         archivo = nuevo_nombre
-                    except Exception:
-                        prov_clean = sanitize_filename(proveedor, max_len=20)
-                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                        try:
-                            archivo.rename(nuevo_nombre)
-                            archivo = nuevo_nombre
                         except Exception:
-                            pass
-#>>>>>>> master
-#>>>>>>> master
+                            prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
+                            nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                            try:
+                                archivo.rename(nuevo_nombre)
+                                archivo = nuevo_nombre
+                            except Exception:
+                                pass
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder
                     )
                 except Exception as e:
                     errores.append(f"OC {numero}: fallo subida {e}")
-            except Exception as exc:  # pragma: no cover - runtime issues
+            except Exception as exc:  # pragma: no cover - incidencias en ejecución
                 errores.append(f"OC {numero}: {exc}")
     finally:
         driver.quit()

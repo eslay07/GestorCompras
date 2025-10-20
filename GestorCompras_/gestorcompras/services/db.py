@@ -81,6 +81,38 @@ def init_db():
         )
     """)
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reasignaciones_servicios (
+            id INTEGER PRIMARY KEY,
+            message_id TEXT UNIQUE,
+            fecha DATETIME,
+            asunto TEXT,
+            task_number TEXT,
+            proveedor TEXT,
+            mecanico TEXT,
+            telefono TEXT,
+            inf_vehiculo TEXT,
+            correo_usuario TEXT,
+            raw_hash TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    cursor.execute("PRAGMA table_info(reasignaciones_servicios)")
+    rs_cols = {col[1] for col in cursor.fetchall()}
+    if "task_number" not in rs_cols:
+        cursor.execute("ALTER TABLE reasignaciones_servicios ADD COLUMN task_number TEXT")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rs_fecha ON reasignaciones_servicios(fecha)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rs_message ON reasignaciones_servicios(message_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rs_task ON reasignaciones_servicios(task_number)"
+    )
+
     # Tabla para formatos de correo personalizados
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS email_templates (

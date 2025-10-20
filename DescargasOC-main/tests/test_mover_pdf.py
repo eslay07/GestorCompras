@@ -102,7 +102,7 @@ def test_mover_oc_bienes_copia_si_move_falla(tmp_path, monkeypatch):
     assert errores == []
     archivos = list(carpeta_tarea.glob("*.pdf"))
     assert len(archivos) == 1
-    assert archivos[0].name.startswith("123456")
+    assert archivos[0].name.startswith("ORDEN 123456")
     assert not any(origen.glob("*.pdf"))
 
 
@@ -151,8 +151,8 @@ def test_mover_oc_bienes_mueve_a_carpeta_existente(tmp_path, monkeypatch):
     assert errores == []
     archivos = list(carpeta_tarea.glob("*.pdf"))
     assert len(archivos) == 1
-    assert "proveedor_x" in archivos[0].stem
-    assert "Proveedor X" in archivos[0].stem
+    assert "PROVEEDOR_X" in archivos[0].stem
+    assert "ORDEN 123456" in archivos[0].stem
     assert not any(origen.glob("*.pdf"))
 
 
@@ -164,12 +164,7 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
 
     carpeta_tarea = destino / "140144463"
     carpeta_tarea.mkdir()
-    conflicto = carpeta_tarea / "123456 - proveedor_x.pdf"
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-    conflicto = carpeta_tarea / "123456 - Proveedor X.pdf"
-#=======
-    conflicto = carpeta_tarea / "123456 - NOMBRE Proveedor X.pdf"
-#>>>>>>> master
+    conflicto = carpeta_tarea / "ORDEN 123456 - PROVEEDOR_X.PDF"
     conflicto.write_text("existing")
 
     pdf = origen / "123456.pdf"
@@ -203,7 +198,7 @@ def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path):
     assert errores == []
     archivos = list(destino.glob("*.pdf"))
     assert len(archivos) == 1
-    assert archivos[0].name == "123456 - proveedor_x.pdf"
+    assert archivos[0].name == "ORDEN 123456 - PROVEEDOR_X.PDF"
     assert not any(origen.glob("*.pdf"))
 
 
@@ -223,7 +218,7 @@ def test_mover_oc_no_bienes_renombra_en_origen_si_no_hay_destino(tmp_path):
     assert errores == []
     archivos = list(origen.glob("*.pdf"))
     assert len(archivos) == 1
-    assert archivos[0].name == "654321 - proveedor_y.pdf"
+    assert archivos[0].name == "ORDEN 654321 - PROVEEDOR_Y.PDF"
 
 
 def test_mover_oc_no_bienes_registra_error_si_no_puede_mover(tmp_path, monkeypatch):
@@ -303,7 +298,7 @@ def test_mover_oc_abastecimiento_permanecen_en_descarga(tmp_path):
 
     archivos_abas = list(origen_abas.glob("*.pdf"))
     assert len(archivos_abas) == 1
-    assert archivos_abas[0].name.startswith("555555 - proveedor_uno")
+    assert archivos_abas[0].name.startswith("ORDEN 555555 - PROVEEDOR_UNO")
     # no se debe mover a la carpeta general
     assert not list(destino_general.glob("*.pdf"))
 def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
