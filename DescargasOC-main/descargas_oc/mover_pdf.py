@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 import PyPDF2
 
-try:  # permite ejecutar el módulo directamente
+try:  # allow running as script
     from .config import Config
     from .logger import get_logger
     from .organizador_bienes import (
@@ -30,10 +30,49 @@ ESPERA_INICIAL = 0.3
 LONGITUD_MAXIMA_PROVEEDOR = 50
 
 
+def normalizar_nombre_archivo(nombre: str | None, longitud_maxima: int = LONGITUD_MAXIMA_PROVEEDOR) -> str:
+    """Normaliza *nombre* para uso seguro en nombres de archivo."""
+
+    texto = (nombre or "").strip()
+    if not texto:
+        return ""
+    texto = re.sub(r"[^\w\- ]", "_", texto)
+    texto = re.sub(r"\s+", "_", texto)
+    texto = re.sub(r"_+", "_", texto).strip("_")
+    if longitud_maxima and len(texto) > longitud_maxima:
+        texto = texto[:longitud_maxima].rstrip("_-")
+    return texto.lower()
+
+
+def _formatear_nombre_final(numero: str | None, nombre_generado: str) -> str:
+    """Ajusta ``nombre_generado`` para producir el formato final requerido."""
+
+    base, ext = os.path.splitext(nombre_generado)
+    base = base.strip()
+    numero = (str(numero).strip() if numero else "")
+
+    if numero:
+        base_final = f"ORDEN {base}" if base else f"ORDEN {numero}"
+    else:
+        base_final = base or "archivo"
+
+    base_final = base_final.upper()
+
+    if numero and not base_final.startswith(f"ORDEN {numero}"):
+        resto = base_final.removeprefix("ORDEN ").strip()
+        resto = f" - {resto}" if resto else ""
+        base_final = f"ORDEN {numero}{resto}"
+
+    ext = ext or ".pdf"
+    if not ext.startswith("."):
+        ext = f".{ext}"
+    return f"{base_final}{ext.upper()}"
+
+
 def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
     if not nombre or not numero:
         return False
-    patron = rf"(?<!\\d){re.escape(numero)}(?!\\d)"
+    patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
     return re.search(patron, nombre) is not None
 
 
@@ -81,7 +120,9 @@ def _asegurar_nombre(ruta_path: Path, nombre_deseado: str) -> tuple[Path | None,
             f"'{(destino_final or Path(nombre_deseado)).name}': {ultimo_error}"
         )
     else:
-        mensaje = f"No se pudo renombrar '{ruta_path.name}' a '{nombre_deseado}'"
+        mensaje = (
+            f"No se pudo renombrar '{ruta_path.name}' a '{nombre_deseado}'"
+        )
     return None, mensaje
 
 
@@ -109,7 +150,7 @@ def _mover_archivo(
             shutil.copy2(str(ruta_path), str(destino_final))
             try:
                 ruta_path.unlink()
-            except Exception as exc:  # pragma: no cover - limpieza de mejor esfuerzo
+            except Exception as exc:  # pragma: no cover - best effort cleanup
                 logger.warning(
                     "No se pudo eliminar '%s' tras copiarlo a '%s': %s",
                     ruta_path,
@@ -155,7 +196,7 @@ def _carpetas_origen(config: Config) -> list[Path]:
 def _destino_no_bienes(
     config: Config, orden: Mapping[str, Any] | None
 ) -> Path | None:
-    """Determina la carpeta destino para órdenes que no pertenecen a bienes."""
+    """Determina la carpeta destino apropiada para una OC que no es de bienes."""
 
     categoria = ""
     if isinstance(orden, Mapping):
@@ -183,20 +224,15 @@ def _destino_no_bienes(
     return None
 
 
-def normalizar_nombre_archivo(nombre: str, longitud_maxima: int = LONGITUD_MAXIMA_PROVEEDOR) -> str:
-    """Normaliza *nombre* para uso en nombres de archivo."""
-
-    limpio = re.sub(r"[^\w\- ]", "_", nombre or "").strip()
-    limpio = re.sub(r"\s+", " ", limpio)
-    if len(limpio) > longitud_maxima:
-        limpio = limpio[:longitud_maxima].rstrip()
-    return limpio
-
-
 def mover_oc(config: Config, ordenes=None):
-    """Renombra y mueve los PDF de las órdenes descargadas."""
+    """Renombra y mueve los PDF de las órdenes descargadas.
 
+    ``ordenes`` debe ser una lista de diccionarios con al menos la clave
+    ``numero`` y opcionalmente ``proveedor``.  Devuelve una tupla con las
+    órdenes subidas, las que faltaron y una lista de errores descriptivos.
+    """
     ordenes = ordenes or []
+    # evitar números repetidos para no procesar la misma OC varias veces
     numeros_oc = list(dict.fromkeys(o.get("numero") for o in ordenes))
     proveedores = {o.get("numero"): o.get("proveedor") for o in ordenes}
     indice_ordenes = {o.get("numero"): o for o in ordenes}
@@ -208,6 +244,8 @@ def mover_oc(config: Config, ordenes=None):
         errores.append("Carpetas de descarga no configuradas")
         return [], numeros_oc, errores
 
+    carpeta_destino_bienes = getattr(config, "carpeta_analizar", None)
+
     archivos: list[Path] = []
     for carpeta in carpetas_origen:
         if not carpeta.exists():
@@ -217,6 +255,7 @@ def mover_oc(config: Config, ordenes=None):
 
     encontrados: dict[str, Path] = {}
 
+    # intentar asociar por nombre de archivo primero (más rápido y confiable)
     for ruta_path in archivos:
         archivo = ruta_path.name
         for numero in numeros_oc:
@@ -226,62 +265,66 @@ def mover_oc(config: Config, ordenes=None):
                 encontrados[numero] = ruta_path
                 break
 
-    restantes = [ruta for ruta in archivos if ruta not in set(encontrados.values())]
+    # para los que no se encontraron, buscar dentro del contenido del PDF
+    encontrados_paths = set(encontrados.values())
+    restantes = [ruta for ruta in archivos if ruta not in encontrados_paths]
     for ruta_path in restantes:
         ruta = str(ruta_path)
         try:
-            with open(ruta, "rb") as archivo_pdf:
-                lector = PyPDF2.PdfReader(archivo_pdf)
-                texto = "".join(pagina.extract_text() or "" for pagina in lector.pages)
-        except Exception as exc:
-            logger.warning("Error leyendo %s: %s", ruta_path.name, exc)
+            with open(ruta, 'rb') as f:
+                pdf = PyPDF2.PdfReader(f)
+                texto = ''.join(p.extract_text() or '' for p in pdf.pages)
+        except Exception as e:
+            logger.warning('Error leyendo %s: %s', ruta_path.name, e)
             continue
         for numero in numeros_oc:
             if numero in encontrados:
                 continue
             if numero and numero in texto:
                 encontrados[numero] = ruta_path
+                encontrados_paths.add(ruta_path)
                 break
 
     faltantes: list[str] = []
     subidos: list[str] = []
     es_bienes = bool(getattr(config, "compra_bienes", False))
-
     for numero in numeros_oc:
         ruta_path = encontrados.get(numero)
         if not ruta_path:
             faltantes.append(numero)
-            errores.append(
-                f"OC {numero}: archivo no encontrado en carpeta de descarga"
-            )
+            errores.append(f"OC {numero}: archivo no encontrado en carpeta de descarga")
             continue
 
-        proveedor = proveedores.get(numero)
+        prov = proveedores.get(numero)
         ruta_str = str(ruta_path)
-        if not proveedor:
-            proveedor = extraer_proveedor_desde_pdf(ruta_str)
-            if indice_ordenes.get(numero) is not None and proveedor:
-                indice_ordenes[numero]["proveedor"] = proveedor
+        if not prov:
+            prov = extraer_proveedor_desde_pdf(ruta_str)
+            if indice_ordenes.get(numero) is not None and prov:
+                indice_ordenes[numero]["proveedor"] = prov
 
         tarea = None
         if es_bienes:
+            # extraer número de tarea para organizar y para el reporte
             tarea = extraer_numero_tarea_desde_pdf(ruta_str)
             if indice_ordenes.get(numero) is not None:
                 indice_ordenes[numero]["tarea"] = tarea
 
-        extension = ruta_path.suffix or ".pdf"
-        nombre_deseado = nombre_archivo_orden(numero, proveedor, extension)
+        ext = ruta_path.suffix or ".pdf"
+        nombre_generado = nombre_archivo_orden(numero, prov, ext)
+        nombre_deseado = _formatear_nombre_final(numero, nombre_generado)
         nombre_original = ruta_path.name
         origen_descarga = ruta_path.parent
 
         if es_bienes:
-            base_bienes = getattr(config, "carpeta_analizar", None) or str(origen_descarga)
+            base_bienes = carpeta_destino_bienes or str(ruta_path.parent)
+
             if tarea:
+                # buscar carpeta existente que comience con el número de tarea
                 destino = None
-                for raiz, carpetas, _ in os.walk(base_bienes):
-                    for nombre_carpeta in carpetas:
-                        if nombre_carpeta.startswith(tarea):
-                            destino = os.path.join(raiz, nombre_carpeta)
+                for root, dirs, _files in os.walk(base_bienes):
+                    for d in dirs:
+                        if d.startswith(tarea):
+                            destino = os.path.join(root, d)
                             break
                     if destino:
                         break
@@ -291,31 +334,31 @@ def mover_oc(config: Config, ordenes=None):
             else:
                 destino = os.path.join(base_bienes, "ordenes sin tarea")
                 os.makedirs(destino, exist_ok=True)
-
             destino_dir = Path(destino)
-            destino_path, error_mov = _mover_archivo(
-                ruta_path, destino_dir, nombre_original
-            )
+            destino_path, error_mov = _mover_archivo(ruta_path, destino_dir, nombre_original)
             if destino_path is None:
                 errores.append(f"OC {numero}: {error_mov}")
                 faltantes.append(numero)
+                # mantener el archivo disponible en origen para reintentos
                 continue
             ruta_path = destino_path
+            ruta_str = str(destino_path)
 
             ruta_path, error_nombre = _asegurar_nombre(ruta_path, nombre_deseado)
             if ruta_path is None:
                 errores.append(f"OC {numero}: {error_nombre}")
                 faltantes.append(numero)
-                try:
-                    regreso = _resolver_conflicto(origen_descarga, nombre_original)
-                    shutil.move(str(destino_path), regreso)
-                except Exception as exc:  # pragma: no cover - recuperación de mejor esfuerzo
-                    logger.warning(
-                        "No se pudo regresar '%s' a '%s' tras un fallo de renombre: %s",
-                        destino_path,
-                        origen_descarga,
-                        exc,
-                    )
+                if origen_descarga is not None:
+                    try:
+                        regreso = _resolver_conflicto(origen_descarga, nombre_original)
+                        shutil.move(str(destino_path), regreso)
+                    except Exception as exc:  # pragma: no cover - best effort recovery
+                        logger.warning(
+                            "No se pudo regresar '%s' a '%s' tras fallo de renombre: %s",
+                            destino_path,
+                            origen_descarga,
+                            exc,
+                        )
                 continue
 
             logger.info("%s movido a %s", ruta_path.name, ruta_path.parent)
@@ -342,6 +385,5 @@ def mover_oc(config: Config, ordenes=None):
             logger.info("%s listo en %s", ruta_path.name, ruta_path.parent)
 
         subidos.append(numero)
-
     return subidos, faltantes, errores
 

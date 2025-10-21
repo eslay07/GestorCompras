@@ -1,5 +1,6 @@
 import sys
 import types
+from pathlib import Path
 from types import SimpleNamespace
 
 fake_pdf = types.ModuleType("PyPDF2")
@@ -31,6 +32,19 @@ def _config(tmp_path, bienes=True):
         origen,
         destino,
     )
+
+
+def _listar_pdfs(carpeta: Path) -> list[Path]:
+    """Devuelve los PDFs de ``carpeta`` ignorando diferencias de mayúsculas."""
+
+    encontrados: list[Path] = []
+    vistos: set[Path] = set()
+    for patron in ("*.pdf", "*.PDF"):
+        for item in carpeta.glob(patron):
+            if item not in vistos:
+                vistos.add(item)
+                encontrados.append(item)
+    return encontrados
 
 
 def test_mover_oc_bienes_registra_error_si_no_se_mueve(tmp_path, monkeypatch):
@@ -70,7 +84,7 @@ def test_mover_oc_bienes_registra_error_si_no_se_mueve(tmp_path, monkeypatch):
     assert faltantes == ["123456"]
     assert any("OC 123456" in msg for msg in errores)
     # el PDF debe permanecer en la carpeta de origen para reintentos
-    assert any(item.suffix.lower() == ".pdf" for item in origen.iterdir())
+    assert bool(_listar_pdfs(origen))
 
 
 def test_mover_oc_bienes_copia_si_move_falla(tmp_path, monkeypatch):
@@ -100,10 +114,10 @@ def test_mover_oc_bienes_copia_si_move_falla(tmp_path, monkeypatch):
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
-    archivos = list(carpeta_tarea.glob("*.pdf"))
+    archivos = _listar_pdfs(carpeta_tarea)
     assert len(archivos) == 1
     assert archivos[0].name.startswith("ORDEN 123456")
-    assert not any(origen.glob("*.pdf"))
+    assert not _listar_pdfs(origen)
 
 
 def test_mover_oc_reporta_error_si_no_puede_renombrar(tmp_path, monkeypatch):
@@ -149,11 +163,11 @@ def test_mover_oc_bienes_mueve_a_carpeta_existente(tmp_path, monkeypatch):
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
-    archivos = list(carpeta_tarea.glob("*.pdf"))
+    archivos = _listar_pdfs(carpeta_tarea)
     assert len(archivos) == 1
     assert "PROVEEDOR_X" in archivos[0].stem
     assert "ORDEN 123456" in archivos[0].stem
-    assert not any(origen.glob("*.pdf"))
+    assert not _listar_pdfs(origen)
 
 
 def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
@@ -177,10 +191,10 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
-    archivos = sorted(carpeta_tarea.glob("*.pdf"))
+    archivos = sorted(_listar_pdfs(carpeta_tarea))
     assert len(archivos) == 2
     nombres = [p.name for p in archivos]
-    assert any(name.endswith("(1).pdf") for name in nombres)
+    assert any(name.lower().endswith("(1).pdf") for name in nombres)
 
 
 def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path):
@@ -196,10 +210,10 @@ def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path):
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
-    archivos = list(destino.glob("*.pdf"))
+    archivos = _listar_pdfs(destino)
     assert len(archivos) == 1
     assert archivos[0].name == "ORDEN 123456 - PROVEEDOR_X.PDF"
-    assert not any(origen.glob("*.pdf"))
+    assert not _listar_pdfs(origen)
 
 
 def test_mover_oc_no_bienes_renombra_en_origen_si_no_hay_destino(tmp_path):
@@ -216,7 +230,7 @@ def test_mover_oc_no_bienes_renombra_en_origen_si_no_hay_destino(tmp_path):
     assert subidos == ["654321"]
     assert faltantes == []
     assert errores == []
-    archivos = list(origen.glob("*.pdf"))
+    archivos = _listar_pdfs(origen)
     assert len(archivos) == 1
     assert archivos[0].name == "ORDEN 654321 - PROVEEDOR_Y.PDF"
 
@@ -296,11 +310,11 @@ def test_mover_oc_abastecimiento_permanecen_en_descarga(tmp_path):
     assert faltantes == []
     assert errores == []
 
-    archivos_abas = list(origen_abas.glob("*.pdf"))
+    archivos_abas = _listar_pdfs(origen_abas)
     assert len(archivos_abas) == 1
     assert archivos_abas[0].name.startswith("ORDEN 555555 - PROVEEDOR_UNO")
     # no se debe mover a la carpeta general
-    assert not list(destino_general.glob("*.pdf"))
+    assert not _listar_pdfs(destino_general)
 def test_mover_oc_no_bienes_identifica_numero_en_nombre(tmp_path, monkeypatch):
     cfg, origen, _destino = _config(tmp_path, bienes=False)
 

@@ -30,50 +30,34 @@ def limpiar_proveedor(valor: str | None) -> str:
     return texto.strip()
 
 
-def nombre_archivo_orden(numero: str | None, proveedor: str | None = None, extension: str | None = ".pdf") -> str:
-    """Genera un nombre de archivo seguro y consistente.
-    - Prefijo ORDEN si hay número.
-    - Proveedor normalizado en MAYÚSCULAS con '_'.
-    - Retro-compatible con llamadas (numero), (numero, proveedor), (numero, proveedor, extension) y (numero, ".pdf").
-    """
-    # Compatibilidad: si 'proveedor' parece extensión, reubicar
-    if proveedor and isinstance(proveedor, str) and proveedor.startswith(".") and (extension is None or extension == ".pdf"):
-        extension = proveedor
-        proveedor = None
+def nombre_archivo_orden(
+    numero: str | None,
+    proveedor: str | None,
+    extension: str | None = ".pdf",
+) -> str:
+    """Genera un nombre de archivo seguro usando número y proveedor."""
 
     numero = (numero or "").strip()
     if numero:
-        import re as _re
-        numero = _re.sub(r"\s+", " ", numero)
-        numero = _re.sub(r"(#)\s+(?=\d)", r"#", numero)
-
+        numero = re.sub(r"\s+", " ", numero)
+        numero = re.sub(r"(#)\s+(?=\d)", r"#", numero)
     base = numero
-
     if proveedor:
-        import re as _re
-        prov_clean = _re.sub(r"[^\w\- ]", "_", proveedor or "")
-        prov_clean = _re.sub(r"\s+", "_", prov_clean)
-        prov_clean = _re.sub(r"_+", "_", prov_clean)
-        prov_clean = prov_clean.lstrip("_").upper()
+        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+        prov_clean = re.sub(r"\s+", "_", prov_clean)
+        prov_clean = re.sub(r"_+", "_", prov_clean)
+        prov_clean = prov_clean.lstrip("_").lower()
         base = f"{base} - {prov_clean}" if base else prov_clean
-
-    base = (base or "archivo").strip()
-
-    # Prefijo ORDEN si hay número
-    if numero:
-        base = f"ORDEN {base}"
-
-    # Limitar longitud razonable
-    MAX_NOMBRE_ARCHIVO = 180
+    base = re.sub(r"\s+", " ", base).strip()
+    if not base:
+        base = "archivo"
     if len(base) > MAX_NOMBRE_ARCHIVO:
         base = base[:MAX_NOMBRE_ARCHIVO].rstrip(" .-_") or "archivo"
-
     if not extension:
         extension = ".pdf"
-    if not extension.startswith('.'):
+    if not extension.startswith("."):
         extension = f".{extension}"
-
-    return f"{base}{extension}".upper()
+    return f"{base}{extension}"
 
 
 def proveedor_desde_pdf(ruta_pdf: str | Path | None) -> str:
