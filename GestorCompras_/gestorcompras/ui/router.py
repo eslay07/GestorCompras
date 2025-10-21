@@ -35,11 +35,11 @@ def open_bienes_menu() -> None:
     if _email_session is None:
         raise RuntimeError("Sesión de correo no inicializada")
     _clear_container()
-    BienesMenu(_container, _email_session, on_back=open_home).pack(fill="both", expand=True)
+    BienesMenu(_container, _email_session).pack(fill="both", expand=True)
 
 
 def open_servicios_menu() -> None:
     if _email_session is None:
         raise RuntimeError("Sesión de correo no inicializada")
     _clear_container()
-    ServiciosHome(_container, _email_session, on_back=open_home).pack(fill="both", expand=True)
+    ServiciosHome(_container, _email_session).pack(fill="both", expand=True)

@@ -1,8 +1,6 @@
 """Menú principal para el flujo de Compras Servicios."""
 from __future__ import annotations
 
-from typing import Callable
-
 import tkinter as tk
 from tkinter import ttk
 
@@ -11,16 +9,10 @@ from gestorcompras.ui.common import add_hover_effect
 
 
 class ServiciosHome(ttk.Frame):
-    def __init__(
-        self,
-        master: tk.Misc,
-        email_session: dict[str, str],
-        on_back: Callable[[], None] | None = None,
-    ):
+    def __init__(self, master: tk.Misc, email_session: dict[str, str]):
         super().__init__(master, style="MyFrame.TFrame")
         self.master = master
         self.email_session = email_session
-        self._on_back = on_back
         self._build()
 
     def _build(self) -> None:
@@ -35,40 +27,27 @@ class ServiciosHome(ttk.Frame):
         )
         titulo.grid(row=0, column=0, pady=(10, 30))
 
-        if self._on_back is not None:
-            back_btn = ttk.Button(
-                container,
-                text="Volver",
-                style="SecondaryButton.TButton",
-                command=self._on_back,
-            )
-            back_btn.grid(row=1, column=0, pady=(0, 20), sticky="ew")
-            add_hover_effect(back_btn)
-            start_row = 2
-        else:
-            start_row = 1
-
         self._add_button(
             container,
-            row=start_row,
+            row=1,
             text="Configuraciones",
             command=lambda: config_gui.open(self.master, self.email_session, mode="servicios"),
         )
         self._add_button(
             container,
-            row=start_row + 1,
+            row=2,
             text="Correos Masivos",
             command=lambda: correos_masivos_gui.open(self.master, self.email_session),
         )
         self._add_button(
             container,
-            row=start_row + 2,
+            row=3,
             text="Descargas OC",
             command=lambda: descargas_oc_gui.open(self.master),
         )
         self._add_button(
             container,
-            row=start_row + 3,
+            row=4,
             text="Reasignación de tareas",
             command=lambda: reasignacion_gui.open(self.master, self.email_session, mode="servicios"),
         )

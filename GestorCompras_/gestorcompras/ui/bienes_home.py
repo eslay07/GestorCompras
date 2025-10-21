@@ -1,8 +1,6 @@
 """Menú principal para el flujo de Compras Bienes."""
 from __future__ import annotations
 
-from typing import Callable
-
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -33,16 +31,10 @@ def _button_specs():
 class BienesMenu(ttk.Frame):
     """Menú existente adaptado para el ruteo desde la pantalla inicial."""
 
-    def __init__(
-        self,
-        master: tk.Misc,
-        email_session: dict[str, str],
-        on_back: Callable[[], None] | None = None,
-    ):
+    def __init__(self, master: tk.Misc, email_session: dict[str, str]):
         super().__init__(master, style="MyFrame.TFrame")
         self.master = master
         self.email_session = email_session
-        self._on_back = on_back
         self._banner_colors = [color_primario, color_acento]
         self._color_index = 0
         self._button_widgets: list[ttk.Button] = []
@@ -66,19 +58,6 @@ class BienesMenu(ttk.Frame):
         lbl_title.configure(font=("Segoe UI", 11, "bold"), foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15, sticky="n")
 
-        self._button_row_offset = 0
-
-        if self._on_back is not None:
-            back_btn = ttk.Button(
-                menu_frame,
-                text="Volver",
-                style="SecondaryButton.TButton",
-                command=self._on_back,
-            )
-            back_btn.grid(row=1, column=0, pady=(0, 15), sticky="ew")
-            add_hover_effect(back_btn)
-            self._button_row_offset = 1
-
         self.menu_frame = menu_frame
         self._show_button(0)
 
@@ -94,13 +73,7 @@ class BienesMenu(ttk.Frame):
         text, method_name = self._buttons[index]
         command = getattr(self, method_name)
         btn = ttk.Button(self.menu_frame, text=text, style="MyButton.TButton", command=command)
-        btn.grid(
-            row=index + 1 + self._button_row_offset,
-            column=0,
-            padx=20,
-            pady=5,
-            sticky="ew",
-        )
+        btn.grid(row=index + 1, column=0, padx=20, pady=5, sticky="ew")
         add_hover_effect(btn)
         self._button_widgets.append(btn)
         self.after(120, self._show_button, index + 1)
