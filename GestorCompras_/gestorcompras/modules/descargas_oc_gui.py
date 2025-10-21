@@ -35,7 +35,7 @@ def open(master: tk.Misc) -> None:
         style="MyLabel.TLabel",
     ).pack(padx=10, pady=10)
 
-    def _launch(script_name: str, error_title: str) -> None:
+    def _launch(module_suffix: str, error_title: str) -> None:
         if _DESCARGAS_ROOT is None:
             messagebox.showerror(
                 "Descargas OC",
@@ -43,16 +43,16 @@ def open(master: tk.Misc) -> None:
                 parent=option_win,
             )
             return
-        script = _DESCARGAS_ROOT / "descargas_oc" / script_name
+        module = f"descargas_oc.{module_suffix}"
         try:
-            subprocess.Popen([sys.executable, str(script)])
+            subprocess.Popen(
+                [sys.executable, "-m", module],
+                cwd=str(_DESCARGAS_ROOT),
+            )
         except OSError as exc:  # pragma: no cover - errores del SO
             messagebox.showerror(
                 error_title,
-                (
-                    f"No se pudo abrir el módulo {script_name}. "
-                    f"Detalle: {exc}"
-                ),
+                (f"No se pudo abrir el módulo {module}. Detalle: {exc}"),
                 parent=option_win,
             )
             return
@@ -62,7 +62,7 @@ def open(master: tk.Misc) -> None:
         option_win,
         text="Descarga Normal",
         style="MyButton.TButton",
-        command=lambda: _launch("ui.py", "Error"),
+        command=lambda: _launch("ui", "Error"),
     )
     btn_norm.pack(padx=10, pady=5)
     add_hover_effect(btn_norm)
@@ -71,7 +71,7 @@ def open(master: tk.Misc) -> None:
         option_win,
         text="Abastecimiento",
         style="MyButton.TButton",
-        command=lambda: _launch("ui_abastecimiento.py", "Error"),
+        command=lambda: _launch("ui_abastecimiento", "Error"),
     )
     btn_abast.pack(padx=10, pady=5)
     add_hover_effect(btn_abast)
