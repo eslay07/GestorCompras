@@ -7,9 +7,24 @@ Generado automáticamente desde el repositorio para distribuirse como actualizac
 from __future__ import annotations
 
 import base64
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
+
+
+def _win_long_path(path: Path) -> str:
+    """Devuelve una ruta con el prefijo extendido en Windows."""
+    absolute = path.resolve(strict=False)
+    text = str(absolute)
+    if not sys.platform.startswith('win'):
+        return text
+    if text.startswith('\\\\?\\'):
+        return text
+    if text.startswith('\\\\'):
+        return f"\\\\?\\UNC\\{text[2:]}"
+    return f"\\\\?\\{text}"
 
 DATA = {
     '.gitignore': 
@@ -9534,12 +9549,27 @@ def _decode(payload: str) -> bytes:
     return base64.b64decode(''.join(payload.split()).encode('ascii'))
 
 
+def _ensure_dir(path: Path) -> None:
+    if sys.platform.startswith('win'):
+        os.makedirs(_win_long_path(path), exist_ok=True)
+    else:
+        path.mkdir(parents=True, exist_ok=True)
+
+
+def _write_file(target: Path, payload: bytes) -> None:
+    if sys.platform.startswith('win'):
+        with open(_win_long_path(target), 'wb') as fh:
+            fh.write(payload)
+    else:
+        target.write_bytes(payload)
+
+
 def apply(update_root: Path | None = None) -> None:
     base = update_root or ROOT
     for rel_path, payload in DATA.items():
         target = base / rel_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(_decode(payload))
+        _ensure_dir(target.parent)
+        _write_file(target, _decode(payload))
         print(f'Actualizado {rel_path}')
 
 
