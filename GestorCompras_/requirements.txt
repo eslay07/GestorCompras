@@ -1,6 +1,6 @@
 jinja2
 pdfplumber
-pandas 
+pandas
 openpyxl
 selenium
 webdriver_manager

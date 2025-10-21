@@ -5,7 +5,7 @@ import re
 from datetime import datetime
 from tkinter import messagebox
 
-try:  # allow running as script
+try:  # permite ejecutar como script
     from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
     from .selenium_modulo import descargar_oc
     from .reporter import enviar_reporte
@@ -97,7 +97,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 subidos, no_encontrados, errores = descargar_oc(
                     ordenes, headless=cfg.headless
                 )
-            except Exception as exc:  # pragma: no cover - runtime safety
+            except Exception as exc:  # pragma: no cover - seguridad en ejecución
                 logger.exception("Fallo al descargar OC")
                 errores = [str(exc)]
                 subidos, no_encontrados = [], [o.get("numero") for o in ordenes]
