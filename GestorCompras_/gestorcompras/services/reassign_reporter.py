@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import Iterable, Dict, List
 
-from gestorcompras.services.email_sender import send_email_custom
+from .email_sender import send_email_custom
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from gestorcompras.services.db import (
     get_suppliers,
     get_email_template_by_name,
 )
-from gestorcompras.services.email_sender import send_email_custom
+from ..services.email_sender import send_email_custom
 
 def buscar_archivo_mas_reciente(orden):
     """

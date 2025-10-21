@@ -33,9 +33,9 @@ if _DESCARGAS_ROOT is not None:
     if _path not in sys.path:
         sys.path.insert(0, _path)
 
-from gestorcompras.services import db
-from gestorcompras.gui.html_editor import HtmlEditor
-from gestorcompras.services.email_sender import send_email_custom
+from ..services import db
+from .html_editor import HtmlEditor
+from ..services.email_sender import send_email_custom
 from descargas_oc.config import Config as DescargasConfig
 from descargas_oc.escuchador import PROCESADOS_FILE
 
