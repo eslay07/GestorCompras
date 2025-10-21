@@ -4,9 +4,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 try:
-    # when imported as part of the 'src' package
+    # al importarse como parte del paquete principal
     from .logger import get_logger
-except ImportError:  # pragma: no cover - fallback for direct imports in tests
+except ImportError:  # pragma: no cover - compatibilidad con importaciones directas en pruebas
     from logger import get_logger
 
 logger = get_logger(__name__)

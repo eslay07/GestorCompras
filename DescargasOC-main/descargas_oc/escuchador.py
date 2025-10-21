@@ -8,7 +8,7 @@ import html
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-try:  # allow running as script without package
+try:  # permite ejecutar como script sin el paquete instalado
     from .config import Config
     from .logger import get_logger
 except ImportError:  # pragma: no cover

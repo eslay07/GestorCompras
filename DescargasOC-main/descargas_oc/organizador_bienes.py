@@ -80,14 +80,22 @@ def elegir_mejor_carpeta_para_numero(numero: str, indice_carpetas: list[tuple[st
 
 
 def mover_sin_sobrescribir(ruta_archivo_origen: str, carpeta_destino: str) -> str | None:
+    logger = globals().get('logger')
+
     nombre = os.path.basename(ruta_archivo_origen)
     base, ext = os.path.splitext(nombre)
+
+    if not re.match(r'(?i)^ORDEN\b', base):
+        base = re.sub(r'^(\d+)', r'ORDEN \1', base)
+
+    nombre = f"{base}{ext}".upper()
+
     destino = os.path.join(carpeta_destino, nombre)
     os.makedirs(carpeta_destino, exist_ok=True)
     if os.path.exists(destino):
         i = 1
         while True:
-            nuevo_nombre = f"{base} ({i}){ext}"
+            nuevo_nombre = f"{os.path.splitext(nombre)[0]} ({i}){os.path.splitext(nombre)[1]}"
             destino = os.path.join(carpeta_destino, nuevo_nombre)
             if not os.path.exists(destino):
                 break
@@ -96,7 +104,8 @@ def mover_sin_sobrescribir(ruta_archivo_origen: str, carpeta_destino: str) -> st
         shutil.move(ruta_archivo_origen, destino)
         return destino
     except Exception as e:  # pragma: no cover
-        logger.error("No se pudo mover '%s' a '%s': %s", ruta_archivo_origen, carpeta_destino, e)
+        if logger:
+            logger.error("No se pudo mover '%s' a '%s': %s", ruta_archivo_origen, carpeta_destino, e)
         return None
 
 

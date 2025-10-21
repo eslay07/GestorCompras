@@ -32,10 +32,6 @@ try:  # permitir la ejecución como script
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-    from .logger import get_logger
-#=======
-#>>>>>>> master
 except ImportError:  # pragma: no cover
     from config import Config
     from mover_pdf import mover_oc
@@ -48,10 +44,6 @@ except ImportError:  # pragma: no cover
         nombre_archivo_orden,
         proveedor_desde_pdf,
     )
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-    from logger import get_logger
-
-
 logger = get_logger(__name__)
 WAIT_TIMEOUT = 30
 
@@ -600,6 +592,7 @@ def descargar_abastecimiento(
 
     driver = webdriver.Chrome(options=options)
     try:
+        ordenes: list[dict[str, str]] = []
         try:
             driver.execute_cdp_cmd(
                 "Page.setDownloadBehavior",
@@ -1208,16 +1201,15 @@ def descargar_abastecimiento(
     finally:
         driver.quit()
 
-    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+    if getattr(cfg, 'abastecimiento_mover_archivos', True):
+        subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+    else:
+        subidos = [o.get('numero') for o in ordenes if o.get('numero')]
+        faltantes, errores_mov = [], []
+
     for err in errores_mov:
         logger.error("Mover OC: %s", err)
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
-    for err in errores_mov:
-        logger.error("Mover OC: %s", err)
-#=======
-    subidos, faltantes, _errores_mov = mover_oc(cfg, ordenes)
-#>>>>>>> master
+
     enviar_reporte(
         subidos,
         faltantes,
