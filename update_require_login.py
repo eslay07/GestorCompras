@@ -1,32 +1,343 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Actualiza los módulos de Descargas OC para que solo se inicien
-a través del inicio de sesión principal del GestorCompras.
+Sincroniza los lanzadores de Descargas OC con la versión que respeta el flujo de login.
 """
 from __future__ import annotations
+
+import base64
 from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
 
-FILES = {
-    'DescargasOC-main/descargas_oc/ui.py': 'import tkinter as tk\nimport threading\nimport logging\nimport re\nfrom datetime import datetime\nfrom tkinter import messagebox\n\ntry:  # permite ejecutar como script\n    from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados\n    from .selenium_modulo import descargar_oc\n    from .reporter import enviar_reporte\n    from .config import Config\n    from .logger import get_logger\nexcept ImportError:  # pragma: no cover\n    from escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados\n    from selenium_modulo import descargar_oc\n    from reporter import enviar_reporte\n    from config import Config\n    from logger import get_logger\n\nlogger = get_logger(__name__)\n\nscanning_lock = threading.Lock()\n\n\ndef center_window(win: tk.Tk | tk.Toplevel):\n    win.update_idletasks()\n    w = win.winfo_width()\n    h = win.winfo_height()\n    x = (win.winfo_screenwidth() // 2) - (w // 2)\n    y = (win.winfo_screenheight() // 2) - (h // 2)\n    win.geometry(f"{w}x{h}+{x}+{y}")\n\n\ndef config_completa(cfg: Config) -> bool:\n    try:\n        cfg.validate()\n    except Exception:\n        return False\n    requeridos = [\n        cfg.usuario,\n        cfg.password,\n        cfg.carpeta_destino_local,\n        cfg.carpeta_analizar,\n        cfg.seafile_url,\n        cfg.seafile_repo_id,\n        cfg.correo_reporte,\n    ]\n    return all(requeridos)\n\n\nclass TextHandler(logging.Handler):\n    def __init__(self, widget: tk.Text):\n        super().__init__()\n        self.widget = widget\n\n    def emit(self, record: logging.LogRecord):\n        msg = self.format(record) + "\\n"\n        self.widget.after(0, lambda m=msg: (self.widget.insert(tk.END, m), self.widget.see(tk.END)))\n\n\ndef realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):\n    if not scanning_lock.acquire(blocking=False):\n        text_widget.insert(tk.END, "Escaneo en progreso...\\n")\n        text_widget.see(tk.END)\n        return\n    try:\n        cfg = Config()\n        if not config_completa(cfg):\n            messagebox.showerror(\n                "Error", "Configuración incompleta o por favor configurar correctamente"\n            )\n            return\n\n        def append(msg: str):\n            text_widget.after(0, lambda m=msg: (text_widget.insert(tk.END, m), text_widget.see(tk.END)))\n\n        append("Buscando órdenes...\\n")\n        ordenes, ultimo = buscar_ocs(cfg)\n        uidl_por_numero = {\n            o.get("numero"): o.get("uidl")\n            for o in ordenes\n            if o.get("numero") and o.get("uidl")\n        }\n        uidl_a_numeros: dict[str, set[str]] = {}\n        for numero, uidl in uidl_por_numero.items():\n            if not uidl:\n                continue\n            uidl_a_numeros.setdefault(uidl, set()).add(numero)\n        pendientes_uidls = set(uidl_a_numeros)\n        exitosas: list[str] = []\n        faltantes: list[str] = []\n        errores: list[str] = []\n        if ordenes:\n            append(f"Procesando {len(ordenes)} OC(s)\\n")\n            try:\n                subidos, no_encontrados, errores = descargar_oc(\n                    ordenes, headless=cfg.headless\n                )\n            except Exception as exc:  # pragma: no cover - seguridad en ejecución\n                logger.exception("Fallo al descargar OC")\n                errores = [str(exc)]\n                subidos, no_encontrados = [], [o.get("numero") for o in ordenes]\n            exitosas.extend(subidos)\n            faltantes.extend(no_encontrados)\n            numeros_con_problemas = {str(n) for n in no_encontrados}\n            for error in errores:\n                m = re.search(r"OC\\s*(\\d+)", error)\n                if m:\n                    numeros_con_problemas.add(m.group(1))\n            uidls_con_problemas = {\n                uidl_por_numero[num]\n                for num in numeros_con_problemas\n                if num in uidl_por_numero and uidl_por_numero[num]\n            }\n            subidos_set = set(subidos)\n            uidls_exitosos: list[str] = []\n            for orden in ordenes:\n                uidl = orden.get("uidl")\n                if not uidl or uidl in uidls_con_problemas:\n                    continue\n                numeros_uidl = uidl_a_numeros.get(uidl, set())\n                if numeros_uidl and numeros_uidl.issubset(subidos_set) and uidl not in uidls_exitosos:\n                    uidls_exitosos.append(uidl)\n            pendientes_uidls -= set(uidls_exitosos)\n            for num in subidos:\n                append(f"✔️ OC {num} procesada\\n")\n            for num in no_encontrados:\n                append(f"❌ OC {num} faltante\\n")\n            if uidls_exitosos:\n                uidls_sin_duplicados = list(dict.fromkeys(uidls_exitosos))\n                ultimo_guardar = ultimo if not pendientes_uidls else None\n                registrar_procesados(uidls_sin_duplicados, ultimo_guardar)\n        else:\n            append("No se encontraron nuevas órdenes\\n")\n        enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)\n        if ordenes:\n            if errores:\n                summary = "Errores durante la descarga:\\n" + "\\n".join(errores)\n            elif enviado:\n                summary = "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"\n            else:\n                summary = "No se pudo enviar el reporte"\n            text_widget.after(0, lambda: messagebox.showinfo("Resultado", summary))\n        append("Proceso finalizado\\n")\n        lbl_last.config(\n            text="Último UIDL: {} - {}".format(\n                cargar_ultimo_uidl(), datetime.now().strftime("%H:%M:%S")\n            )\n        )\n    finally:\n        scanning_lock.release()\n\n\ndef main():\n    root = tk.Tk()\n    root.title("Descargas OC")\n    root.tk_setPalette(\n        background="#1e1e1e",\n        foreground="#f0f0f0",\n        activeBackground="#333333",\n        activeForeground="#f0f0f0",\n        highlightColor="#555555",\n    )\n    root.configure(bg="#1e1e1e")\n\n    frame = tk.Frame(root)\n    frame.pack(padx=10, pady=10)\n\n    text = tk.Text(frame, width=80, height=20, bg="#000000", fg="#f0f0f0", insertbackground="#f0f0f0")\n    text.pack(pady=5)\n\n    handler = TextHandler(text)\n    handler.setFormatter(logging.Formatter(\'%(asctime)s [%(levelname)s] %(message)s\'))\n    logging.getLogger().addHandler(handler)\n\n    estado = {"activo": False, "contador": 0}\n    lbl_contador = tk.Label(frame, text="Escuchador detenido")\n    lbl_contador.pack()\n    lbl_last = tk.Label(frame, text="Último UIDL: " + (cargar_ultimo_uidl() or \'-\'))\n    lbl_last.pack()\n\n    cfg = Config()\n    manual_mode = {"active": False}\n\n    def actualizar_contador():\n        if estado["activo"]:\n            if estado["contador"] <= 0:\n                threading.Thread(target=realizar_escaneo, args=(text, lbl_last), daemon=True).start()\n                estado["contador"] = cfg.scan_interval\n            lbl_contador.config(text=f"Siguiente escaneo en {estado[\'contador\']} s")\n            estado["contador"] -= 1\n            root.after(1000, actualizar_contador)\n        else:\n            lbl_contador.config(text="Escuchador detenido")\n\n    def toggle():\n        if estado["activo"]:\n            estado["activo"] = False\n            btn_toggle.config(text="Activar escuchador")\n        else:\n            if not config_completa(cfg):\n                messagebox.showerror(\n                    "Error",\n                    "Configuración incompleta o por favor configurar correctamente",\n                )\n                return\n            estado["activo"] = True\n            estado["contador"] = cfg.scan_interval\n            btn_toggle.config(text="Detener escuchador")\n            actualizar_contador()\n\n    def escanear_ahora():\n        estado["contador"] = cfg.scan_interval\n        threading.Thread(target=realizar_escaneo, args=(text, lbl_last), daemon=True).start()\n\n    def activar_manual():\n        manual_mode["active"] = True\n        text.delete("1.0", tk.END)\n        text.insert(tk.END, "Introduzca ordenes que desea descargar 1 por linea:\\n")\n        btn_ejecutar.config(state=tk.DISABLED)\n        text.focus_set()\n\n    def check_manual_input(event=None):\n        if manual_mode["active"]:\n            contenido = text.get("2.0", tk.END).strip()\n            btn_ejecutar.config(state=tk.NORMAL if contenido else tk.DISABLED)\n\n    text.bind("<KeyRelease>", check_manual_input)\n\n    def ejecutar_manual():\n        if not scanning_lock.acquire(blocking=False):\n            text.insert(tk.END, "Descarga en progreso...\\n")\n            text.see(tk.END)\n            return\n        contenido = text.get("2.0", tk.END).strip()\n        numeros = [n.strip() for n in contenido.splitlines() if n.strip()]\n        if not numeros:\n            scanning_lock.release()\n            return\n        if not messagebox.askyesno(\n            "Confirmación",\n            "Se descargarán las siguientes órdenes:\\n" + "\\n".join(numeros),\n        ):\n            scanning_lock.release()\n            return\n        text.delete("1.0", tk.END)\n        manual_mode["active"] = False\n        btn_ejecutar.config(state=tk.DISABLED)\n\n        def run():\n            try:\n                cfg.load()\n                ordenes = [{"numero": n} for n in numeros]\n\n                def append(msg: str):\n                    text.after(0, lambda m=msg: (text.insert(tk.END, m), text.see(tk.END)))\n\n                append(f"Procesando {len(ordenes)} OC(s)\\n")\n                try:\n                    subidos, no_encontrados, errores = descargar_oc(\n                        ordenes, headless=cfg.headless\n                    )\n                except Exception as exc:\n                    errores = [str(exc)]\n                    subidos, no_encontrados = [], numeros\n                for num in subidos:\n                    append(f"✔️ OC {num} procesada\\n")\n                for num in no_encontrados:\n                    append(f"❌ OC {num} faltante\\n")\n                enviar_reporte(subidos, no_encontrados, ordenes, cfg)\n                if errores:\n                    summary = "Errores durante la descarga:\\n" + "\\n".join(errores)\n                else:\n                    summary = "Proceso finalizado"\n                text.after(0, lambda: messagebox.showinfo("Resultado", summary))\n            finally:\n                scanning_lock.release()\n                text.after(0, lambda: btn_ejecutar.config(state=tk.DISABLED))\n\n        threading.Thread(target=run, daemon=True).start()\n\n    def actualizar_intervalo():\n        try:\n            val = int(entry_interval.get())\n            if val >= 300:\n                cfg.load()\n                cfg.data[\'scan_interval\'] = val\n                cfg.save()\n                estado[\'contador\'] = val\n        except ValueError:\n            pass\n\n    btn_toggle = tk.Button(frame, text="Activar escuchador", command=toggle)\n    btn_toggle.pack(side=tk.LEFT, padx=5)\n\n    btn_escanear = tk.Button(frame, text="Escanear ahora", command=escanear_ahora)\n    btn_escanear.pack(side=tk.LEFT, padx=5)\n\n    btn_manual = tk.Button(frame, text="Descarga manual", command=activar_manual)\n    btn_manual.pack(side=tk.LEFT, padx=5)\n    btn_ejecutar = tk.Button(frame, text="Ejecutar descarga", command=ejecutar_manual, state=tk.DISABLED)\n    btn_ejecutar.pack(side=tk.LEFT, padx=5)\n\n    var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))\n\n    def actualizar_bienes():\n        cfg.load()\n        cfg.data[\'compra_bienes\'] = var_bienes.get()\n        cfg.save()\n\n    chk_bienes = tk.Checkbutton(\n        frame,\n        text="Compra Bienes",\n        variable=var_bienes,\n        command=actualizar_bienes,\n        selectcolor="#00aa00",\n    )\n    chk_bienes.pack(side=tk.LEFT, padx=5)\n\n    var_visible = tk.BooleanVar(value=not bool(cfg.headless))\n\n    def actualizar_visible():\n        cfg.load()\n        cfg.data[\'headless\'] = not var_visible.get()\n        cfg.save()\n\n    chk_visible = tk.Checkbutton(\n        frame,\n        text="Descarga visible",\n        variable=var_visible,\n        command=actualizar_visible,\n        selectcolor="#00aa00",\n    )\n    chk_visible.pack(side=tk.LEFT, padx=5)\n\n    tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)\n    entry_interval = tk.Entry(frame, width=5)\n    entry_interval.insert(0, str(cfg.scan_interval))\n    entry_interval.pack(side=tk.LEFT)\n    btn_interval = tk.Button(frame, text="Guardar", command=actualizar_intervalo)\n    btn_interval.pack(side=tk.LEFT, padx=5)\n\n    center_window(root)\n    root.mainloop()\n\n\nif __name__ == \'__main__\':\n    main()\n',
-    'DescargasOC-main/descargas_oc/ui_abastecimiento.py': '"""Interfaz para descargar órdenes de compra de Abastecimiento."""\nimport threading\nimport tkinter as tk\nfrom tkinter import messagebox\nfrom tkinter import ttk\n\ntry:  # permite ejecutar como script\n    from .selenium_abastecimiento import descargar_abastecimiento\n    from .config import Config\nexcept ImportError:  # pragma: no cover\n    from selenium_abastecimiento import descargar_abastecimiento\n    from config import Config\n\nlock = threading.Lock()\n\n# Valor por defecto para el campo "Solicitante"\nDEFAULT_SOLICITANTE = "1221 - HERRERA PUENTE WILLIAM"\n\n\ndef ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):\n    if not lock.acquire(blocking=False):\n        messagebox.showinfo("Proceso en curso", "Ya existe una descarga en ejecución")\n        return\n\n    fd = entry_fd.get().strip()\n    fh = entry_fh.get().strip()\n    sol = entry_sol.get().strip()\n    aut = entry_aut.get().strip()\n    cfg = Config()\n    btn.config(state=tk.DISABLED)\n\n    def tarea():\n        try:\n            descargar_abastecimiento(\n                fd, fh, sol, aut, headless=cfg.abastecimiento_headless\n            )\n            messagebox.showinfo("Finalizado", "Proceso completado")\n        except Exception as exc:\n            messagebox.showerror("Error", str(exc))\n        finally:\n            lock.release()\n            btn.config(state=tk.NORMAL)\n\n    threading.Thread(target=tarea, daemon=True).start()\n\n\ndef main():\n    root = tk.Tk()\n    root.title("Descarga Abastecimiento")\n    root.tk_setPalette(\n        background="#1e1e1e",\n        foreground="#f0f0f0",\n        activeBackground="#333333",\n        activeForeground="#f0f0f0",\n        highlightColor="#555555",\n    )\n    root.configure(bg="#1e1e1e")\n\n    tk.Label(root, text="Fecha inicio (dd/mm/aa):").grid(row=0, column=0, sticky="e")\n    entry_fd = tk.Entry(root)\n    entry_fd.grid(row=0, column=1, padx=5, pady=2)\n\n    tk.Label(root, text="Fecha final (dd/mm/aa):").grid(row=1, column=0, sticky="e")\n    entry_fh = tk.Entry(root)\n    entry_fh.grid(row=1, column=1, padx=5, pady=2)\n\n    cfg = Config()\n    tk.Label(root, text="Solicitante:").grid(row=2, column=0, sticky="e")\n    solicitantes = cfg.abastecimiento_solicitantes or []\n    if DEFAULT_SOLICITANTE not in solicitantes:\n        solicitantes.insert(0, DEFAULT_SOLICITANTE)\n    sol_var = tk.StringVar(value=DEFAULT_SOLICITANTE)\n    entry_sol = ttk.Combobox(\n        root,\n        textvariable=sol_var,\n        values=solicitantes,\n        width=40,\n    )\n    entry_sol.grid(row=2, column=1, padx=5, pady=2)\n\n    tk.Label(root, text="Autoriza:").grid(row=3, column=0, sticky="e")\n    aut_var = tk.StringVar()\n    entry_aut = ttk.Combobox(\n        root,\n        textvariable=aut_var,\n        values=cfg.abastecimiento_autorizadores or [],\n        width=40,\n    )\n    entry_aut.grid(row=3, column=1, padx=5, pady=2)\n\n    var_visible = tk.BooleanVar(value=not bool(cfg.headless))\n\n    def actualizar_visible():\n        cfg.load()\n        cfg.data["headless"] = not var_visible.get()\n        cfg.save()\n\n    chk_visible = tk.Checkbutton(\n        root,\n        text="Descarga visible",\n        variable=var_visible,\n        command=actualizar_visible,\n        selectcolor="#00aa00",\n    )\n    chk_visible.grid(row=4, column=1, sticky="w", padx=5, pady=2)\n\n    btn_ejecutar = tk.Button(\n        root,\n        text="Descargar",\n        command=lambda: ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn_ejecutar),\n    )\n    btn_ejecutar.grid(row=5, column=0, columnspan=2, pady=10)\n\n    def abrir_config():\n        configurar_abastecimiento()\n        nuevo = Config()\n        if entry_sol.winfo_exists():\n            solicitantes = nuevo.abastecimiento_solicitantes or []\n            if DEFAULT_SOLICITANTE not in solicitantes:\n                solicitantes.insert(0, DEFAULT_SOLICITANTE)\n            entry_sol[\'values\'] = solicitantes\n            sol_var.set(DEFAULT_SOLICITANTE)\n        if entry_aut.winfo_exists():\n            entry_aut[\'values\'] = nuevo.abastecimiento_autorizadores or []\n\n    btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)\n    btn_cfg.grid(row=6, column=0, columnspan=2, pady=(0, 10))\n\n    def center_window(win):\n        win.update_idletasks()\n        w = win.winfo_width()\n        h = win.winfo_height()\n        x = (win.winfo_screenwidth() // 2) - (w // 2)\n        y = (win.winfo_screenheight() // 2) - (h // 2)\n        win.geometry(f"{w}x{h}+{x}+{y}")\n\n    center_window(root)\n    root.mainloop()\n\n\nif __name__ == "__main__":  # pragma: no cover\n    main()\n',
+DATA = {
+    'DescargasOC-main/descargas_oc/ui.py': "
+aW1wb3J0IHRraW50ZXIgYXMgdGsKaW1wb3J0IHRocmVhZGluZwppbXBvcnQgbG9nZ2luZwppbXBv
+cnQgcmUKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUKZnJvbSB0a2ludGVyIGltcG9ydCBt
+ZXNzYWdlYm94Cgp0cnk6ICAjIHBlcm1pdGUgZWplY3V0YXIgY29tbyBzY3JpcHQKICAgIGZyb20g
+LmVzY3VjaGFkb3IgaW1wb3J0IGJ1c2Nhcl9vY3MsIGNhcmdhcl91bHRpbW9fdWlkbCwgcmVnaXN0
+cmFyX3Byb2Nlc2Fkb3MKICAgIGZyb20gLnNlbGVuaXVtX21vZHVsbyBpbXBvcnQgZGVzY2FyZ2Fy
+X29jCiAgICBmcm9tIC5yZXBvcnRlciBpbXBvcnQgZW52aWFyX3JlcG9ydGUKICAgIGZyb20gLmNv
+bmZpZyBpbXBvcnQgQ29uZmlnCiAgICBmcm9tIC5sb2dnZXIgaW1wb3J0IGdldF9sb2dnZXIKZXhj
+ZXB0IEltcG9ydEVycm9yOiAgIyBwcmFnbWE6IG5vIGNvdmVyCiAgICBmcm9tIGVzY3VjaGFkb3Ig
+aW1wb3J0IGJ1c2Nhcl9vY3MsIGNhcmdhcl91bHRpbW9fdWlkbCwgcmVnaXN0cmFyX3Byb2Nlc2Fk
+b3MKICAgIGZyb20gc2VsZW5pdW1fbW9kdWxvIGltcG9ydCBkZXNjYXJnYXJfb2MKICAgIGZyb20g
+cmVwb3J0ZXIgaW1wb3J0IGVudmlhcl9yZXBvcnRlCiAgICBmcm9tIGNvbmZpZyBpbXBvcnQgQ29u
+ZmlnCiAgICBmcm9tIGxvZ2dlciBpbXBvcnQgZ2V0X2xvZ2dlcgoKbG9nZ2VyID0gZ2V0X2xvZ2dl
+cihfX25hbWVfXykKCnNjYW5uaW5nX2xvY2sgPSB0aHJlYWRpbmcuTG9jaygpCgoKZGVmIGNlbnRl
+cl93aW5kb3cod2luOiB0ay5UayB8IHRrLlRvcGxldmVsKToKICAgIHdpbi51cGRhdGVfaWRsZXRh
+c2tzKCkKICAgIHcgPSB3aW4ud2luZm9fd2lkdGgoKQogICAgaCA9IHdpbi53aW5mb19oZWlnaHQo
+KQogICAgeCA9ICh3aW4ud2luZm9fc2NyZWVud2lkdGgoKSAvLyAyKSAtICh3IC8vIDIpCiAgICB5
+ID0gKHdpbi53aW5mb19zY3JlZW5oZWlnaHQoKSAvLyAyKSAtIChoIC8vIDIpCiAgICB3aW4uZ2Vv
+bWV0cnkoZiJ7d314e2h9K3t4fSt7eX0iKQoKCmRlZiBjb25maWdfY29tcGxldGEoY2ZnOiBDb25m
+aWcpIC0+IGJvb2w6CiAgICB0cnk6CiAgICAgICAgY2ZnLnZhbGlkYXRlKCkKICAgIGV4Y2VwdCBF
+eGNlcHRpb246CiAgICAgICAgcmV0dXJuIEZhbHNlCiAgICByZXF1ZXJpZG9zID0gWwogICAgICAg
+IGNmZy51c3VhcmlvLAogICAgICAgIGNmZy5wYXNzd29yZCwKICAgICAgICBjZmcuY2FycGV0YV9k
+ZXN0aW5vX2xvY2FsLAogICAgICAgIGNmZy5jYXJwZXRhX2FuYWxpemFyLAogICAgICAgIGNmZy5z
+ZWFmaWxlX3VybCwKICAgICAgICBjZmcuc2VhZmlsZV9yZXBvX2lkLAogICAgICAgIGNmZy5jb3Jy
+ZW9fcmVwb3J0ZSwKICAgIF0KICAgIHJldHVybiBhbGwocmVxdWVyaWRvcykKCgpjbGFzcyBUZXh0
+SGFuZGxlcihsb2dnaW5nLkhhbmRsZXIpOgogICAgZGVmIF9faW5pdF9fKHNlbGYsIHdpZGdldDog
+dGsuVGV4dCk6CiAgICAgICAgc3VwZXIoKS5fX2luaXRfXygpCiAgICAgICAgc2VsZi53aWRnZXQg
+PSB3aWRnZXQKCiAgICBkZWYgZW1pdChzZWxmLCByZWNvcmQ6IGxvZ2dpbmcuTG9nUmVjb3JkKToK
+ICAgICAgICBtc2cgPSBzZWxmLmZvcm1hdChyZWNvcmQpICsgIlxuIgogICAgICAgIHNlbGYud2lk
+Z2V0LmFmdGVyKDAsIGxhbWJkYSBtPW1zZzogKHNlbGYud2lkZ2V0Lmluc2VydCh0ay5FTkQsIG0p
+LCBzZWxmLndpZGdldC5zZWUodGsuRU5EKSkpCgoKZGVmIHJlYWxpemFyX2VzY2FuZW8odGV4dF93
+aWRnZXQ6IHRrLlRleHQsIGxibF9sYXN0OiB0ay5MYWJlbCk6CiAgICBpZiBub3Qgc2Nhbm5pbmdf
+bG9jay5hY3F1aXJlKGJsb2NraW5nPUZhbHNlKToKICAgICAgICB0ZXh0X3dpZGdldC5pbnNlcnQo
+dGsuRU5ELCAiRXNjYW5lbyBlbiBwcm9ncmVzby4uLlxuIikKICAgICAgICB0ZXh0X3dpZGdldC5z
+ZWUodGsuRU5EKQogICAgICAgIHJldHVybgogICAgdHJ5OgogICAgICAgIGNmZyA9IENvbmZpZygp
+CiAgICAgICAgaWYgbm90IGNvbmZpZ19jb21wbGV0YShjZmcpOgogICAgICAgICAgICBtZXNzYWdl
+Ym94LnNob3dlcnJvcigKICAgICAgICAgICAgICAgICJFcnJvciIsICJDb25maWd1cmFjacOzbiBp
+bmNvbXBsZXRhIG8gcG9yIGZhdm9yIGNvbmZpZ3VyYXIgY29ycmVjdGFtZW50ZSIKICAgICAgICAg
+ICAgKQogICAgICAgICAgICByZXR1cm4KCiAgICAgICAgZGVmIGFwcGVuZChtc2c6IHN0cik6CiAg
+ICAgICAgICAgIHRleHRfd2lkZ2V0LmFmdGVyKDAsIGxhbWJkYSBtPW1zZzogKHRleHRfd2lkZ2V0
+Lmluc2VydCh0ay5FTkQsIG0pLCB0ZXh0X3dpZGdldC5zZWUodGsuRU5EKSkpCgogICAgICAgIGFw
+cGVuZCgiQnVzY2FuZG8gw7NyZGVuZXMuLi5cbiIpCiAgICAgICAgb3JkZW5lcywgdWx0aW1vID0g
+YnVzY2FyX29jcyhjZmcpCiAgICAgICAgdWlkbF9wb3JfbnVtZXJvID0gewogICAgICAgICAgICBv
+LmdldCgibnVtZXJvIik6IG8uZ2V0KCJ1aWRsIikKICAgICAgICAgICAgZm9yIG8gaW4gb3JkZW5l
+cwogICAgICAgICAgICBpZiBvLmdldCgibnVtZXJvIikgYW5kIG8uZ2V0KCJ1aWRsIikKICAgICAg
+ICB9CiAgICAgICAgdWlkbF9hX251bWVyb3M6IGRpY3Rbc3RyLCBzZXRbc3RyXV0gPSB7fQogICAg
+ICAgIGZvciBudW1lcm8sIHVpZGwgaW4gdWlkbF9wb3JfbnVtZXJvLml0ZW1zKCk6CiAgICAgICAg
+ICAgIGlmIG5vdCB1aWRsOgogICAgICAgICAgICAgICAgY29udGludWUKICAgICAgICAgICAgdWlk
+bF9hX251bWVyb3Muc2V0ZGVmYXVsdCh1aWRsLCBzZXQoKSkuYWRkKG51bWVybykKICAgICAgICBw
+ZW5kaWVudGVzX3VpZGxzID0gc2V0KHVpZGxfYV9udW1lcm9zKQogICAgICAgIGV4aXRvc2FzOiBs
+aXN0W3N0cl0gPSBbXQogICAgICAgIGZhbHRhbnRlczogbGlzdFtzdHJdID0gW10KICAgICAgICBl
+cnJvcmVzOiBsaXN0W3N0cl0gPSBbXQogICAgICAgIGlmIG9yZGVuZXM6CiAgICAgICAgICAgIGFw
+cGVuZChmIlByb2Nlc2FuZG8ge2xlbihvcmRlbmVzKX0gT0MocylcbiIpCiAgICAgICAgICAgIHRy
+eToKICAgICAgICAgICAgICAgIHN1Ymlkb3MsIG5vX2VuY29udHJhZG9zLCBlcnJvcmVzID0gZGVz
+Y2FyZ2FyX29jKAogICAgICAgICAgICAgICAgICAgIG9yZGVuZXMsIGhlYWRsZXNzPWNmZy5oZWFk
+bGVzcwogICAgICAgICAgICAgICAgKQogICAgICAgICAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGV4
+YzogICMgcHJhZ21hOiBubyBjb3ZlciAtIHNlZ3VyaWRhZCBlbiBlamVjdWNpw7NuCiAgICAgICAg
+ICAgICAgICBsb2dnZXIuZXhjZXB0aW9uKCJGYWxsbyBhbCBkZXNjYXJnYXIgT0MiKQogICAgICAg
+ICAgICAgICAgZXJyb3JlcyA9IFtzdHIoZXhjKV0KICAgICAgICAgICAgICAgIHN1Ymlkb3MsIG5v
+X2VuY29udHJhZG9zID0gW10sIFtvLmdldCgibnVtZXJvIikgZm9yIG8gaW4gb3JkZW5lc10KICAg
+ICAgICAgICAgZXhpdG9zYXMuZXh0ZW5kKHN1Ymlkb3MpCiAgICAgICAgICAgIGZhbHRhbnRlcy5l
+eHRlbmQobm9fZW5jb250cmFkb3MpCiAgICAgICAgICAgIG51bWVyb3NfY29uX3Byb2JsZW1hcyA9
+IHtzdHIobikgZm9yIG4gaW4gbm9fZW5jb250cmFkb3N9CiAgICAgICAgICAgIGZvciBlcnJvciBp
+biBlcnJvcmVzOgogICAgICAgICAgICAgICAgbSA9IHJlLnNlYXJjaChyIk9DXHMqKFxkKykiLCBl
+cnJvcikKICAgICAgICAgICAgICAgIGlmIG06CiAgICAgICAgICAgICAgICAgICAgbnVtZXJvc19j
+b25fcHJvYmxlbWFzLmFkZChtLmdyb3VwKDEpKQogICAgICAgICAgICB1aWRsc19jb25fcHJvYmxl
+bWFzID0gewogICAgICAgICAgICAgICAgdWlkbF9wb3JfbnVtZXJvW251bV0KICAgICAgICAgICAg
+ICAgIGZvciBudW0gaW4gbnVtZXJvc19jb25fcHJvYmxlbWFzCiAgICAgICAgICAgICAgICBpZiBu
+dW0gaW4gdWlkbF9wb3JfbnVtZXJvIGFuZCB1aWRsX3Bvcl9udW1lcm9bbnVtXQogICAgICAgICAg
+ICB9CiAgICAgICAgICAgIHN1Ymlkb3Nfc2V0ID0gc2V0KHN1Ymlkb3MpCiAgICAgICAgICAgIHVp
+ZGxzX2V4aXRvc29zOiBsaXN0W3N0cl0gPSBbXQogICAgICAgICAgICBmb3Igb3JkZW4gaW4gb3Jk
+ZW5lczoKICAgICAgICAgICAgICAgIHVpZGwgPSBvcmRlbi5nZXQoInVpZGwiKQogICAgICAgICAg
+ICAgICAgaWYgbm90IHVpZGwgb3IgdWlkbCBpbiB1aWRsc19jb25fcHJvYmxlbWFzOgogICAgICAg
+ICAgICAgICAgICAgIGNvbnRpbnVlCiAgICAgICAgICAgICAgICBudW1lcm9zX3VpZGwgPSB1aWRs
+X2FfbnVtZXJvcy5nZXQodWlkbCwgc2V0KCkpCiAgICAgICAgICAgICAgICBpZiBudW1lcm9zX3Vp
+ZGwgYW5kIG51bWVyb3NfdWlkbC5pc3N1YnNldChzdWJpZG9zX3NldCkgYW5kIHVpZGwgbm90IGlu
+IHVpZGxzX2V4aXRvc29zOgogICAgICAgICAgICAgICAgICAgIHVpZGxzX2V4aXRvc29zLmFwcGVu
+ZCh1aWRsKQogICAgICAgICAgICBwZW5kaWVudGVzX3VpZGxzIC09IHNldCh1aWRsc19leGl0b3Nv
+cykKICAgICAgICAgICAgZm9yIG51bSBpbiBzdWJpZG9zOgogICAgICAgICAgICAgICAgYXBwZW5k
+KGYi4pyU77iPIE9DIHtudW19IHByb2Nlc2FkYVxuIikKICAgICAgICAgICAgZm9yIG51bSBpbiBu
+b19lbmNvbnRyYWRvczoKICAgICAgICAgICAgICAgIGFwcGVuZChmIuKdjCBPQyB7bnVtfSBmYWx0
+YW50ZVxuIikKICAgICAgICAgICAgaWYgdWlkbHNfZXhpdG9zb3M6CiAgICAgICAgICAgICAgICB1
+aWRsc19zaW5fZHVwbGljYWRvcyA9IGxpc3QoZGljdC5mcm9ta2V5cyh1aWRsc19leGl0b3Nvcykp
+CiAgICAgICAgICAgICAgICB1bHRpbW9fZ3VhcmRhciA9IHVsdGltbyBpZiBub3QgcGVuZGllbnRl
+c191aWRscyBlbHNlIE5vbmUKICAgICAgICAgICAgICAgIHJlZ2lzdHJhcl9wcm9jZXNhZG9zKHVp
+ZGxzX3Npbl9kdXBsaWNhZG9zLCB1bHRpbW9fZ3VhcmRhcikKICAgICAgICBlbHNlOgogICAgICAg
+ICAgICBhcHBlbmQoIk5vIHNlIGVuY29udHJhcm9uIG51ZXZhcyDDs3JkZW5lc1xuIikKICAgICAg
+ICBlbnZpYWRvID0gZW52aWFyX3JlcG9ydGUoZXhpdG9zYXMsIGZhbHRhbnRlcywgb3JkZW5lcywg
+Y2ZnKQogICAgICAgIGlmIG9yZGVuZXM6CiAgICAgICAgICAgIGlmIGVycm9yZXM6CiAgICAgICAg
+ICAgICAgICBzdW1tYXJ5ID0gIkVycm9yZXMgZHVyYW50ZSBsYSBkZXNjYXJnYTpcbiIgKyAiXG4i
+LmpvaW4oZXJyb3JlcykKICAgICAgICAgICAgZWxpZiBlbnZpYWRvOgogICAgICAgICAgICAgICAg
+c3VtbWFyeSA9ICJPUkRFTkVTIERFIENPTVBSQSBERVNDQVJHQURBUyBZIFJFUE9SVEUgRU5WSUFE
+TyIKICAgICAgICAgICAgZWxzZToKICAgICAgICAgICAgICAgIHN1bW1hcnkgPSAiTm8gc2UgcHVk
+byBlbnZpYXIgZWwgcmVwb3J0ZSIKICAgICAgICAgICAgdGV4dF93aWRnZXQuYWZ0ZXIoMCwgbGFt
+YmRhOiBtZXNzYWdlYm94LnNob3dpbmZvKCJSZXN1bHRhZG8iLCBzdW1tYXJ5KSkKICAgICAgICBh
+cHBlbmQoIlByb2Nlc28gZmluYWxpemFkb1xuIikKICAgICAgICBsYmxfbGFzdC5jb25maWcoCiAg
+ICAgICAgICAgIHRleHQ9IsOabHRpbW8gVUlETDoge30gLSB7fSIuZm9ybWF0KAogICAgICAgICAg
+ICAgICAgY2FyZ2FyX3VsdGltb191aWRsKCksIGRhdGV0aW1lLm5vdygpLnN0cmZ0aW1lKCIlSDol
+TTolUyIpCiAgICAgICAgICAgICkKICAgICAgICApCiAgICBmaW5hbGx5OgogICAgICAgIHNjYW5u
+aW5nX2xvY2sucmVsZWFzZSgpCgoKZGVmIG1haW4oKToKICAgIHJvb3QgPSB0ay5UaygpCiAgICBy
+b290LnRpdGxlKCJEZXNjYXJnYXMgT0MiKQogICAgcm9vdC50a19zZXRQYWxldHRlKAogICAgICAg
+IGJhY2tncm91bmQ9IiMxZTFlMWUiLAogICAgICAgIGZvcmVncm91bmQ9IiNmMGYwZjAiLAogICAg
+ICAgIGFjdGl2ZUJhY2tncm91bmQ9IiMzMzMzMzMiLAogICAgICAgIGFjdGl2ZUZvcmVncm91bmQ9
+IiNmMGYwZjAiLAogICAgICAgIGhpZ2hsaWdodENvbG9yPSIjNTU1NTU1IiwKICAgICkKICAgIHJv
+b3QuY29uZmlndXJlKGJnPSIjMWUxZTFlIikKCiAgICBmcmFtZSA9IHRrLkZyYW1lKHJvb3QpCiAg
+ICBmcmFtZS5wYWNrKHBhZHg9MTAsIHBhZHk9MTApCgogICAgdGV4dCA9IHRrLlRleHQoZnJhbWUs
+IHdpZHRoPTgwLCBoZWlnaHQ9MjAsIGJnPSIjMDAwMDAwIiwgZmc9IiNmMGYwZjAiLCBpbnNlcnRi
+YWNrZ3JvdW5kPSIjZjBmMGYwIikKICAgIHRleHQucGFjayhwYWR5PTUpCgogICAgaGFuZGxlciA9
+IFRleHRIYW5kbGVyKHRleHQpCiAgICBoYW5kbGVyLnNldEZvcm1hdHRlcihsb2dnaW5nLkZvcm1h
+dHRlcignJShhc2N0aW1lKXMgWyUobGV2ZWxuYW1lKXNdICUobWVzc2FnZSlzJykpCiAgICBsb2dn
+aW5nLmdldExvZ2dlcigpLmFkZEhhbmRsZXIoaGFuZGxlcikKCiAgICBlc3RhZG8gPSB7ImFjdGl2
+byI6IEZhbHNlLCAiY29udGFkb3IiOiAwfQogICAgbGJsX2NvbnRhZG9yID0gdGsuTGFiZWwoZnJh
+bWUsIHRleHQ9IkVzY3VjaGFkb3IgZGV0ZW5pZG8iKQogICAgbGJsX2NvbnRhZG9yLnBhY2soKQog
+ICAgbGJsX2xhc3QgPSB0ay5MYWJlbChmcmFtZSwgdGV4dD0iw5psdGltbyBVSURMOiAiICsgKGNh
+cmdhcl91bHRpbW9fdWlkbCgpIG9yICctJykpCiAgICBsYmxfbGFzdC5wYWNrKCkKCiAgICBjZmcg
+PSBDb25maWcoKQogICAgbWFudWFsX21vZGUgPSB7ImFjdGl2ZSI6IEZhbHNlfQoKICAgIGRlZiBh
+Y3R1YWxpemFyX2NvbnRhZG9yKCk6CiAgICAgICAgaWYgZXN0YWRvWyJhY3Rpdm8iXToKICAgICAg
+ICAgICAgaWYgZXN0YWRvWyJjb250YWRvciJdIDw9IDA6CiAgICAgICAgICAgICAgICB0aHJlYWRp
+bmcuVGhyZWFkKHRhcmdldD1yZWFsaXphcl9lc2NhbmVvLCBhcmdzPSh0ZXh0LCBsYmxfbGFzdCks
+IGRhZW1vbj1UcnVlKS5zdGFydCgpCiAgICAgICAgICAgICAgICBlc3RhZG9bImNvbnRhZG9yIl0g
+PSBjZmcuc2Nhbl9pbnRlcnZhbAogICAgICAgICAgICBsYmxfY29udGFkb3IuY29uZmlnKHRleHQ9
+ZiJTaWd1aWVudGUgZXNjYW5lbyBlbiB7ZXN0YWRvWydjb250YWRvciddfSBzIikKICAgICAgICAg
+ICAgZXN0YWRvWyJjb250YWRvciJdIC09IDEKICAgICAgICAgICAgcm9vdC5hZnRlcigxMDAwLCBh
+Y3R1YWxpemFyX2NvbnRhZG9yKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIGxibF9jb250YWRv
+ci5jb25maWcodGV4dD0iRXNjdWNoYWRvciBkZXRlbmlkbyIpCgogICAgZGVmIHRvZ2dsZSgpOgog
+ICAgICAgIGlmIGVzdGFkb1siYWN0aXZvIl06CiAgICAgICAgICAgIGVzdGFkb1siYWN0aXZvIl0g
+PSBGYWxzZQogICAgICAgICAgICBidG5fdG9nZ2xlLmNvbmZpZyh0ZXh0PSJBY3RpdmFyIGVzY3Vj
+aGFkb3IiKQogICAgICAgIGVsc2U6CiAgICAgICAgICAgIGlmIG5vdCBjb25maWdfY29tcGxldGEo
+Y2ZnKToKICAgICAgICAgICAgICAgIG1lc3NhZ2Vib3guc2hvd2Vycm9yKAogICAgICAgICAgICAg
+ICAgICAgICJFcnJvciIsCiAgICAgICAgICAgICAgICAgICAgIkNvbmZpZ3VyYWNpw7NuIGluY29t
+cGxldGEgbyBwb3IgZmF2b3IgY29uZmlndXJhciBjb3JyZWN0YW1lbnRlIiwKICAgICAgICAgICAg
+ICAgICkKICAgICAgICAgICAgICAgIHJldHVybgogICAgICAgICAgICBlc3RhZG9bImFjdGl2byJd
+ID0gVHJ1ZQogICAgICAgICAgICBlc3RhZG9bImNvbnRhZG9yIl0gPSBjZmcuc2Nhbl9pbnRlcnZh
+bAogICAgICAgICAgICBidG5fdG9nZ2xlLmNvbmZpZyh0ZXh0PSJEZXRlbmVyIGVzY3VjaGFkb3Ii
+KQogICAgICAgICAgICBhY3R1YWxpemFyX2NvbnRhZG9yKCkKCiAgICBkZWYgZXNjYW5lYXJfYWhv
+cmEoKToKICAgICAgICBlc3RhZG9bImNvbnRhZG9yIl0gPSBjZmcuc2Nhbl9pbnRlcnZhbAogICAg
+ICAgIHRocmVhZGluZy5UaHJlYWQodGFyZ2V0PXJlYWxpemFyX2VzY2FuZW8sIGFyZ3M9KHRleHQs
+IGxibF9sYXN0KSwgZGFlbW9uPVRydWUpLnN0YXJ0KCkKCiAgICBkZWYgYWN0aXZhcl9tYW51YWwo
+KToKICAgICAgICBtYW51YWxfbW9kZVsiYWN0aXZlIl0gPSBUcnVlCiAgICAgICAgdGV4dC5kZWxl
+dGUoIjEuMCIsIHRrLkVORCkKICAgICAgICB0ZXh0Lmluc2VydCh0ay5FTkQsICJJbnRyb2R1emNh
+IG9yZGVuZXMgcXVlIGRlc2VhIGRlc2NhcmdhciAxIHBvciBsaW5lYTpcbiIpCiAgICAgICAgYnRu
+X2VqZWN1dGFyLmNvbmZpZyhzdGF0ZT10ay5ESVNBQkxFRCkKICAgICAgICB0ZXh0LmZvY3VzX3Nl
+dCgpCgogICAgZGVmIGNoZWNrX21hbnVhbF9pbnB1dChldmVudD1Ob25lKToKICAgICAgICBpZiBt
+YW51YWxfbW9kZVsiYWN0aXZlIl06CiAgICAgICAgICAgIGNvbnRlbmlkbyA9IHRleHQuZ2V0KCIy
+LjAiLCB0ay5FTkQpLnN0cmlwKCkKICAgICAgICAgICAgYnRuX2VqZWN1dGFyLmNvbmZpZyhzdGF0
+ZT10ay5OT1JNQUwgaWYgY29udGVuaWRvIGVsc2UgdGsuRElTQUJMRUQpCgogICAgdGV4dC5iaW5k
+KCI8S2V5UmVsZWFzZT4iLCBjaGVja19tYW51YWxfaW5wdXQpCgogICAgZGVmIGVqZWN1dGFyX21h
+bnVhbCgpOgogICAgICAgIGlmIG5vdCBzY2FubmluZ19sb2NrLmFjcXVpcmUoYmxvY2tpbmc9RmFs
+c2UpOgogICAgICAgICAgICB0ZXh0Lmluc2VydCh0ay5FTkQsICJEZXNjYXJnYSBlbiBwcm9ncmVz
+by4uLlxuIikKICAgICAgICAgICAgdGV4dC5zZWUodGsuRU5EKQogICAgICAgICAgICByZXR1cm4K
+ICAgICAgICBjb250ZW5pZG8gPSB0ZXh0LmdldCgiMi4wIiwgdGsuRU5EKS5zdHJpcCgpCiAgICAg
+ICAgbnVtZXJvcyA9IFtuLnN0cmlwKCkgZm9yIG4gaW4gY29udGVuaWRvLnNwbGl0bGluZXMoKSBp
+ZiBuLnN0cmlwKCldCiAgICAgICAgaWYgbm90IG51bWVyb3M6CiAgICAgICAgICAgIHNjYW5uaW5n
+X2xvY2sucmVsZWFzZSgpCiAgICAgICAgICAgIHJldHVybgogICAgICAgIGlmIG5vdCBtZXNzYWdl
+Ym94LmFza3llc25vKAogICAgICAgICAgICAiQ29uZmlybWFjacOzbiIsCiAgICAgICAgICAgICJT
+ZSBkZXNjYXJnYXLDoW4gbGFzIHNpZ3VpZW50ZXMgw7NyZGVuZXM6XG4iICsgIlxuIi5qb2luKG51
+bWVyb3MpLAogICAgICAgICk6CiAgICAgICAgICAgIHNjYW5uaW5nX2xvY2sucmVsZWFzZSgpCiAg
+ICAgICAgICAgIHJldHVybgogICAgICAgIHRleHQuZGVsZXRlKCIxLjAiLCB0ay5FTkQpCiAgICAg
+ICAgbWFudWFsX21vZGVbImFjdGl2ZSJdID0gRmFsc2UKICAgICAgICBidG5fZWplY3V0YXIuY29u
+ZmlnKHN0YXRlPXRrLkRJU0FCTEVEKQoKICAgICAgICBkZWYgcnVuKCk6CiAgICAgICAgICAgIHRy
+eToKICAgICAgICAgICAgICAgIGNmZy5sb2FkKCkKICAgICAgICAgICAgICAgIG9yZGVuZXMgPSBb
+eyJudW1lcm8iOiBufSBmb3IgbiBpbiBudW1lcm9zXQoKICAgICAgICAgICAgICAgIGRlZiBhcHBl
+bmQobXNnOiBzdHIpOgogICAgICAgICAgICAgICAgICAgIHRleHQuYWZ0ZXIoMCwgbGFtYmRhIG09
+bXNnOiAodGV4dC5pbnNlcnQodGsuRU5ELCBtKSwgdGV4dC5zZWUodGsuRU5EKSkpCgogICAgICAg
+ICAgICAgICAgYXBwZW5kKGYiUHJvY2VzYW5kbyB7bGVuKG9yZGVuZXMpfSBPQyhzKVxuIikKICAg
+ICAgICAgICAgICAgIHRyeToKICAgICAgICAgICAgICAgICAgICBzdWJpZG9zLCBub19lbmNvbnRy
+YWRvcywgZXJyb3JlcyA9IGRlc2Nhcmdhcl9vYygKICAgICAgICAgICAgICAgICAgICAgICAgb3Jk
+ZW5lcywgaGVhZGxlc3M9Y2ZnLmhlYWRsZXNzCiAgICAgICAgICAgICAgICAgICAgKQogICAgICAg
+ICAgICAgICAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBleGM6CiAgICAgICAgICAgICAgICAgICAgZXJy
+b3JlcyA9IFtzdHIoZXhjKV0KICAgICAgICAgICAgICAgICAgICBzdWJpZG9zLCBub19lbmNvbnRy
+YWRvcyA9IFtdLCBudW1lcm9zCiAgICAgICAgICAgICAgICBmb3IgbnVtIGluIHN1Ymlkb3M6CiAg
+ICAgICAgICAgICAgICAgICAgYXBwZW5kKGYi4pyU77iPIE9DIHtudW19IHByb2Nlc2FkYVxuIikK
+ICAgICAgICAgICAgICAgIGZvciBudW0gaW4gbm9fZW5jb250cmFkb3M6CiAgICAgICAgICAgICAg
+ICAgICAgYXBwZW5kKGYi4p2MIE9DIHtudW19IGZhbHRhbnRlXG4iKQogICAgICAgICAgICAgICAg
+ZW52aWFyX3JlcG9ydGUoc3ViaWRvcywgbm9fZW5jb250cmFkb3MsIG9yZGVuZXMsIGNmZykKICAg
+ICAgICAgICAgICAgIGlmIGVycm9yZXM6CiAgICAgICAgICAgICAgICAgICAgc3VtbWFyeSA9ICJF
+cnJvcmVzIGR1cmFudGUgbGEgZGVzY2FyZ2E6XG4iICsgIlxuIi5qb2luKGVycm9yZXMpCiAgICAg
+ICAgICAgICAgICBlbHNlOgogICAgICAgICAgICAgICAgICAgIHN1bW1hcnkgPSAiUHJvY2VzbyBm
+aW5hbGl6YWRvIgogICAgICAgICAgICAgICAgdGV4dC5hZnRlcigwLCBsYW1iZGE6IG1lc3NhZ2Vi
+b3guc2hvd2luZm8oIlJlc3VsdGFkbyIsIHN1bW1hcnkpKQogICAgICAgICAgICBmaW5hbGx5Ogog
+ICAgICAgICAgICAgICAgc2Nhbm5pbmdfbG9jay5yZWxlYXNlKCkKICAgICAgICAgICAgICAgIHRl
+eHQuYWZ0ZXIoMCwgbGFtYmRhOiBidG5fZWplY3V0YXIuY29uZmlnKHN0YXRlPXRrLkRJU0FCTEVE
+KSkKCiAgICAgICAgdGhyZWFkaW5nLlRocmVhZCh0YXJnZXQ9cnVuLCBkYWVtb249VHJ1ZSkuc3Rh
+cnQoKQoKICAgIGRlZiBhY3R1YWxpemFyX2ludGVydmFsbygpOgogICAgICAgIHRyeToKICAgICAg
+ICAgICAgdmFsID0gaW50KGVudHJ5X2ludGVydmFsLmdldCgpKQogICAgICAgICAgICBpZiB2YWwg
+Pj0gMzAwOgogICAgICAgICAgICAgICAgY2ZnLmxvYWQoKQogICAgICAgICAgICAgICAgY2ZnLmRh
+dGFbJ3NjYW5faW50ZXJ2YWwnXSA9IHZhbAogICAgICAgICAgICAgICAgY2ZnLnNhdmUoKQogICAg
+ICAgICAgICAgICAgZXN0YWRvWydjb250YWRvciddID0gdmFsCiAgICAgICAgZXhjZXB0IFZhbHVl
+RXJyb3I6CiAgICAgICAgICAgIHBhc3MKCiAgICBidG5fdG9nZ2xlID0gdGsuQnV0dG9uKGZyYW1l
+LCB0ZXh0PSJBY3RpdmFyIGVzY3VjaGFkb3IiLCBjb21tYW5kPXRvZ2dsZSkKICAgIGJ0bl90b2dn
+bGUucGFjayhzaWRlPXRrLkxFRlQsIHBhZHg9NSkKCiAgICBidG5fZXNjYW5lYXIgPSB0ay5CdXR0
+b24oZnJhbWUsIHRleHQ9IkVzY2FuZWFyIGFob3JhIiwgY29tbWFuZD1lc2NhbmVhcl9haG9yYSkK
+ICAgIGJ0bl9lc2NhbmVhci5wYWNrKHNpZGU9dGsuTEVGVCwgcGFkeD01KQoKICAgIGJ0bl9tYW51
+YWwgPSB0ay5CdXR0b24oZnJhbWUsIHRleHQ9IkRlc2NhcmdhIG1hbnVhbCIsIGNvbW1hbmQ9YWN0
+aXZhcl9tYW51YWwpCiAgICBidG5fbWFudWFsLnBhY2soc2lkZT10ay5MRUZULCBwYWR4PTUpCiAg
+ICBidG5fZWplY3V0YXIgPSB0ay5CdXR0b24oZnJhbWUsIHRleHQ9IkVqZWN1dGFyIGRlc2Nhcmdh
+IiwgY29tbWFuZD1lamVjdXRhcl9tYW51YWwsIHN0YXRlPXRrLkRJU0FCTEVEKQogICAgYnRuX2Vq
+ZWN1dGFyLnBhY2soc2lkZT10ay5MRUZULCBwYWR4PTUpCgogICAgdmFyX2JpZW5lcyA9IHRrLkJv
+b2xlYW5WYXIodmFsdWU9Ym9vbChjZmcuY29tcHJhX2JpZW5lcykpCgogICAgZGVmIGFjdHVhbGl6
+YXJfYmllbmVzKCk6CiAgICAgICAgY2ZnLmxvYWQoKQogICAgICAgIGNmZy5kYXRhWydjb21wcmFf
+YmllbmVzJ10gPSB2YXJfYmllbmVzLmdldCgpCiAgICAgICAgY2ZnLnNhdmUoKQoKICAgIGNoa19i
+aWVuZXMgPSB0ay5DaGVja2J1dHRvbigKICAgICAgICBmcmFtZSwKICAgICAgICB0ZXh0PSJDb21w
+cmEgQmllbmVzIiwKICAgICAgICB2YXJpYWJsZT12YXJfYmllbmVzLAogICAgICAgIGNvbW1hbmQ9
+YWN0dWFsaXphcl9iaWVuZXMsCiAgICAgICAgc2VsZWN0Y29sb3I9IiMwMGFhMDAiLAogICAgKQog
+ICAgY2hrX2JpZW5lcy5wYWNrKHNpZGU9dGsuTEVGVCwgcGFkeD01KQoKICAgIHZhcl92aXNpYmxl
+ID0gdGsuQm9vbGVhblZhcih2YWx1ZT1ub3QgYm9vbChjZmcuaGVhZGxlc3MpKQoKICAgIGRlZiBh
+Y3R1YWxpemFyX3Zpc2libGUoKToKICAgICAgICBjZmcubG9hZCgpCiAgICAgICAgY2ZnLmRhdGFb
+J2hlYWRsZXNzJ10gPSBub3QgdmFyX3Zpc2libGUuZ2V0KCkKICAgICAgICBjZmcuc2F2ZSgpCgog
+ICAgY2hrX3Zpc2libGUgPSB0ay5DaGVja2J1dHRvbigKICAgICAgICBmcmFtZSwKICAgICAgICB0
+ZXh0PSJEZXNjYXJnYSB2aXNpYmxlIiwKICAgICAgICB2YXJpYWJsZT12YXJfdmlzaWJsZSwKICAg
+ICAgICBjb21tYW5kPWFjdHVhbGl6YXJfdmlzaWJsZSwKICAgICAgICBzZWxlY3Rjb2xvcj0iIzAw
+YWEwMCIsCiAgICApCiAgICBjaGtfdmlzaWJsZS5wYWNrKHNpZGU9dGsuTEVGVCwgcGFkeD01KQoK
+ICAgIHRrLkxhYmVsKGZyYW1lLCB0ZXh0PSJJbnRlcnZhbG8oc2VnKToiKS5wYWNrKHNpZGU9dGsu
+TEVGVCwgcGFkeD01KQogICAgZW50cnlfaW50ZXJ2YWwgPSB0ay5FbnRyeShmcmFtZSwgd2lkdGg9
+NSkKICAgIGVudHJ5X2ludGVydmFsLmluc2VydCgwLCBzdHIoY2ZnLnNjYW5faW50ZXJ2YWwpKQog
+ICAgZW50cnlfaW50ZXJ2YWwucGFjayhzaWRlPXRrLkxFRlQpCiAgICBidG5faW50ZXJ2YWwgPSB0
+ay5CdXR0b24oZnJhbWUsIHRleHQ9Ikd1YXJkYXIiLCBjb21tYW5kPWFjdHVhbGl6YXJfaW50ZXJ2
+YWxvKQogICAgYnRuX2ludGVydmFsLnBhY2soc2lkZT10ay5MRUZULCBwYWR4PTUpCgogICAgY2Vu
+dGVyX3dpbmRvdyhyb290KQogICAgcm9vdC5tYWlubG9vcCgpCgoKaWYgX19uYW1lX18gPT0gJ19f
+bWFpbl9fJzoKICAgIG1haW4oKQo=
+",
+    'DescargasOC-main/descargas_oc/ui_abastecimiento.py': "
+IiIiSW50ZXJmYXogcGFyYSBkZXNjYXJnYXIgw7NyZGVuZXMgZGUgY29tcHJhIGRlIEFiYXN0ZWNp
+bWllbnRvLiIiIgppbXBvcnQgdGhyZWFkaW5nCmltcG9ydCB0a2ludGVyIGFzIHRrCmZyb20gdGtp
+bnRlciBpbXBvcnQgbWVzc2FnZWJveApmcm9tIHRraW50ZXIgaW1wb3J0IHR0awoKdHJ5OiAgIyBw
+ZXJtaXRlIGVqZWN1dGFyIGNvbW8gc2NyaXB0CiAgICBmcm9tIC5zZWxlbml1bV9hYmFzdGVjaW1p
+ZW50byBpbXBvcnQgZGVzY2FyZ2FyX2FiYXN0ZWNpbWllbnRvCiAgICBmcm9tIC5jb25maWcgaW1w
+b3J0IENvbmZpZwpleGNlcHQgSW1wb3J0RXJyb3I6ICAjIHByYWdtYTogbm8gY292ZXIKICAgIGZy
+b20gc2VsZW5pdW1fYWJhc3RlY2ltaWVudG8gaW1wb3J0IGRlc2Nhcmdhcl9hYmFzdGVjaW1pZW50
+bwogICAgZnJvbSBjb25maWcgaW1wb3J0IENvbmZpZwoKbG9jayA9IHRocmVhZGluZy5Mb2NrKCkK
+CiMgVmFsb3IgcG9yIGRlZmVjdG8gcGFyYSBlbCBjYW1wbyAiU29saWNpdGFudGUiCkRFRkFVTFRf
+U09MSUNJVEFOVEUgPSAiMTIyMSAtIEhFUlJFUkEgUFVFTlRFIFdJTExJQU0iCgoKZGVmIGVqZWN1
+dGFyKGVudHJ5X2ZkLCBlbnRyeV9maCwgZW50cnlfc29sLCBlbnRyeV9hdXQsIGJ0bik6CiAgICBp
+ZiBub3QgbG9jay5hY3F1aXJlKGJsb2NraW5nPUZhbHNlKToKICAgICAgICBtZXNzYWdlYm94LnNo
+b3dpbmZvKCJQcm9jZXNvIGVuIGN1cnNvIiwgIllhIGV4aXN0ZSB1bmEgZGVzY2FyZ2EgZW4gZWpl
+Y3VjacOzbiIpCiAgICAgICAgcmV0dXJuCgogICAgZmQgPSBlbnRyeV9mZC5nZXQoKS5zdHJpcCgp
+CiAgICBmaCA9IGVudHJ5X2ZoLmdldCgpLnN0cmlwKCkKICAgIHNvbCA9IGVudHJ5X3NvbC5nZXQo
+KS5zdHJpcCgpCiAgICBhdXQgPSBlbnRyeV9hdXQuZ2V0KCkuc3RyaXAoKQogICAgY2ZnID0gQ29u
+ZmlnKCkKICAgIGJ0bi5jb25maWcoc3RhdGU9dGsuRElTQUJMRUQpCgogICAgZGVmIHRhcmVhKCk6
+CiAgICAgICAgdHJ5OgogICAgICAgICAgICBkZXNjYXJnYXJfYWJhc3RlY2ltaWVudG8oCiAgICAg
+ICAgICAgICAgICBmZCwgZmgsIHNvbCwgYXV0LCBoZWFkbGVzcz1jZmcuYWJhc3RlY2ltaWVudG9f
+aGVhZGxlc3MKICAgICAgICAgICAgKQogICAgICAgICAgICBtZXNzYWdlYm94LnNob3dpbmZvKCJG
+aW5hbGl6YWRvIiwgIlByb2Nlc28gY29tcGxldGFkbyIpCiAgICAgICAgZXhjZXB0IEV4Y2VwdGlv
+biBhcyBleGM6CiAgICAgICAgICAgIG1lc3NhZ2Vib3guc2hvd2Vycm9yKCJFcnJvciIsIHN0cihl
+eGMpKQogICAgICAgIGZpbmFsbHk6CiAgICAgICAgICAgIGxvY2sucmVsZWFzZSgpCiAgICAgICAg
+ICAgIGJ0bi5jb25maWcoc3RhdGU9dGsuTk9STUFMKQoKICAgIHRocmVhZGluZy5UaHJlYWQodGFy
+Z2V0PXRhcmVhLCBkYWVtb249VHJ1ZSkuc3RhcnQoKQoKCmRlZiBtYWluKCk6CiAgICByb290ID0g
+dGsuVGsoKQogICAgcm9vdC50aXRsZSgiRGVzY2FyZ2EgQWJhc3RlY2ltaWVudG8iKQogICAgcm9v
+dC50a19zZXRQYWxldHRlKAogICAgICAgIGJhY2tncm91bmQ9IiMxZTFlMWUiLAogICAgICAgIGZv
+cmVncm91bmQ9IiNmMGYwZjAiLAogICAgICAgIGFjdGl2ZUJhY2tncm91bmQ9IiMzMzMzMzMiLAog
+ICAgICAgIGFjdGl2ZUZvcmVncm91bmQ9IiNmMGYwZjAiLAogICAgICAgIGhpZ2hsaWdodENvbG9y
+PSIjNTU1NTU1IiwKICAgICkKICAgIHJvb3QuY29uZmlndXJlKGJnPSIjMWUxZTFlIikKCiAgICB0
+ay5MYWJlbChyb290LCB0ZXh0PSJGZWNoYSBpbmljaW8gKGRkL21tL2FhKToiKS5ncmlkKHJvdz0w
+LCBjb2x1bW49MCwgc3RpY2t5PSJlIikKICAgIGVudHJ5X2ZkID0gdGsuRW50cnkocm9vdCkKICAg
+IGVudHJ5X2ZkLmdyaWQocm93PTAsIGNvbHVtbj0xLCBwYWR4PTUsIHBhZHk9MikKCiAgICB0ay5M
+YWJlbChyb290LCB0ZXh0PSJGZWNoYSBmaW5hbCAoZGQvbW0vYWEpOiIpLmdyaWQocm93PTEsIGNv
+bHVtbj0wLCBzdGlja3k9ImUiKQogICAgZW50cnlfZmggPSB0ay5FbnRyeShyb290KQogICAgZW50
+cnlfZmguZ3JpZChyb3c9MSwgY29sdW1uPTEsIHBhZHg9NSwgcGFkeT0yKQoKICAgIGNmZyA9IENv
+bmZpZygpCiAgICB0ay5MYWJlbChyb290LCB0ZXh0PSJTb2xpY2l0YW50ZToiKS5ncmlkKHJvdz0y
+LCBjb2x1bW49MCwgc3RpY2t5PSJlIikKICAgIHNvbGljaXRhbnRlcyA9IGNmZy5hYmFzdGVjaW1p
+ZW50b19zb2xpY2l0YW50ZXMgb3IgW10KICAgIGlmIERFRkFVTFRfU09MSUNJVEFOVEUgbm90IGlu
+IHNvbGljaXRhbnRlczoKICAgICAgICBzb2xpY2l0YW50ZXMuaW5zZXJ0KDAsIERFRkFVTFRfU09M
+SUNJVEFOVEUpCiAgICBzb2xfdmFyID0gdGsuU3RyaW5nVmFyKHZhbHVlPURFRkFVTFRfU09MSUNJ
+VEFOVEUpCiAgICBlbnRyeV9zb2wgPSB0dGsuQ29tYm9ib3goCiAgICAgICAgcm9vdCwKICAgICAg
+ICB0ZXh0dmFyaWFibGU9c29sX3ZhciwKICAgICAgICB2YWx1ZXM9c29saWNpdGFudGVzLAogICAg
+ICAgIHdpZHRoPTQwLAogICAgKQogICAgZW50cnlfc29sLmdyaWQocm93PTIsIGNvbHVtbj0xLCBw
+YWR4PTUsIHBhZHk9MikKCiAgICB0ay5MYWJlbChyb290LCB0ZXh0PSJBdXRvcml6YToiKS5ncmlk
+KHJvdz0zLCBjb2x1bW49MCwgc3RpY2t5PSJlIikKICAgIGF1dF92YXIgPSB0ay5TdHJpbmdWYXIo
+KQogICAgZW50cnlfYXV0ID0gdHRrLkNvbWJvYm94KAogICAgICAgIHJvb3QsCiAgICAgICAgdGV4
+dHZhcmlhYmxlPWF1dF92YXIsCiAgICAgICAgdmFsdWVzPWNmZy5hYmFzdGVjaW1pZW50b19hdXRv
+cml6YWRvcmVzIG9yIFtdLAogICAgICAgIHdpZHRoPTQwLAogICAgKQogICAgZW50cnlfYXV0Lmdy
+aWQocm93PTMsIGNvbHVtbj0xLCBwYWR4PTUsIHBhZHk9MikKCiAgICB2YXJfdmlzaWJsZSA9IHRr
+LkJvb2xlYW5WYXIodmFsdWU9bm90IGJvb2woY2ZnLmhlYWRsZXNzKSkKCiAgICBkZWYgYWN0dWFs
+aXphcl92aXNpYmxlKCk6CiAgICAgICAgY2ZnLmxvYWQoKQogICAgICAgIGNmZy5kYXRhWyJoZWFk
+bGVzcyJdID0gbm90IHZhcl92aXNpYmxlLmdldCgpCiAgICAgICAgY2ZnLnNhdmUoKQoKICAgIGNo
+a192aXNpYmxlID0gdGsuQ2hlY2tidXR0b24oCiAgICAgICAgcm9vdCwKICAgICAgICB0ZXh0PSJE
+ZXNjYXJnYSB2aXNpYmxlIiwKICAgICAgICB2YXJpYWJsZT12YXJfdmlzaWJsZSwKICAgICAgICBj
+b21tYW5kPWFjdHVhbGl6YXJfdmlzaWJsZSwKICAgICAgICBzZWxlY3Rjb2xvcj0iIzAwYWEwMCIs
+CiAgICApCiAgICBjaGtfdmlzaWJsZS5ncmlkKHJvdz00LCBjb2x1bW49MSwgc3RpY2t5PSJ3Iiwg
+cGFkeD01LCBwYWR5PTIpCgogICAgYnRuX2VqZWN1dGFyID0gdGsuQnV0dG9uKAogICAgICAgIHJv
+b3QsCiAgICAgICAgdGV4dD0iRGVzY2FyZ2FyIiwKICAgICAgICBjb21tYW5kPWxhbWJkYTogZWpl
+Y3V0YXIoZW50cnlfZmQsIGVudHJ5X2ZoLCBlbnRyeV9zb2wsIGVudHJ5X2F1dCwgYnRuX2VqZWN1
+dGFyKSwKICAgICkKICAgIGJ0bl9lamVjdXRhci5ncmlkKHJvdz01LCBjb2x1bW49MCwgY29sdW1u
+c3Bhbj0yLCBwYWR5PTEwKQoKICAgIGRlZiBhYnJpcl9jb25maWcoKToKICAgICAgICBjb25maWd1
+cmFyX2FiYXN0ZWNpbWllbnRvKCkKICAgICAgICBudWV2byA9IENvbmZpZygpCiAgICAgICAgaWYg
+ZW50cnlfc29sLndpbmZvX2V4aXN0cygpOgogICAgICAgICAgICBzb2xpY2l0YW50ZXMgPSBudWV2
+by5hYmFzdGVjaW1pZW50b19zb2xpY2l0YW50ZXMgb3IgW10KICAgICAgICAgICAgaWYgREVGQVVM
+VF9TT0xJQ0lUQU5URSBub3QgaW4gc29saWNpdGFudGVzOgogICAgICAgICAgICAgICAgc29saWNp
+dGFudGVzLmluc2VydCgwLCBERUZBVUxUX1NPTElDSVRBTlRFKQogICAgICAgICAgICBlbnRyeV9z
+b2xbJ3ZhbHVlcyddID0gc29saWNpdGFudGVzCiAgICAgICAgICAgIHNvbF92YXIuc2V0KERFRkFV
+TFRfU09MSUNJVEFOVEUpCiAgICAgICAgaWYgZW50cnlfYXV0LndpbmZvX2V4aXN0cygpOgogICAg
+ICAgICAgICBlbnRyeV9hdXRbJ3ZhbHVlcyddID0gbnVldm8uYWJhc3RlY2ltaWVudG9fYXV0b3Jp
+emFkb3JlcyBvciBbXQoKICAgIGJ0bl9jZmcgPSB0ay5CdXR0b24ocm9vdCwgdGV4dD0iQ29uZmln
+dXJhciIsIGNvbW1hbmQ9YWJyaXJfY29uZmlnKQogICAgYnRuX2NmZy5ncmlkKHJvdz02LCBjb2x1
+bW49MCwgY29sdW1uc3Bhbj0yLCBwYWR5PSgwLCAxMCkpCgogICAgZGVmIGNlbnRlcl93aW5kb3co
+d2luKToKICAgICAgICB3aW4udXBkYXRlX2lkbGV0YXNrcygpCiAgICAgICAgdyA9IHdpbi53aW5m
+b193aWR0aCgpCiAgICAgICAgaCA9IHdpbi53aW5mb19oZWlnaHQoKQogICAgICAgIHggPSAod2lu
+LndpbmZvX3NjcmVlbndpZHRoKCkgLy8gMikgLSAodyAvLyAyKQogICAgICAgIHkgPSAod2luLndp
+bmZvX3NjcmVlbmhlaWdodCgpIC8vIDIpIC0gKGggLy8gMikKICAgICAgICB3aW4uZ2VvbWV0cnko
+ZiJ7d314e2h9K3t4fSt7eX0iKQoKICAgIGNlbnRlcl93aW5kb3cocm9vdCkKICAgIHJvb3QubWFp
+bmxvb3AoKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6ICAjIHByYWdtYTogbm8gY292ZXIK
+ICAgIG1haW4oKQo=
+",
 }
 
-def apply() -> None:
-    for rel_path, content in FILES.items():
-        target = ROOT / rel_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        backup = target.with_suffix(target.suffix + '.bak')
-        if not backup.exists() and target.exists():
-            backup.write_text(target.read_text(), encoding='utf-8')
-        target.write_text(content, encoding='utf-8')
-        print(f'Actualizado {target}')
+
+def _decode(payload: str) -> str:
+    cleaned = ''.join(payload.split())
+    return base64.b64decode(cleaned).decode('utf-8')
 
 
-def main() -> None:
-    apply()
+FILES = {rel: _decode(payload) for rel, payload in DATA.items()}
+
+
+def ensure_parent(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def write_file(path: Path, payload: str):
+    ensure_parent(path)
+    path.write_text(_decode(payload), encoding='utf-8')
+
+
+def main():
+    for rel, payload in DATA.items():
+        write_file(ROOT / rel, payload)
+    print(f'Se actualizaron {len(DATA)} archivos.')
 
 
 if __name__ == '__main__':
