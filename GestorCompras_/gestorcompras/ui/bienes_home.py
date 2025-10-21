@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Callable
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from gestorcompras.gui import config_gui, seguimientos_gui
 from gestorcompras.modules import correos_masivos_gui, descargas_oc_gui, reasignacion_gui
@@ -16,18 +16,6 @@ color_texto = theme.color_texto
 color_titulos = theme.color_titulos
 color_primario = theme.color_primario
 color_acento = theme.color_acento
-
-
-def _button_specs():
-    return [
-        ("Reasignación de Tareas", "open_reasignacion"),
-        ("Correos Masivos", "open_correos_masivos"),
-        ("Seguimientos", "open_seguimientos"),
-        ("Descargas OC", "open_descargas_oc"),
-        ("Cotizador", "open_cotizador"),
-        ("Configuración", "open_config"),
-        ("Salir", "quit"),
-    ]
 
 
 class BienesMenu(ttk.Frame):
@@ -46,7 +34,7 @@ class BienesMenu(ttk.Frame):
         self._banner_colors = [color_primario, color_acento]
         self._color_index = 0
         self._button_widgets: list[ttk.Button] = []
-        self._buttons = _button_specs()
+        self._buttons = self._menu_structure()
         self._build()
 
     def _build(self) -> None:
@@ -66,19 +54,6 @@ class BienesMenu(ttk.Frame):
         lbl_title.configure(font=("Segoe UI", 11, "bold"), foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15, sticky="n")
 
-        self._button_row_offset = 0
-
-        if self._on_back is not None:
-            back_btn = ttk.Button(
-                menu_frame,
-                text="Volver",
-                style="SecondaryButton.TButton",
-                command=self._on_back,
-            )
-            back_btn.grid(row=1, column=0, pady=(0, 15), sticky="ew")
-            add_hover_effect(back_btn)
-            self._button_row_offset = 1
-
         self.menu_frame = menu_frame
         self._show_button(0)
 
@@ -88,14 +63,25 @@ class BienesMenu(ttk.Frame):
         self._color_index = (self._color_index + 1) % len(self._banner_colors)
         self.after(800, self._animate_banner)
 
+    def _menu_structure(self) -> list[tuple[str, Callable[[], None]]]:
+        items: list[tuple[str, Callable[[], None]]] = [
+            ("Reasignación de Tareas", self.open_reasignacion),
+            ("Correos Masivos", self.open_correos_masivos),
+            ("Descargas OC", self.open_descargas_oc),
+            ("Seguimientos", self.open_seguimientos),
+            ("Configuración", self.open_config),
+        ]
+        if self._on_back is not None:
+            items.append(("Volver", self.go_back))
+        return items
+
     def _show_button(self, index: int) -> None:
         if index >= len(self._buttons):
             return
-        text, method_name = self._buttons[index]
-        command = getattr(self, method_name)
+        text, command = self._buttons[index]
         btn = ttk.Button(self.menu_frame, text=text, style="MyButton.TButton", command=command)
         btn.grid(
-            row=index + 1 + self._button_row_offset,
+            row=index + 1,
             column=0,
             padx=20,
             pady=5,
@@ -122,14 +108,9 @@ class BienesMenu(ttk.Frame):
     def open_config(self) -> None:
         config_gui.open_config_gui(self.master, self.email_session)
 
-    def open_cotizador(self) -> None:
-        messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo", parent=self.master)
-
-    def quit(self) -> None:
-        if isinstance(self.master, tk.Tk):
-            self.master.quit()
-        else:
-            self.master.winfo_toplevel().quit()
+    def go_back(self) -> None:
+        if self._on_back is not None:
+            self._on_back()
 
 
 __all__ = ["BienesMenu"]

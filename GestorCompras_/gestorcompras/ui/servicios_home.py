@@ -35,43 +35,30 @@ class ServiciosHome(ttk.Frame):
         )
         titulo.grid(row=0, column=0, pady=(10, 30))
 
-        if self._on_back is not None:
-            back_btn = ttk.Button(
-                container,
-                text="Volver",
-                style="SecondaryButton.TButton",
-                command=self._on_back,
-            )
-            back_btn.grid(row=1, column=0, pady=(0, 20), sticky="ew")
-            add_hover_effect(back_btn)
-            start_row = 2
-        else:
-            start_row = 1
+        buttons: list[tuple[str, Callable[[], None]]] = [
+            (
+                "Reasignación de Tareas",
+                lambda: reasignacion_gui.open(self.master, self.email_session, mode="servicios"),
+            ),
+            (
+                "Descargas OC",
+                lambda: descargas_oc_gui.open(self.master),
+            ),
+            (
+                "Correos Masivos",
+                lambda: correos_masivos_gui.open(self.master, self.email_session),
+            ),
+            (
+                "Configuraciones",
+                lambda: config_gui.open(self.master, self.email_session, mode="servicios"),
+            ),
+        ]
 
-        self._add_button(
-            container,
-            row=start_row,
-            text="Configuraciones",
-            command=lambda: config_gui.open(self.master, self.email_session, mode="servicios"),
-        )
-        self._add_button(
-            container,
-            row=start_row + 1,
-            text="Correos Masivos",
-            command=lambda: correos_masivos_gui.open(self.master, self.email_session),
-        )
-        self._add_button(
-            container,
-            row=start_row + 2,
-            text="Descargas OC",
-            command=lambda: descargas_oc_gui.open(self.master),
-        )
-        self._add_button(
-            container,
-            row=start_row + 3,
-            text="Reasignación de tareas",
-            command=lambda: reasignacion_gui.open(self.master, self.email_session, mode="servicios"),
-        )
+        if self._on_back is not None:
+            buttons.append(("Volver", self._on_back))
+
+        for idx, (text, command) in enumerate(buttons, start=1):
+            self._add_button(container, row=idx, text=text, command=command)
 
     def _add_button(self, container: ttk.Frame, row: int, text: str, command) -> None:
         btn = ttk.Button(
