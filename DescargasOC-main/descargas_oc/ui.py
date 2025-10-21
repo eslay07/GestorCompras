@@ -2,7 +2,9 @@ import tkinter as tk
 import threading
 import logging
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
 from tkinter import messagebox
 
 try:  # permite ejecutar como script
@@ -346,6 +348,9 @@ def main():
 
 
 if __name__ == '__main__':
+    repo_root = Path(__file__).resolve().parents[2]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     try:
         from GestorCompras_.gestorcompras import main as gestor_main
     except ImportError:
