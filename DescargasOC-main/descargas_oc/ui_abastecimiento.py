@@ -1,8 +1,6 @@
 """Interfaz para descargar órdenes de compra de Abastecimiento."""
 import threading
 import tkinter as tk
-import sys
-from pathlib import Path
 from tkinter import messagebox
 from tkinter import ttk
 
@@ -141,18 +139,4 @@ def main():
 
 
 if __name__ == "__main__":  # pragma: no cover
-    repo_root = Path(__file__).resolve().parents[2]
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-    try:
-        from GestorCompras_.gestorcompras import main as gestor_main
-    except ImportError:
-        try:
-            from gestorcompras import main as gestor_main
-        except ImportError as exc:
-            raise SystemExit(
-                "No se encontró el módulo principal de inicio de sesión. "
-                "Ejecute GestorCompras desde su lanzador oficial."
-            ) from exc
-
-    gestor_main.main()
+    main()
