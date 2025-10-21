@@ -27,6 +27,7 @@ def _bootstrap() -> None:
         full_name = f"{_BASE_PACKAGE}.{subpkg}"
         module = importlib.import_module(full_name)
         sys.modules[f"{__name__}.{subpkg}"] = module
+        setattr(package, subpkg, module)
 
 
 _bootstrap()
