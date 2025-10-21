@@ -139,4 +139,15 @@ def main():
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()
+    try:
+        from GestorCompras_.gestorcompras import main as gestor_main
+    except ImportError:
+        try:
+            from gestorcompras import main as gestor_main
+        except ImportError as exc:
+            raise SystemExit(
+                "No se encontró el módulo principal de inicio de sesión. "
+                "Ejecute GestorCompras desde su lanzador oficial."
+            ) from exc
+
+    gestor_main.main()
