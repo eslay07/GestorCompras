@@ -8,15 +8,9 @@ import imaplib
 import email
 import re
 import logging
-from typing import Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-SERVICIOS_HEADLESS_KEY = "SERVICIOS_HEADLESS"
-SERVICIOS_MENSAJE_KEY = "SERVICIOS_REASIGNACION_MSG"
-SERVICIOS_DEPARTAMENTO_KEY = "SERVICIOS_DEPARTAMENTO"
-SERVICIOS_USUARIO_KEY = "SERVICIOS_USUARIO"
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -54,23 +48,6 @@ def process_body(body):
         }
         tasks_data.append(task_info)
     return tasks_data
-
-
-def _normalize_template(template: str | None) -> str:
-    if template is None or not template.strip():
-        template = db.get_config(SERVICIOS_MENSAJE_KEY, 'Taller Asignado "{proveedor}"')
-    return template
-
-
-def _provider_from_details(task: dict[str, Any]) -> str:
-    detalles = task.get("details") or []
-    if isinstance(detalles, list):
-        for detalle in detalles:
-            if isinstance(detalle, dict):
-                proveedor = detalle.get("Proveedor") or detalle.get("supplier")
-                if proveedor:
-                    return str(proveedor)
-    return "N/D"
 
 
 class DateDialog(simpledialog.Dialog):
@@ -189,46 +166,11 @@ def wait_clickable_or_error(driver, locator, parent, description, timeout=30, re
 
 def process_task(driver, task, parent_window):
     task_number = task["task_number"]
-    dept = str(task.get("reasignacion", "")).strip().upper()
+    dept = task["reasignacion"].strip().upper()
     assignments = db.get_assignment_config()
-    assignment_info = assignments.get(dept, {})
-
-    dept_name = (
-        task.get("department_override")
-        or task.get("department")
-        or assignment_info.get("department")
-        or db.get_config(SERVICIOS_DEPARTAMENTO_KEY, "")
-    )
-    empleado = (
-        task.get("employee_override")
-        or task.get("empleado")
-        or assignment_info.get("person")
-        or db.get_config(SERVICIOS_USUARIO_KEY, "SIN ASIGNAR")
-    )
-
-    if not dept_name or not empleado:
-        raise Exception(
-            "No existe configuración de departamento o usuario para la reasignación de la tarea "
-            f"{task_number}"
-        )
-
-    proveedor = task.get("proveedor") or _provider_from_details(task)
-    mecanico = task.get("mecanico", "")
-    telefono = task.get("telefono", "")
-    inf_vehiculo = task.get("inf_vehiculo", "")
-    template = _normalize_template(task.get("comentario_template"))
-    variables = {
-        "proveedor": proveedor or "N/D",
-        "mecanico": mecanico or "N/D",
-        "telefono": telefono or "N/D",
-        "inf_vehiculo": inf_vehiculo or "N/D",
-        "task_number": task_number,
-    }
-    try:
-        comentario = template.format(**variables).strip()
-    except Exception:
-        comentario = template.replace("{proveedor}", variables["proveedor"]).strip()
-
+    empleado = assignments.get(dept, {}).get("person", "SIN ASIGNAR")
+    dept_name = assignments.get(dept, {}).get("department", "")
+    
     element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
     driver.execute_script("arguments[0].click();", element)
     
@@ -257,14 +199,38 @@ def process_task(driver, task, parent_window):
     time.sleep(1)
     comment_input = wait_clickable_or_error(
         driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')
-    comment_input.send_keys(comentario)
+    comment_input.send_keys('SE RECIBE LA MERCADERIA')
     time.sleep(1)
     wait_clickable_or_error(
         driver, (By.ID, 'btnGrabarEjecucionTarea'), parent_window, 'el botón Grabar Ejecución').click()
     time.sleep(2)
     wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación inicial').click()
     time.sleep(2)
-
+    
+    for detail in task["details"]:
+        tracking_button = wait_clickable_or_error(
+            driver,
+            (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']"),
+            parent_window,
+            'el botón de seguimiento'
+        )
+        tracking_button.click()
+        time.sleep(2)
+        tracking_input = wait_clickable_or_error(
+            driver,
+            (By.ID, 'txtSeguimientoTarea'),
+            parent_window,
+            'el campo de seguimiento'
+        )
+        tracking_message = f"SE INGRESA LA FACTURA {detail['Factura']} CON EL INGRESO {detail['Ingreso']}"
+        tracking_input.clear()
+        tracking_input.send_keys(tracking_message)
+        time.sleep(2)
+        wait_clickable_or_error(driver, (By.ID, 'btnIngresoSeguimiento'), parent_window, 'el botón Ingreso Seguimiento').click()
+        time.sleep(2)
+        wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación de seguimiento').click()
+        time.sleep(2)
+    
     wait_clickable_or_error(
         driver,
         (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
@@ -304,7 +270,7 @@ def process_task(driver, task, parent_window):
         parent_window,
         'el área de observación'
     )
-    observation_textarea.send_keys('TALLER ASIGNADO')
+    observation_textarea.send_keys('TRABAJO REALIZADO')
     try:
         WebDriverWait(driver, 20).until(
             EC.visibility_of_element_located((By.ID, "modalReasignarTarea"))
@@ -326,7 +292,7 @@ def process_task(driver, task, parent_window):
     final_confirm_button.click()
     time.sleep(2)
 
-def open_reasignacion(master, email_session):
+def _open_reasignacion_window(master, email_session):
     window = tk.Toplevel(master)
     window.title("Reasignación de Tareas")
     window.geometry("820x650")
@@ -384,12 +350,6 @@ def open_reasignacion(master, email_session):
 
     task_vars = {}
     select_all_var = tk.BooleanVar(value=False)
-    headless_var = tk.BooleanVar(value=db.get_config(SERVICIOS_HEADLESS_KEY, "1") != "0")
-
-    def toggle_headless(*_args):
-        db.set_config(SERVICIOS_HEADLESS_KEY, "1" if headless_var.get() else "0")
-
-    headless_var.trace_add("write", toggle_headless)
 
     def toggle_select_all():
         new_val = select_all_var.get()
@@ -404,13 +364,6 @@ def open_reasignacion(master, email_session):
         command=toggle_select_all
     )
     chk_select_all.pack(side="left", padx=5)
-
-    ttk.Checkbutton(
-        bottom_frame,
-        text="Ejecutar navegador en modo oculto (headless)",
-        style="MyCheckbutton.TCheckbutton",
-        variable=headless_var,
-    ).pack(side="left", padx=5)
 
     process_btn = ttk.Button(
         bottom_frame,
@@ -469,8 +422,7 @@ def open_reasignacion(master, email_session):
 
         service = Service(ChromeDriverManager().install())
         chrome_options = Options()
-        if headless_var.get():
-            chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--disable-extensions")
         chrome_options.add_argument("--no-sandbox")
@@ -508,3 +460,10 @@ def open_reasignacion(master, email_session):
     process_btn.configure(command=process_tasks)
     actualizar_tareas()
 
+
+def open_reasignacion_async(master, email_session):
+    threading.Thread(target=_open_reasignacion_window, args=(master, email_session), daemon=True).start()
+
+
+def open_reasignacion(master, email_session):
+    _open_reasignacion_window(master, email_session)
