@@ -19,7 +19,7 @@ color_acento = theme.color_acento
 def _button_specs():
     return [
         ("Reasignación de Tareas", "open_reasignacion"),
-        ("Correos Masivos", "open_correos_masivos"),
+        ("Solicitud de Despachos", "open_solicitud_despachos"),
         ("Seguimientos", "open_seguimientos"),
         ("Descargas OC", "open_descargas_oc"),
         ("Cotizador", "open_cotizador"),
@@ -82,7 +82,7 @@ class BienesMenu(ttk.Frame):
     def open_reasignacion(self) -> None:
         reasignacion_gui.open(self.master, self.email_session, mode="bienes")
 
-    def open_correos_masivos(self) -> None:
+    def open_solicitud_despachos(self) -> None:
         # Alias que mantiene compatibilidad con la UI anterior
         correos_masivos_gui.open(self.master, self.email_session)
 
