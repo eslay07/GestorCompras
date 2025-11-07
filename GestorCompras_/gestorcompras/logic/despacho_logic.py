@@ -14,9 +14,16 @@ def buscar_archivo_mas_reciente(orden):
     """
     base_dir = get_config("PDF_FOLDER", os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdfs"))
     archivos_encontrados = []
+    orden_normalized = orden.strip()
+    orden_digits = re.sub(r"\D", "", orden_normalized)
+    search_terms = {orden_normalized}
+    if orden_digits:
+        search_terms.add(orden_digits)
     for root, _, files in os.walk(base_dir):
         for file in files:
-            if file.endswith(".pdf") and orden in file:
+            if not file.lower().endswith(".pdf"):
+                continue
+            if any(term and term in file for term in search_terms):
                 archivos_encontrados.append(os.path.join(root, file))
     if archivos_encontrados:
         pdf_path = max(archivos_encontrados, key=os.path.getctime)
