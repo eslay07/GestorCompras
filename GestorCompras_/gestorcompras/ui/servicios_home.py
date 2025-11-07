@@ -36,7 +36,7 @@ class ServiciosHome(ttk.Frame):
         self._add_button(
             container,
             row=2,
-            text="Solicitud de Despachos",
+            text="Correos Masivos",
             command=lambda: correos_masivos_gui.open(self.master, self.email_session),
         )
         self._add_button(
