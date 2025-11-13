@@ -405,14 +405,14 @@ def descargar_oc(
                     try:
                         archivo.rename(nuevo_nombre)
                         archivo = nuevo_nombre
+                    except Exception:
+                        prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
+                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                        try:
+                            archivo.rename(nuevo_nombre)
+                            archivo = nuevo_nombre
                         except Exception:
-                            prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
-                            nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
-                            try:
-                                archivo.rename(nuevo_nombre)
-                                archivo = nuevo_nombre
-                            except Exception:
-                                pass
+                            pass
                 try:
                     cliente.upload_file(
                         repo_id, str(archivo), parent_dir=subfolder

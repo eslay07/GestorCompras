@@ -212,9 +212,7 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
 
         def _agregar(texto: str):
             texto = (texto or "").strip()
-            if not texto:
-                return
-            if texto in vistos:
+            if not texto or texto in vistos:
                 return
             vistos.add(texto)
             textos.append(texto)
@@ -226,8 +224,6 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
         for parte in fila_texto.splitlines():
             _agregar(parte)
 
-    if fila is not None:
-        textos: list[str] = []
         for locator in (".//mat-cell", ".//td"):
             try:
                 celdas = fila.find_elements(By.XPATH, locator)
@@ -262,39 +258,32 @@ def _extraer_datos_orden(btn, indice: int) -> tuple[str, str]:
             numero = numero_candidato
             numero_texto = texto
             break
-                    texto = celda.text.strip()
-                except Exception:
-                    texto = ""
-                if texto:
-                    textos.append(texto)
-            if textos:
-                break
 
-        if textos:
-            numero = textos[0]
-            if len(textos) > 1:
-                proveedor = textos[1]
+    if (not numero or not proveedor) and textos:
+        numero = numero or textos[0]
+        if len(textos) > 1 and not proveedor:
+            proveedor = textos[1]
 
-        if not numero or not proveedor:
+    if fila is not None and (not numero or not proveedor):
+        try:
+            spans = fila.find_elements(By.XPATH, ".//span")
+        except Exception:
+            spans = []
+        span_textos: list[str] = []
+        for span in spans:
             try:
-                spans = fila.find_elements(By.XPATH, ".//span")
+                texto = span.text.strip()
             except Exception:
-                spans = []
-            span_textos: list[str] = []
-            for span in spans:
-                try:
-                    texto = span.text.strip()
-                except Exception:
-                    texto = ""
-                if texto:
-                    span_textos.append(texto)
-            if not numero and span_textos:
-                numero = span_textos[0]
-            if not proveedor and span_textos:
-                for texto in span_textos:
-                    if texto != numero:
-                        proveedor = texto
-                        break
+                texto = ""
+            if texto:
+                span_textos.append(texto)
+        if not numero and span_textos:
+            numero = span_textos[0]
+        if not proveedor and span_textos:
+            for texto in span_textos:
+                if texto != numero:
+                    proveedor = texto
+                    break
 
     if not numero:
         numero = str(indice + 1)
@@ -744,31 +733,6 @@ def descargar_abastecimiento(
             except Exception:
                 return False
             try:
-
-        def obtener_autocomplete(nombre: str, indice: int):
-            etiquetas = AUTOCOMPLETE_LABELS.get(nombre, [])
-            for etiqueta in etiquetas:
-                try:
-                    campo = _buscar_autocomplete_por_texto(driver, etiqueta)
-                    if campo:
-                        return campo, ("label", etiqueta)
-                except RuntimeError:
-                    continue
-
-            try:
-                campo = _obtener_por_indice(indice)
-                return campo, ("index", indice)
-            except TimeoutException as exc:
-                logger.error("%s: no se encontró un campo visible", nombre)
-                raise RuntimeError(f"No se pudo localizar '{nombre}'") from exc
-
-        def _es_campo_autocomplete(elemento) -> bool:
-            try:
-                if elemento.tag_name.lower() != "input":
-                    return False
-            except Exception:
-                return False
-            try:
                 return (elemento.get_attribute("aria-autocomplete") or "").lower() == "list"
             except Exception:
                 return False
@@ -1128,69 +1092,63 @@ def descargar_abastecimiento(
         for idx in range(total_botones):
             botones = driver.find_elements(*elements["descargar_orden"])
             if idx >= len(botones):
-#=======
-            row = btn.find_element(By.XPATH, "./ancestor::tr")
-            celdas = row.find_elements(By.TAG_NAME, "td")
-            numero = celdas[0].text.strip() if celdas else str(idx)
-            proveedor = celdas[1].text.strip() if len(celdas) > 1 else ""
-        except Exception:
-            numero = str(idx)
-            proveedor = ""
-        existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
-        try:
-            btn.click()
-        except ElementClickInterceptedException:
-            driver.execute_script("arguments[0].click();", btn)
-        archivo_descargado = esperar_descarga_pdf(destino, existentes)
-        ordenes.append({"numero": numero, "proveedor": proveedor})
-        for _ in range(5):
-            if not driver.find_elements(*elements["toast"]):
-#>>>>>>> master
                 break
+
             btn = botones[idx]
             try:
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
             except Exception:
                 pass
             time.sleep(0.2)
-            numero, proveedor = _extraer_datos_orden(btn, idx)
 
+            numero, proveedor = _extraer_datos_orden(btn, idx)
             orden = {
                 "numero": numero,
                 "proveedor": proveedor,
                 "categoria": "abastecimiento",
             }
             ordenes.append(orden)
-            ordenes.append(
-                {"numero": numero, "proveedor": proveedor, "categoria": "abastecimiento"}
-            )
+
             existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
             try:
                 btn.click()
             except (ElementClickInterceptedException, StaleElementReferenceException):
                 driver.execute_script("arguments[0].click();", btn)
+
             try:
                 archivo_descargado = esperar_descarga_pdf(destino, existentes)
-                ruta_descargada = Path(archivo_descargado)
-                numero_archivo = _numero_desde_texto(ruta_descargada.stem)
-                if numero_archivo:
-                    orden["numero"] = numero_archivo
-                    numero = numero_archivo
-                logger.info("OC %s descargada en %s", numero, archivo_descargado)
-                proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
-                if proveedor_pdf:
-                    orden["proveedor"] = proveedor_pdf
-                _renombrar_pdf_descargado(
-                    ruta_descargada,
-                    str(numero),
-                    orden.get("proveedor", ""),
-                )
-                base_nombre = _nombre_archivo(numero, proveedor)
-                if base_nombre:
-                    archivo_descargado = _renombrar_descarga(archivo_descargado, base_nombre)
-                logger.info("OC %s descargada en %s", numero, archivo_descargado)
             except Exception as exc:
-                logger.error("No se pudo descargar la OC %s: %s", numero, exc)
+                numero_log = orden.get("numero") or str(idx + 1)
+                logger.error("No se pudo descargar la OC %s: %s", numero_log, exc)
+                esperar_toast()
+                time.sleep(0.5)
+                continue
+
+            ruta_descargada = Path(archivo_descargado)
+            numero_archivo = _numero_desde_texto(ruta_descargada.stem)
+            if numero_archivo:
+                orden["numero"] = numero_archivo
+                numero = numero_archivo
+
+            proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
+            if proveedor_pdf:
+                orden["proveedor"] = proveedor_pdf
+
+            _renombrar_pdf_descargado(
+                ruta_descargada,
+                str(orden.get("numero") or numero),
+                orden.get("proveedor", ""),
+            )
+
+            base_nombre = _nombre_archivo(orden.get("numero"), orden.get("proveedor"))
+            if base_nombre:
+                archivo_final = _renombrar_descarga(ruta_descargada, base_nombre)
+                orden["archivo"] = str(archivo_final)
+                archivo_descargado = archivo_final
+            else:
+                orden["archivo"] = str(ruta_descargada)
+
+            logger.info("OC %s descargada en %s", orden.get("numero"), archivo_descargado)
             esperar_toast()
             time.sleep(0.5)
 
