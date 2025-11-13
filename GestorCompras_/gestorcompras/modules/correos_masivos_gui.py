@@ -1,8 +1,7 @@
-"""Módulo de compatibilidad para la interfaz de Correos Masivos.
+"""Punto de entrada conservado para la antigua opción de Correos Masivos.
 
-Este archivo mantiene el punto de entrada esperado por el menú de
-navegación. Internamente reutiliza la implementación previa ubicada en
-:mod:`gestorcompras.gui.despacho_gui` para evitar duplicar lógica.
+Tras revertir la pantalla al flujo clásico de *Solicitud de Despachos*,
+se mantiene este alias para no romper referencias existentes.
 """
 from gestorcompras.gui.despacho_gui import open_despacho as open
 
