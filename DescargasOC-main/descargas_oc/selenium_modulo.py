@@ -118,9 +118,10 @@ def descargar_oc(
                 break
         return archivo
 
-    user = username if username is not None else cfg.usuario
-    if user and "@" not in str(user):
-        user = f"{user}@telconet.ec"
+    user_raw = username if username is not None else cfg.usuario
+    user = str(user_raw or "").strip()
+    if "@" in user:
+        user = user.split("@", 1)[0]
     pwd = password if password is not None else cfg.password
 
     ubicaciones_descarga: dict[str, str] = {}

@@ -49,8 +49,6 @@ def open(master: tk.Misc, email_session: dict | None = None) -> None:
         if email_session:
             usuario = (email_session.get("address") or "").strip()
             password = (email_session.get("password") or "").strip()
-            if usuario and "@" not in usuario:
-                usuario = f"{usuario}@telconet.ec"
             env = dict(**os.environ)
             if usuario:
                 env["USUARIO_OC"] = usuario

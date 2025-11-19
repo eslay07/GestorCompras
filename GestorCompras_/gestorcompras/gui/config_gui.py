@@ -554,31 +554,6 @@ class ConfigGUI(tk.Toplevel):
         ).grid(row=row, column=1, sticky="w", padx=5, pady=2)
 
         row += 1
-        ttk.Label(general_frame, text="Usuario:", style="MyLabel.TLabel").grid(
-            row=row, column=0, sticky="w", padx=5, pady=2
-        )
-        user_entry = ttk.Entry(
-            general_frame,
-            textvariable=_str_var("usuario", cfg.usuario or ""),
-            style="MyEntry.TEntry",
-        )
-        user_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        self._oc_entries["usuario"] = user_entry
-
-        row += 1
-        ttk.Label(general_frame, text="Contraseña:", style="MyLabel.TLabel").grid(
-            row=row, column=0, sticky="w", padx=5, pady=2
-        )
-        pwd_entry = ttk.Entry(
-            general_frame,
-            textvariable=_str_var("password", cfg.password or ""),
-            show="*",
-            style="MyEntry.TEntry",
-        )
-        pwd_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        self._oc_entries["password"] = pwd_entry
-
-        row += 1
         ttk.Label(
             general_frame,
             text="Carpeta de descarga principal:",
@@ -624,45 +599,6 @@ class ConfigGUI(tk.Toplevel):
         ).pack(side="left", padx=(5, 0))
         self._oc_entries["carpeta_analizar"] = analizar_entry
 
-        row += 1
-        ttk.Label(general_frame, text="URL Telcodrive:", style="MyLabel.TLabel").grid(
-            row=row, column=0, sticky="w", padx=5, pady=2
-        )
-        url_entry = ttk.Entry(
-            general_frame,
-            textvariable=_str_var("seafile_url", cfg.seafile_url or ""),
-            style="MyEntry.TEntry",
-        )
-        url_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        self._oc_entries["seafile_url"] = url_entry
-
-        row += 1
-        ttk.Label(general_frame, text="ID de carpeta principal:", style="MyLabel.TLabel").grid(
-            row=row, column=0, sticky="w", padx=5, pady=2
-        )
-        repo_entry = ttk.Entry(
-            general_frame,
-            textvariable=_str_var("seafile_repo_id", cfg.seafile_repo_id or ""),
-            style="MyEntry.TEntry",
-        )
-        repo_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        self._oc_entries["seafile_repo_id"] = repo_entry
-
-        row += 1
-        ttk.Label(
-            general_frame,
-            text="Carpeta personal Telcodrive:",
-            style="MyLabel.TLabel",
-        ).grid(row=row, column=0, sticky="w", padx=5, pady=2)
-        sub_entry = ttk.Entry(
-            general_frame,
-            textvariable=_str_var("seafile_subfolder", cfg.seafile_subfolder or "/"),
-            style="MyEntry.TEntry",
-        )
-        sub_entry.grid(row=row, column=1, sticky="ew", padx=5, pady=2)
-        self._oc_entries["seafile_subfolder"] = sub_entry
-
-        row += 1
         ttk.Label(general_frame, text="Correo para reporte:", style="MyLabel.TLabel").grid(
             row=row, column=0, sticky="w", padx=5, pady=2
         )
@@ -800,13 +736,6 @@ class ConfigGUI(tk.Toplevel):
             command=self.save_descargas_config,
         ).pack(side="left", padx=5)
 
-        ttk.Button(
-            button_frame,
-            text="Probar subida a Telcodrive",
-            style="MyButton.TButton",
-            command=self.test_seafile_upload,
-        ).pack(side="left", padx=5)
-
         self._procesados_button = ttk.Button(
             button_frame,
             text="Generar procesados",
@@ -928,13 +857,8 @@ class ConfigGUI(tk.Toplevel):
         data = {
             "pop_server": self._oc_vars["pop_server"].get().strip(),
             "pop_port": self._safe_int("pop_port", cfg.data.get("pop_port", 995)),
-            "usuario": self._oc_vars["usuario"].get().strip(),
-            "password": self._oc_vars["password"].get(),
             "carpeta_destino_local": self._oc_vars["carpeta_destino_local"].get().strip(),
             "carpeta_analizar": self._oc_vars["carpeta_analizar"].get().strip(),
-            "seafile_url": self._oc_vars["seafile_url"].get().strip(),
-            "seafile_repo_id": self._oc_vars["seafile_repo_id"].get().strip(),
-            "seafile_subfolder": self._oc_vars["seafile_subfolder"].get().strip() or "/",
             "correo_reporte": self._oc_vars["correo_reporte"].get().strip(),
             "headless": bool(self._oc_vars["headless"].get()),
             "abastecimiento_carpeta_descarga": self._oc_vars[
@@ -973,41 +897,11 @@ class ConfigGUI(tk.Toplevel):
         self.descargas_cfg.save()
         self._procesados_status.set("Generado" if PROCESADOS_FILE.exists() else "Pendiente")
         messagebox.showinfo("Información", "Configuración guardada correctamente.")
-
-    def test_seafile_upload(self):
-        datos = self._collect_descargas_form()
-        self.descargas_cfg.data.update(datos)
-        try:
-            self.descargas_cfg.validate()
-        except Exception as exc:
-            messagebox.showerror("Error", f"Configuración inválida: {exc}")
-            return
-        archivo = filedialog.askopenfilename(title="Seleccionar archivo de prueba")
-        if not archivo:
-            return
-        try:
-            from descargas_oc.seafile_client import SeafileClient
-
-            cliente = SeafileClient(
-                self.descargas_cfg.seafile_url,
-                self.descargas_cfg.usuario,
-                self.descargas_cfg.password,
-            )
-            cliente.upload_file(
-                self.descargas_cfg.seafile_repo_id,
-                archivo,
-                parent_dir=self.descargas_cfg.seafile_subfolder,
-            )
-        except Exception as exc:
-            messagebox.showerror("Error", f"No se pudo subir el archivo: {exc}")
-            return
-        messagebox.showinfo("Información", "Archivo subido correctamente.")
-
     def generate_processed_file(self):
         datos = self._collect_descargas_form()
         servidor = datos["pop_server"]
-        usuario = datos["usuario"]
-        contrasena = datos["password"]
+        usuario = getattr(self.descargas_cfg, "usuario", "")
+        contrasena = getattr(self.descargas_cfg, "password", "")
         puerto = datos["pop_port"]
         if not (servidor and usuario and contrasena):
             messagebox.showwarning(

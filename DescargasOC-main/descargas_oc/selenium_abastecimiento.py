@@ -541,9 +541,10 @@ def descargar_abastecimiento(
     """Automatiza la descarga visible de órdenes de compra por abastecimiento."""
 
     cfg = Config()
-    user = username if username is not None else cfg.usuario
-    if user and "@" not in str(user):
-        user = f"{user}@telconet.ec"
+    user_raw = username if username is not None else cfg.usuario
+    user = str(user_raw or "").strip()
+    if "@" in user:
+        user = user.split("@", 1)[0]
     pwd = password if password is not None else cfg.password
     destino = Path(
         download_dir
