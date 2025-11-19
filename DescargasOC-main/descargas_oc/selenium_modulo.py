@@ -19,11 +19,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 try:  # permite ejecutar como script
-    from .seafile_client import SeafileClient
-except ImportError:  # pragma: no cover
-    from seafile_client import SeafileClient
-
-try:  # permite ejecutar como script
     from .config import Config
     from .mover_pdf import mover_oc, normalizar_nombre_archivo
     from .organizador_bienes import organizar as organizar_bienes
@@ -124,13 +119,11 @@ def descargar_oc(
         return archivo
 
     user = username if username is not None else cfg.usuario
-    if user:
-        user = user.split("@")[0]
+    if user and "@" not in str(user):
+        user = f"{user}@telconet.ec"
     pwd = password if password is not None else cfg.password
 
-    cliente = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
-    repo_id = cfg.seafile_repo_id
-    subfolder = cfg.seafile_subfolder or "/"
+    ubicaciones_descarga: dict[str, str] = {}
 
     options = webdriver.ChromeOptions()
     prefs = {
@@ -373,12 +366,6 @@ def descargar_oc(
                             archivo = nuevo_nombre
                         except Exception:
                             pass
-                try:
-                    cliente.upload_file(
-                        repo_id, str(archivo), parent_dir=subfolder
-                    )
-                except Exception as e:
-                    errores.append(f"OC {numero}: fallo subida {e}")
             except Exception as exc:  # pragma: no cover - incidencias en ejecución
                 errores.append(f"OC {numero}: {exc}")
     finally:
@@ -388,7 +375,11 @@ def descargar_oc(
         actualizar_proveedores_desde_pdfs(ordenes, download_dir)
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+    subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(cfg, ordenes)
+    for numero, ruta in ubicaciones_descarga.items():
+        for orden in ordenes:
+            if str(orden.get("numero")) == str(numero):
+                orden["ruta"] = ruta
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     errores.extend(errores_mov)

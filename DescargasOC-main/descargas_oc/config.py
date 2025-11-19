@@ -104,13 +104,10 @@ class Config:
         # valores predeterminados cuando el archivo de configuración está vacío
         self.data.setdefault('pop_server', 'pop.telconet.ec')
         self.data.setdefault('pop_port', 995)
-        self.data.setdefault('usuario', 'jotoapanta@telconet.ec')
-        self.data.setdefault('carpeta_destino_local', r'E:\Seadrive\jotoapan_1\Shared with me\BD_TELCO\BIENES')
-        self.data.setdefault('carpeta_analizar', r'E:\Seadrive\jotoapan_1\Shared with me\BD_TELCO\BIENES')
-        self.data.setdefault('seafile_url', 'https://telcodrive.telconet.net')
-        self.data.setdefault('seafile_repo_id', 'ede837d2-5de8-45f8-802d-aa513aaad8b2')
-        self.data.setdefault('seafile_subfolder', '/prueba')
-        self.data.setdefault('correo_reporte', 'jotoapanta@telconet.ec')
+        self.data.setdefault('usuario', '')
+        self.data.setdefault('carpeta_destino_local', '')
+        self.data.setdefault('carpeta_analizar', '')
+        self.data.setdefault('correo_reporte', '')
         self.data.setdefault('remitente_adicional', 'naf@telconet.ec')
         self.data.setdefault('smtp_server', 'smtp.telconet.ec')
         self.data.setdefault('smtp_port', 587)
@@ -166,15 +163,6 @@ class Config:
 
     # validaciones
     def validate(self):
-        repo_id = self.data.get('seafile_repo_id', '')
-        try:
-            uuid.UUID(repo_id)
-        except Exception as exc:
-            raise ValueError("seafile_repo_id invalido") from exc
-        sub = (self.data.get('seafile_subfolder', '/') or '/').strip()
-        if not sub.startswith('/'):
-            sub = '/' + sub
-        self.data['seafile_subfolder'] = sub
         if not self.data.get('pop_server'):
             raise ValueError('pop_server requerido')
         if not self.data.get('pop_port'):

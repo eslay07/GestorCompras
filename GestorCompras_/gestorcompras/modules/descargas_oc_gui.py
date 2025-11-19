@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tkinter as tk
@@ -21,7 +22,7 @@ def _find_descargas_root() -> Path | None:
 _DESCARGAS_ROOT = _find_descargas_root()
 
 
-def open(master: tk.Misc) -> None:
+def open(master: tk.Misc, email_session: dict | None = None) -> None:
     """Abre el selector para iniciar los módulos de descargas de OC."""
     option_win = tk.Toplevel(master)
     option_win.title("Descargas OC")
@@ -44,10 +45,22 @@ def open(master: tk.Misc) -> None:
             )
             return
         module = f"descargas_oc.{module_suffix}"
+        env = None
+        if email_session:
+            usuario = (email_session.get("address") or "").strip()
+            password = (email_session.get("password") or "").strip()
+            if usuario and "@" not in usuario:
+                usuario = f"{usuario}@telconet.ec"
+            env = dict(**os.environ)
+            if usuario:
+                env["USUARIO_OC"] = usuario
+            if password:
+                env["PASSWORD_OC"] = password
         try:
             subprocess.Popen(
                 [sys.executable, "-m", module],
                 cwd=str(_DESCARGAS_ROOT),
+                env=env,
             )
         except OSError as exc:  # pragma: no cover - errores del SO
             messagebox.showerror(

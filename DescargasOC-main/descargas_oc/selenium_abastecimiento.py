@@ -542,8 +542,8 @@ def descargar_abastecimiento(
 
     cfg = Config()
     user = username if username is not None else cfg.usuario
-    if user:
-        user = user.split("@")[0]
+    if user and "@" not in str(user):
+        user = f"{user}@telconet.ec"
     pwd = password if password is not None else cfg.password
     destino = Path(
         download_dir
@@ -1160,10 +1160,15 @@ def descargar_abastecimiento(
         driver.quit()
 
     if getattr(cfg, 'abastecimiento_mover_archivos', True):
-        subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+        subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(cfg, ordenes)
     else:
         subidos = [o.get('numero') for o in ordenes if o.get('numero')]
-        faltantes, errores_mov = [], []
+        faltantes, errores_mov, ubicaciones_descarga = [], [], {}
+
+    for numero, ruta in ubicaciones_descarga.items():
+        for orden in ordenes:
+            if str(orden.get("numero")) == str(numero):
+                orden["ruta"] = ruta
 
     for err in errores_mov:
         logger.error("Mover OC: %s", err)
