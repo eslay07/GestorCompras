@@ -599,6 +599,7 @@ class ConfigGUI(tk.Toplevel):
         ).pack(side="left", padx=(5, 0))
         self._oc_entries["carpeta_analizar"] = analizar_entry
 
+        row += 1
         ttk.Label(general_frame, text="Correo para reporte:", style="MyLabel.TLabel").grid(
             row=row, column=0, sticky="w", padx=5, pady=2
         )
