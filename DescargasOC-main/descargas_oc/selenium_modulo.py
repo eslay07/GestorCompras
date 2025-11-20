@@ -280,22 +280,29 @@ def descargar_oc(
                 )
             except Exception:
                 pass
-        time.sleep(2)
-        for _ in range(3):
-            try:
-                driver.switch_to.window(driver.window_handles[-1])
-            except Exception:
-                pass
-            if driver.find_elements(*elements["lista_accesos"]):
-                break
-            try:
-                menu = driver.find_elements(*elements["menu_hamburguesa"])
-                if menu:
-                    menu[0].click()
-            except Exception:
-                pass
-            time.sleep(2)
-        else:
+
+        def _esperar_menu_accesos():
+            for _ in range(8):
+                try:
+                    driver.switch_to.window(driver.window_handles[-1])
+                except Exception:
+                    pass
+                try:
+                    driver.switch_to.default_content()
+                except Exception:
+                    pass
+                if driver.find_elements(*elements["lista_accesos"]):
+                    return True
+                try:
+                    menu = driver.find_elements(*elements["menu_hamburguesa"])
+                    if menu:
+                        menu[0].click()
+                except Exception:
+                    pass
+                time.sleep(2)
+            return False
+
+        if not _esperar_menu_accesos():
             raise RuntimeError("Fallo al localizar 'lista_accesos'")
         _click("lista_accesos", elements["lista_accesos"])
         _click("seleccion_compania", elements["seleccion_compania"])
