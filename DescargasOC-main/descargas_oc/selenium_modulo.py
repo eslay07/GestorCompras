@@ -337,15 +337,6 @@ def descargar_oc(
                     time.sleep(2)
                     _click("btnbuscarorden", elements["btnbuscarorden"])
 
-                    toasts = _leer_toasts()
-                    if toasts:
-                        if any("Transacción realizada correctamente" in t for t in toasts):
-                            exito = True
-                            break
-                        if intento < 3:
-                            time.sleep(2)
-                            continue
-
                     for _ in range(5):
                         if not driver.find_elements(*elements["toast"]):
                             break
@@ -358,6 +349,14 @@ def descargar_oc(
                         boton_descarga.click()
                     except ElementClickInterceptedException:
                         driver.execute_script("arguments[0].click();", boton_descarga)
+
+                    time.sleep(1)
+                    toasts = _leer_toasts()
+                    if toasts and not any(
+                        "Transacción realizada correctamente" in t for t in toasts
+                    ):
+                        if intento < 3:
+                            continue
 
                     archivo = esperar_descarga_pdf(download_dir, existentes)
                     if not getattr(cfg, "compra_bienes", False):

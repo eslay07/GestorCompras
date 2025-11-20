@@ -1116,67 +1116,90 @@ def descargar_abastecimiento(
 
         ordenes: list[dict[str, str]] = []
         for idx in range(total_botones):
-            botones = driver.find_elements(*elements["descargar_orden"])
-            if idx >= len(botones):
-                break
+            intento_descarga = 0
+            descargado = False
+            while intento_descarga < 4 and not descargado:
+                botones = driver.find_elements(*elements["descargar_orden"])
+                if idx >= len(botones):
+                    break
 
-            btn = botones[idx]
-            try:
-                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
-            except Exception:
-                pass
-            time.sleep(0.2)
+                btn = botones[idx]
+                try:
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", btn)
+                except Exception:
+                    pass
+                time.sleep(0.2)
 
-            numero, proveedor = _extraer_datos_orden(btn, idx)
-            orden = {
-                "numero": numero,
-                "proveedor": proveedor,
-                "categoria": "abastecimiento",
-            }
-            ordenes.append(orden)
+                numero, proveedor = _extraer_datos_orden(btn, idx)
+                if intento_descarga == 0:
+                    orden = {
+                        "numero": numero,
+                        "proveedor": proveedor,
+                        "categoria": "abastecimiento",
+                    }
+                    ordenes.append(orden)
+                else:
+                    orden = ordenes[idx]
 
-            existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
-            try:
-                btn.click()
-            except (ElementClickInterceptedException, StaleElementReferenceException):
-                driver.execute_script("arguments[0].click();", btn)
+                existentes = {pdf: pdf.stat().st_mtime for pdf in destino.glob("*.pdf")}
+                try:
+                    btn.click()
+                except (ElementClickInterceptedException, StaleElementReferenceException):
+                    driver.execute_script("arguments[0].click();", btn)
 
-            try:
-                archivo_descargado = esperar_descarga_pdf(destino, existentes)
-            except Exception as exc:
-                numero_log = orden.get("numero") or str(idx + 1)
-                logger.error("No se pudo descargar la OC %s: %s", numero_log, exc)
+                time.sleep(1)
+                toasts = _leer_toasts()
+                if toasts and not any(
+                    "Transacción realizada correctamente" in t for t in toasts
+                ):
+                    intento_descarga += 1
+                    if intento_descarga < 4:
+                        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+                        esperar_toast()
+                        continue
+
+                try:
+                    archivo_descargado = esperar_descarga_pdf(destino, existentes)
+                except Exception as exc:
+                    numero_log = orden.get("numero") or str(idx + 1)
+                    logger.error("No se pudo descargar la OC %s: %s", numero_log, exc)
+                    intento_descarga += 1
+                    if intento_descarga < 4:
+                        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+                        esperar_toast()
+                        time.sleep(0.5)
+                        continue
+                    break
+
+                ruta_descargada = Path(archivo_descargado)
+                numero_archivo = _numero_desde_texto(ruta_descargada.stem)
+                if numero_archivo:
+                    orden["numero"] = numero_archivo
+                    numero = numero_archivo
+
+                proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
+                if proveedor_pdf:
+                    orden["proveedor"] = proveedor_pdf
+
+                _renombrar_pdf_descargado(
+                    ruta_descargada,
+                    str(orden.get("numero") or numero),
+                    orden.get("proveedor", ""),
+                )
+
+                base_nombre = _nombre_archivo(orden.get("numero"), orden.get("proveedor"))
+                if base_nombre:
+                    archivo_final = _renombrar_descarga(ruta_descargada, base_nombre)
+                    orden["archivo"] = str(archivo_final)
+                    archivo_descargado = archivo_final
+                else:
+                    orden["archivo"] = str(ruta_descargada)
+
+                logger.info("OC %s descargada en %s", orden.get("numero"), archivo_descargado)
+                descargado = True
                 esperar_toast()
                 time.sleep(0.5)
-                continue
-
-            ruta_descargada = Path(archivo_descargado)
-            numero_archivo = _numero_desde_texto(ruta_descargada.stem)
-            if numero_archivo:
-                orden["numero"] = numero_archivo
-                numero = numero_archivo
-
-            proveedor_pdf = proveedor_desde_pdf(archivo_descargado)
-            if proveedor_pdf:
-                orden["proveedor"] = proveedor_pdf
-
-            _renombrar_pdf_descargado(
-                ruta_descargada,
-                str(orden.get("numero") or numero),
-                orden.get("proveedor", ""),
-            )
-
-            base_nombre = _nombre_archivo(orden.get("numero"), orden.get("proveedor"))
-            if base_nombre:
-                archivo_final = _renombrar_descarga(ruta_descargada, base_nombre)
-                orden["archivo"] = str(archivo_final)
-                archivo_descargado = archivo_final
-            else:
-                orden["archivo"] = str(ruta_descargada)
-
-            logger.info("OC %s descargada en %s", orden.get("numero"), archivo_descargado)
-            esperar_toast()
-            time.sleep(0.5)
+                break
 
         if ordenes:
             actualizar_proveedores_desde_pdfs(ordenes, destino)
