@@ -90,7 +90,7 @@ class BienesMenu(ttk.Frame):
         seguimientos_gui.open_seguimientos(self.master, self.email_session)
 
     def open_descargas_oc(self) -> None:
-        descargas_oc_gui.open(self.master)
+        descargas_oc_gui.open(self.master, self.email_session)
 
     def open_config(self) -> None:
         config_gui.open_config_gui(self.master, self.email_session)

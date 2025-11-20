@@ -47,11 +47,11 @@ def _formatear_tabla(
     if not filas:
         return "─ Sin datos ─"
 
-    headers = headers or ("Orden", "Tarea", "Proveedor")
+    headers = headers or ("Orden", "Tarea", "Proveedor", "Ubicación")
     num_cols = len(headers)
 
     # Límite de ancho por columna para que no se rompa la vista en correos
-    default_max = [16, 18, 40]
+    default_max = [16, 18, 32, 60]
     maxw = [default_max[i] if i < len(default_max) else 30 for i in range(num_cols)]
 
     def _clip(x: str, w: int) -> str:
@@ -88,7 +88,7 @@ def _tabla_html(
     if not filas:
         return "<p style='font-family:Segoe UI, Arial, sans-serif;font-size:13px;'>– Sin datos –</p>"
 
-    headers = headers or ("Orden", "Tarea", "Proveedor")
+    headers = headers or ("Orden", "Tarea", "Proveedor", "Ubicación")
     num_cols = len(headers)
 
     table_style = (
@@ -116,7 +116,7 @@ def _tabla_html(
         "word-break:break-word;"
     )
 
-    default_widths = ["16ch", "20ch", "auto"]
+    default_widths = ["12ch", "16ch", "22ch", "auto"]
     colgroup = "<colgroup>" + "".join(
         f"<col style='width:{default_widths[i] if i < len(default_widths) else 'auto'}'>"
         for i in range(num_cols)
@@ -218,46 +218,48 @@ def enviar_reporte(
     texto = ''
     if categoria:
         texto += f'Categoría: {categoria}\n\n'
-    texto += 'Órdenes subidas correctamente:\n'
+    texto += 'Órdenes descargadas correctamente:\n'
 
     usar_tabla_categoria = bool(categoria and categoria.lower() == 'abastecimiento')
     tabla_headers = (
-        ("Orden", "Proveedor", "Categoría")
+        ("Orden", "Proveedor", "Categoría", "Ubicación")
         if usar_tabla_categoria
-        else ("Orden", "Tarea", "Proveedor")
+        else ("Orden", "Tarea", "Proveedor", "Ubicación")
     )
 
     filas_ok: list[tuple[str, ...]] = []
     for num in exitosas_uniq:
         data = info.get(num, {})
         prov = data.get('proveedor') or '-'
+        ruta = data.get('ruta') or '-'
         if usar_tabla_categoria:
             cat_valor = data.get('categoria') or categoria or '-'
-            filas_ok.append((num, prov, cat_valor))
+            filas_ok.append((num, prov, cat_valor, ruta))
         else:
             tarea = data.get('tarea') or _buscar_tarea(num, cfg) or '-'
-            filas_ok.append((num, tarea, prov))
+            filas_ok.append((num, tarea, prov, ruta))
 
     html = ''
     if categoria:
         html += f"<p>Categoría: {escape(categoria)}</p>"
-    html += '<h3>Órdenes subidas correctamente:</h3>' + _tabla_html(filas_ok, tabla_headers)
+    html += '<h3>Órdenes descargadas correctamente:</h3>' + _tabla_html(filas_ok, tabla_headers)
     if filas_ok:
         texto += _formatear_tabla(filas_ok, tabla_headers) + '\n'
     if faltantes_uniq:
-        texto += '\nNo se encontraron archivos para las siguientes OC:\n'
+        texto += '\nNo se ubicaron archivos locales para las siguientes OC:\n'
         filas_bad: list[tuple[str, ...]] = []
         for num in faltantes_uniq:
             data = info.get(num, {})
             prov = data.get('proveedor') or '-'
+            ruta = data.get('ruta') or '-'
             if usar_tabla_categoria:
                 cat_valor = data.get('categoria') or categoria or '-'
-                filas_bad.append((num, prov, cat_valor))
+                filas_bad.append((num, prov, cat_valor, ruta))
             else:
                 tarea = data.get('tarea') or '-'
-                filas_bad.append((num, tarea, prov))
+                filas_bad.append((num, tarea, prov, ruta))
         texto += _formatear_tabla(filas_bad, tabla_headers) + '\n'
-        html += '<h3>No se encontraron archivos para las siguientes OC:</h3>' + _tabla_html(filas_bad, tabla_headers)
+        html += '<h3>No se ubicaron archivos locales para las siguientes OC:</h3>' + _tabla_html(filas_bad, tabla_headers)
     mensaje.set_content(texto)
     mensaje.add_alternative(html, subtype='html')
     candidatos: list[str] = []

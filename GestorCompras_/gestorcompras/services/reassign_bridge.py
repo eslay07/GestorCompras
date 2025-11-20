@@ -99,7 +99,7 @@ def _run_selenium_batch(
     if not payloads:
         return []
 
-    from gestorcompras.gui.reasignacion_gui import login_telcos, process_task
+    from gestorcompras.gui.reasignacion_gui import login_telcos, process_task_servicios
 
     driver = None
     resultados: List[Dict[str, Any]] = []
@@ -111,7 +111,7 @@ def _run_selenium_batch(
         for payload in payloads:
             message_id = payload.get("message_id")
             try:
-                process_task(driver, payload, None)
+                process_task_servicios(driver, payload, None)
                 _reanudar_panel(driver)
                 resultados.append({
                     "status": "ok",

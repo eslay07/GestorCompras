@@ -37,15 +37,7 @@ def config_completa(cfg: Config) -> bool:
         cfg.validate()
     except Exception:
         return False
-    requeridos = [
-        cfg.usuario,
-        cfg.password,
-        cfg.carpeta_destino_local,
-        cfg.carpeta_analizar,
-        cfg.seafile_url,
-        cfg.seafile_repo_id,
-        cfg.correo_reporte,
-    ]
+    requeridos = [cfg.carpeta_destino_local, cfg.carpeta_analizar, cfg.correo_reporte]
     return all(requeridos)
 
 
