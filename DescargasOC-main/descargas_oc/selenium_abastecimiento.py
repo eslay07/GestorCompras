@@ -677,6 +677,17 @@ def descargar_abastecimiento(
                     continue
             return False
 
+        def _leer_toasts() -> list[str]:
+            textos: list[str] = []
+            for elemento in driver.find_elements(*elements["toast"]):
+                try:
+                    texto = (elemento.text or "").strip()
+                except Exception:
+                    texto = ""
+                if texto:
+                    textos.append(texto)
+            return textos
+
         def esperar_toast():
             try:
                 # Esperar a que aparezca un toast (si corresponde)
@@ -930,8 +941,16 @@ def descargar_abastecimiento(
             "autoriza", 1, autoriza, usar_activo=True, avanzar_tab=False
         )
 
-        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
-        esperar_toast()
+        for intento in range(4):
+            hacer_click("btnbuscarorden", elements["btnbuscarorden"])
+            esperar_toast()
+            toasts = _leer_toasts()
+            if toasts and not any(
+                "Transacción realizada correctamente" in t for t in toasts
+            ) and intento < 3:
+                time.sleep(2)
+                continue
+            break
 
         try:
             WebDriverWait(driver, 20).until(

@@ -250,6 +250,17 @@ def descargar_oc(
                 time.sleep(2)
         raise RuntimeError(f"No se pudo hacer click en '{name}'")
 
+    def _leer_toasts() -> list[str]:
+        textos: list[str] = []
+        for toast in driver.find_elements(*elements["toast"]):
+            try:
+                texto = (toast.text or "").strip()
+            except Exception:
+                texto = ""
+            if texto:
+                textos.append(texto)
+        return textos
+
     errores: list[str] = []
     try:
         driver.get(
@@ -316,66 +327,84 @@ def descargar_oc(
         for oc in ordenes:
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
-            try:
-                campo = _find("digitar_oc", elements["digitar_oc"])
-                campo.clear()
-                campo.send_keys(numero)
-                time.sleep(2)
-                _click("btnbuscarorden", elements["btnbuscarorden"])
-
-                for _ in range(5):
-                    if not driver.find_elements(*elements["toast"]):
-                        break
-                    time.sleep(2)
-                boton_descarga = _find("descargar_orden", elements["descargar_orden"])
-                existentes = {
-                    pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
-                }
+            exito = False
+            ultimo_error: Exception | None = None
+            for intento in range(4):
                 try:
-                    boton_descarga.click()
-                except ElementClickInterceptedException:
-                    driver.execute_script("arguments[0].click();", boton_descarga)
+                    campo = _find("digitar_oc", elements["digitar_oc"])
+                    campo.clear()
+                    campo.send_keys(numero)
+                    time.sleep(2)
+                    _click("btnbuscarorden", elements["btnbuscarorden"])
 
-                archivo = esperar_descarga_pdf(download_dir, existentes)
-                if not getattr(cfg, "compra_bienes", False):
-                    prov_clean = None
-                    if proveedor:
-                        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-                        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
-                        if not prov_clean:
-                            prov_clean = None
-                    partes: list[str] = []
-                    if numero:
-                        partes.append(str(numero))
-                    if prov_clean:
-                        partes.append(prov_clean)
-                    base_nombre = " - ".join(partes) if partes else None
-                    archivo = _renombrar_descarga(archivo, base_nombre)
-                antes = set(download_dir.glob("*.pdf"))
-                for _ in range(120):  # esperar hasta 60 s
-                    time.sleep(0.5)
-                    nuevos = set(download_dir.glob("*.pdf")) - antes
-                    if nuevos:
-                        archivo = nuevos.pop()
-                        break
-                else:
-                    raise RuntimeError("No se descargó archivo")
-                if not getattr(cfg, "compra_bienes", False) and proveedor:
-                    prov_clean = normalizar_nombre_archivo(proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    toasts = _leer_toasts()
+                    if toasts:
+                        if any("Transacción realizada correctamente" in t for t in toasts):
+                            exito = True
+                            break
+                        if intento < 3:
+                            time.sleep(2)
+                            continue
+
+                    for _ in range(5):
+                        if not driver.find_elements(*elements["toast"]):
+                            break
+                        time.sleep(2)
+                    boton_descarga = _find("descargar_orden", elements["descargar_orden"])
+                    existentes = {
+                        pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
+                    }
                     try:
-                        archivo.rename(nuevo_nombre)
-                        archivo = nuevo_nombre
-                    except Exception:
-                        prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
+                        boton_descarga.click()
+                    except ElementClickInterceptedException:
+                        driver.execute_script("arguments[0].click();", boton_descarga)
+
+                    archivo = esperar_descarga_pdf(download_dir, existentes)
+                    if not getattr(cfg, "compra_bienes", False):
+                        prov_clean = None
+                        if proveedor:
+                            prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                            prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+                            if not prov_clean:
+                                prov_clean = None
+                        partes: list[str] = []
+                        if numero:
+                            partes.append(str(numero))
+                        if prov_clean:
+                            partes.append(prov_clean)
+                        base_nombre = " - ".join(partes) if partes else None
+                        archivo = _renombrar_descarga(archivo, base_nombre)
+                    antes = set(download_dir.glob("*.pdf"))
+                    for _ in range(120):  # esperar hasta 60 s
+                        time.sleep(0.5)
+                        nuevos = set(download_dir.glob("*.pdf")) - antes
+                        if nuevos:
+                            archivo = nuevos.pop()
+                            break
+                    else:
+                        raise RuntimeError("No se descargó archivo")
+                    if not getattr(cfg, "compra_bienes", False) and proveedor:
+                        prov_clean = normalizar_nombre_archivo(proveedor)
                         nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
                         try:
                             archivo.rename(nuevo_nombre)
                             archivo = nuevo_nombre
                         except Exception:
-                            pass
-            except Exception as exc:  # pragma: no cover - incidencias en ejecución
-                errores.append(f"OC {numero}: {exc}")
+                            prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
+                            nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                            try:
+                                archivo.rename(nuevo_nombre)
+                                archivo = nuevo_nombre
+                            except Exception:
+                                pass
+                    exito = True
+                    break
+                except Exception as exc:  # pragma: no cover - incidencias en ejecución
+                    ultimo_error = exc
+                    time.sleep(2)
+                    continue
+            if not exito and ultimo_error:
+                errores.append(f"OC {numero}: {ultimo_error}")
     finally:
         driver.quit()
 
