@@ -1147,17 +1147,6 @@ def descargar_abastecimiento(
                 except (ElementClickInterceptedException, StaleElementReferenceException):
                     driver.execute_script("arguments[0].click();", btn)
 
-                time.sleep(1)
-                toasts = _leer_toasts()
-                if toasts and not any(
-                    "Transacción realizada correctamente" in t for t in toasts
-                ):
-                    intento_descarga += 1
-                    if intento_descarga < 4:
-                        hacer_click("btnbuscarorden", elements["btnbuscarorden"])
-                        esperar_toast()
-                        continue
-
                 try:
                     archivo_descargado = esperar_descarga_pdf(destino, existentes)
                 except Exception as exc:
