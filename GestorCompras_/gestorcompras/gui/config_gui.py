@@ -901,13 +901,27 @@ class ConfigGUI(tk.Toplevel):
     def generate_processed_file(self):
         datos = self._collect_descargas_form()
         servidor = datos["pop_server"]
-        usuario = getattr(self.descargas_cfg, "usuario", "")
-        contrasena = getattr(self.descargas_cfg, "password", "")
         puerto = datos["pop_port"]
+
+        usuario = ""
+        contrasena = ""
+        if self.email_session:
+            usuario = (self.email_session.get("address") or "").strip()
+            if usuario and "@" not in usuario:
+                usuario = f"{usuario}@telconet.ec"
+            contrasena = (self.email_session.get("password") or "").strip()
+
+        if not usuario:
+            usuario = getattr(self.descargas_cfg, "usuario", "") or ""
+        if usuario and "@" not in usuario:
+            usuario = f"{usuario}@telconet.ec"
+        if not contrasena:
+            contrasena = getattr(self.descargas_cfg, "password", "") or ""
+
         if not (servidor and usuario and contrasena):
             messagebox.showwarning(
                 "Advertencia",
-                "Debe completar servidor, usuario y contraseña para generar el archivo.",
+                "Debe contar con servidor POP, usuario y contraseña del inicio de sesión para generar el archivo de procesados.",
             )
             return
 

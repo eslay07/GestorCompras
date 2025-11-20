@@ -1174,6 +1174,8 @@ def descargar_abastecimiento(
     for err in errores_mov:
         logger.error("Mover OC: %s", err)
 
+    faltantes = [n for n in faltantes if str(n) not in ubicaciones_descarga]
+
     enviar_reporte(
         subidos,
         faltantes,

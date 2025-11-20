@@ -384,9 +384,7 @@ def descargar_oc(
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     errores.extend(errores_mov)
-    faltantes.extend(n for n in numeros if any(n in e for e in errores))
-    # evitar números repetidos al reportar faltantes
-    faltantes = list(dict.fromkeys(faltantes))
+    faltantes = [n for n in faltantes if n not in ubicaciones_descarga]
     return subidos, faltantes, errores
 
 
