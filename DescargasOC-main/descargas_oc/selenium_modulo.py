@@ -361,15 +361,6 @@ def descargar_oc(
                             partes.append(prov_clean)
                         base_nombre = " - ".join(partes) if partes else None
                         archivo = _renombrar_descarga(archivo, base_nombre)
-                    antes = set(download_dir.glob("*.pdf"))
-                    for _ in range(120):  # esperar hasta 60 s
-                        time.sleep(0.5)
-                        nuevos = set(download_dir.glob("*.pdf")) - antes
-                        if nuevos:
-                            archivo = nuevos.pop()
-                            break
-                    else:
-                        raise RuntimeError("No se descargó archivo")
                     if not getattr(cfg, "compra_bienes", False) and proveedor:
                         prov_clean = normalizar_nombre_archivo(proveedor)
                         nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
