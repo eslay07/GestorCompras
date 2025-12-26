@@ -11,16 +11,12 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import re
 
 from selenium import webdriver
 from selenium.common.exceptions import ElementClickInterceptedException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-
-try:  # permite ejecutar como script
-    from .seafile_client import SeafileClient
-except ImportError:  # pragma: no cover
-    from seafile_client import SeafileClient
 
 try:  # permite ejecutar como script
     from .config import Config
@@ -32,47 +28,6 @@ except ImportError:  # pragma: no cover
     from mover_pdf import mover_oc, normalizar_nombre_archivo
     from organizador_bienes import organizar as organizar_bienes
     from pdf_info import actualizar_proveedores_desde_pdfs
-
-
-def esperar_descarga_pdf(
-    directory: Path,
-    existentes: dict[Path, float],
-    timeout: float = 60.0,
-    intervalo: float = 0.5,
-) -> Path:
-    """Espera a que aparezca un PDF nuevo o actualizado en ``directory``."""
-
-    limite = time.monotonic() + timeout
-    while time.monotonic() < limite:
-        time.sleep(intervalo)
-        candidatos: list[tuple[float, Path]] = []
-        for pdf in directory.glob("*.pdf"):
-            try:
-                mtime = pdf.stat().st_mtime
-            except FileNotFoundError:
-                continue
-            anterior = existentes.get(pdf)
-            if anterior is None or mtime > anterior:
-                candidatos.append((mtime, pdf))
-        if not candidatos:
-            continue
-        candidatos.sort()
-        candidato = candidatos[-1][1]
-        crdownload = candidato.with_suffix(candidato.suffix + ".crdownload")
-        if crdownload.exists():
-            continue
-        try:
-            size = candidato.stat().st_size
-        except FileNotFoundError:
-            continue
-        time.sleep(min(intervalo / 2, 0.5))
-        try:
-            if candidato.stat().st_size != size:
-                continue
-        except FileNotFoundError:
-            continue
-        return candidato
-    raise RuntimeError("No se descargó archivo")
 
 
 def esperar_descarga_pdf(
@@ -163,14 +118,13 @@ def descargar_oc(
                 break
         return archivo
 
-    user = username if username is not None else cfg.usuario
-    if user:
-        user = user.split("@")[0]
+    user_raw = username if username is not None else cfg.usuario
+    user = str(user_raw or "").strip()
+    if "@" in user:
+        user = user.split("@", 1)[0]
     pwd = password if password is not None else cfg.password
 
-    cliente = SeafileClient(cfg.seafile_url, cfg.usuario, cfg.password)
-    repo_id = cfg.seafile_repo_id
-    subfolder = cfg.seafile_subfolder or "/"
+    ubicaciones_descarga: dict[str, str] = {}
 
     options = webdriver.ChromeOptions()
     prefs = {
@@ -296,6 +250,17 @@ def descargar_oc(
                 time.sleep(2)
         raise RuntimeError(f"No se pudo hacer click en '{name}'")
 
+    def _leer_toasts() -> list[str]:
+        textos: list[str] = []
+        for toast in driver.find_elements(*elements["toast"]):
+            try:
+                texto = (toast.text or "").strip()
+            except Exception:
+                texto = ""
+            if texto:
+                textos.append(texto)
+        return textos
+
     errores: list[str] = []
     try:
         driver.get(
@@ -326,22 +291,29 @@ def descargar_oc(
                 )
             except Exception:
                 pass
-        time.sleep(2)
-        for _ in range(3):
-            try:
-                driver.switch_to.window(driver.window_handles[-1])
-            except Exception:
-                pass
-            if driver.find_elements(*elements["lista_accesos"]):
-                break
-            try:
-                menu = driver.find_elements(*elements["menu_hamburguesa"])
-                if menu:
-                    menu[0].click()
-            except Exception:
-                pass
-            time.sleep(2)
-        else:
+
+        def _esperar_menu_accesos():
+            for _ in range(8):
+                try:
+                    driver.switch_to.window(driver.window_handles[-1])
+                except Exception:
+                    pass
+                try:
+                    driver.switch_to.default_content()
+                except Exception:
+                    pass
+                if driver.find_elements(*elements["lista_accesos"]):
+                    return True
+                try:
+                    menu = driver.find_elements(*elements["menu_hamburguesa"])
+                    if menu:
+                        menu[0].click()
+                except Exception:
+                    pass
+                time.sleep(2)
+            return False
+
+        if not _esperar_menu_accesos():
             raise RuntimeError("Fallo al localizar 'lista_accesos'")
         _click("lista_accesos", elements["lista_accesos"])
         _click("seleccion_compania", elements["seleccion_compania"])
@@ -355,56 +327,46 @@ def descargar_oc(
         for oc in ordenes:
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
-            try:
-                campo = _find("digitar_oc", elements["digitar_oc"])
-                campo.clear()
-                campo.send_keys(numero)
-                time.sleep(2)
-                _click("btnbuscarorden", elements["btnbuscarorden"])
-
-                for _ in range(5):
-                    if not driver.find_elements(*elements["toast"]):
-                        break
-                    time.sleep(2)
-                boton_descarga = _find("descargar_orden", elements["descargar_orden"])
-                existentes = {
-                    pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
-                }
+            exito = False
+            ultimo_error: Exception | None = None
+            for intento in range(4):
                 try:
-                    boton_descarga.click()
-                except ElementClickInterceptedException:
-                    driver.execute_script("arguments[0].click();", boton_descarga)
+                    campo = _find("digitar_oc", elements["digitar_oc"])
+                    campo.clear()
+                    campo.send_keys(numero)
+                    time.sleep(2)
+                    _click("btnbuscarorden", elements["btnbuscarorden"])
 
-                archivo = esperar_descarga_pdf(download_dir, existentes)
-                if not getattr(cfg, "compra_bienes", False):
-                    prov_clean = None
-                    if proveedor:
-                        prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
-                        prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
-                        if not prov_clean:
-                            prov_clean = None
-                    partes: list[str] = []
-                    if numero:
-                        partes.append(str(numero))
-                    if prov_clean:
-                        partes.append(prov_clean)
-                    base_nombre = " - ".join(partes) if partes else None
-                    archivo = _renombrar_descarga(archivo, base_nombre)
-                antes = set(download_dir.glob("*.pdf"))
-                for _ in range(120):  # esperar hasta 60 s
-                    time.sleep(0.5)
-                    nuevos = set(download_dir.glob("*.pdf")) - antes
-                    if nuevos:
-                        archivo = nuevos.pop()
-                        break
-                else:
-                    raise RuntimeError("No se descargó archivo")
-                if not getattr(cfg, "compra_bienes", False) and proveedor:
-                    prov_clean = normalizar_nombre_archivo(proveedor)
-                    nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                    boton_descarga = _find("descargar_orden", elements["descargar_orden"])
+                    existentes = {
+                        pdf: pdf.stat().st_mtime for pdf in download_dir.glob("*.pdf")
+                    }
                     try:
-                        archivo.rename(nuevo_nombre)
-                        archivo = nuevo_nombre
+                        boton_descarga.click()
+                    except ElementClickInterceptedException:
+                        driver.execute_script("arguments[0].click();", boton_descarga)
+
+                    archivo = esperar_descarga_pdf(download_dir, existentes)
+                    if not getattr(cfg, "compra_bienes", False):
+                        prov_clean = None
+                        if proveedor:
+                            prov_clean = re.sub(r"[^\w\- ]", "_", proveedor)
+                            prov_clean = re.sub(r"\s+", " ", prov_clean).strip()
+                            if not prov_clean:
+                                prov_clean = None
+                        partes: list[str] = []
+                        if numero:
+                            partes.append(str(numero))
+                        if prov_clean:
+                            partes.append(prov_clean)
+                        base_nombre = " - ".join(partes) if partes else None
+                        archivo = _renombrar_descarga(archivo, base_nombre)
+                    if not getattr(cfg, "compra_bienes", False) and proveedor:
+                        prov_clean = normalizar_nombre_archivo(proveedor)
+                        nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
+                        try:
+                            archivo.rename(nuevo_nombre)
+                            archivo = nuevo_nombre
                         except Exception:
                             prov_clean = normalizar_nombre_archivo(proveedor, longitud_maxima=20)
                             nuevo_nombre = download_dir / f"{numero} - {prov_clean}.pdf"
@@ -413,14 +375,14 @@ def descargar_oc(
                                 archivo = nuevo_nombre
                             except Exception:
                                 pass
-                try:
-                    cliente.upload_file(
-                        repo_id, str(archivo), parent_dir=subfolder
-                    )
-                except Exception as e:
-                    errores.append(f"OC {numero}: fallo subida {e}")
-            except Exception as exc:  # pragma: no cover - incidencias en ejecución
-                errores.append(f"OC {numero}: {exc}")
+                    exito = True
+                    break
+                except Exception as exc:  # pragma: no cover - incidencias en ejecución
+                    ultimo_error = exc
+                    time.sleep(2)
+                    continue
+            if not exito and ultimo_error:
+                errores.append(f"OC {numero}: {ultimo_error}")
     finally:
         driver.quit()
 
@@ -428,13 +390,15 @@ def descargar_oc(
         actualizar_proveedores_desde_pdfs(ordenes, download_dir)
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes, errores_mov = mover_oc(cfg, ordenes)
+    subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(cfg, ordenes)
+    for numero, ruta in ubicaciones_descarga.items():
+        for orden in ordenes:
+            if str(orden.get("numero")) == str(numero):
+                orden["ruta"] = ruta
     if getattr(cfg, "compra_bienes", False):
         organizar_bienes(cfg.carpeta_analizar, cfg.carpeta_analizar)
     errores.extend(errores_mov)
-    faltantes.extend(n for n in numeros if any(n in e for e in errores))
-    # evitar números repetidos al reportar faltantes
-    faltantes = list(dict.fromkeys(faltantes))
+    faltantes = [n for n in faltantes if n not in ubicaciones_descarga]
     return subidos, faltantes, errores
 
 

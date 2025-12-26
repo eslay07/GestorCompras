@@ -663,7 +663,31 @@ class ServiciosReasignacion(tk.Toplevel):
 
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:
-    if mode == "servicios":
+    """Abre la ventana correspondiente según el flujo seleccionado."""
+
+    mode_normalized = (mode or "bienes").strip().lower()
+    if mode_normalized == "servicios":
         ServiciosReasignacion(master, email_session)
-    else:
+    elif mode_normalized == "bienes":
         legacy_gui.open_reasignacion(master, email_session)
+    else:
+        messagebox.showerror(
+            "Reasignación",
+            f"Modo desconocido '{mode}'. Seleccione entre 'bienes' o 'servicios'.",
+            parent=master,
+        )
+
+
+def open_servicios(master: tk.Misc, email_session: dict[str, str]) -> None:
+    """Alias explícito para abrir la reasignación de Servicios."""
+
+    open(master, email_session, mode="servicios")
+
+
+def open_bienes(master: tk.Misc, email_session: dict[str, str]) -> None:
+    """Alias explícito para abrir la reasignación de Bienes."""
+
+    open(master, email_session, mode="bienes")
+
+
+__all__ = ["open", "open_servicios", "open_bienes", "ServiciosReasignacion"]

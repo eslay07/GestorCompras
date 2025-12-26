@@ -43,7 +43,7 @@ class ServiciosHome(ttk.Frame):
             container,
             row=3,
             text="Descargas OC",
-            command=lambda: descargas_oc_gui.open(self.master),
+            command=lambda: descargas_oc_gui.open(self.master, self.email_session),
         )
         self._add_button(
             container,
