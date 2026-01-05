@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tkinter as tk
@@ -21,7 +22,7 @@ def _find_descargas_root() -> Path | None:
 _DESCARGAS_ROOT = _find_descargas_root()
 
 
-def open(master: tk.Misc) -> None:
+def open(master: tk.Misc, email_session: dict | None = None) -> None:
     """Abre el selector para iniciar los módulos de descargas de OC."""
     option_win = tk.Toplevel(master)
     option_win.title("Descargas OC")
@@ -35,7 +36,7 @@ def open(master: tk.Misc) -> None:
         style="MyLabel.TLabel",
     ).pack(padx=10, pady=10)
 
-    def _launch(script_name: str, error_title: str) -> None:
+    def _launch(module_suffix: str, error_title: str) -> None:
         if _DESCARGAS_ROOT is None:
             messagebox.showerror(
                 "Descargas OC",
@@ -43,16 +44,26 @@ def open(master: tk.Misc) -> None:
                 parent=option_win,
             )
             return
-        script = _DESCARGAS_ROOT / "descargas_oc" / script_name
+        module = f"descargas_oc.{module_suffix}"
+        env = None
+        if email_session:
+            usuario = (email_session.get("address") or "").strip()
+            password = (email_session.get("password") or "").strip()
+            env = dict(**os.environ)
+            if usuario:
+                env["USUARIO_OC"] = usuario
+            if password:
+                env["PASSWORD_OC"] = password
         try:
-            subprocess.Popen([sys.executable, str(script)])
+            subprocess.Popen(
+                [sys.executable, "-m", module],
+                cwd=str(_DESCARGAS_ROOT),
+                env=env,
+            )
         except OSError as exc:  # pragma: no cover - errores del SO
             messagebox.showerror(
                 error_title,
-                (
-                    f"No se pudo abrir el módulo {script_name}. "
-                    f"Detalle: {exc}"
-                ),
+                (f"No se pudo abrir el módulo {module}. Detalle: {exc}"),
                 parent=option_win,
             )
             return
@@ -62,7 +73,7 @@ def open(master: tk.Misc) -> None:
         option_win,
         text="Descarga Normal",
         style="MyButton.TButton",
-        command=lambda: _launch("ui.py", "Error"),
+        command=lambda: _launch("ui", "Error"),
     )
     btn_norm.pack(padx=10, pady=5)
     add_hover_effect(btn_norm)
@@ -71,7 +82,7 @@ def open(master: tk.Misc) -> None:
         option_win,
         text="Abastecimiento",
         style="MyButton.TButton",
-        command=lambda: _launch("ui_abastecimiento.py", "Error"),
+        command=lambda: _launch("ui_abastecimiento", "Error"),
     )
     btn_abast.pack(padx=10, pady=5)
     add_hover_effect(btn_abast)

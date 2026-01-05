@@ -189,6 +189,135 @@ def wait_clickable_or_error(driver, locator, parent, description, timeout=30, re
 
 def process_task(driver, task, parent_window):
     task_number = task["task_number"]
+    dept = task["reasignacion"].strip().upper()
+    assignments = db.get_assignment_config()
+    empleado = assignments.get(dept, {}).get("person", "SIN ASIGNAR")
+    dept_name = assignments.get(dept, {}).get("department", "")
+
+    element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
+    driver.execute_script("arguments[0].click();", element)
+
+    search_input = wait_clickable_or_error(
+        driver,
+        (By.CSS_SELECTOR, 'input[type="search"].form-control.form-control-sm'),
+        parent_window,
+        'el campo de búsqueda'
+    )
+    search_input.clear()
+    search_input.send_keys(task_number)
+    search_input.send_keys(Keys.RETURN)
+
+    try:
+        time.sleep(0.5)
+        wait_clickable_or_error(
+            driver,
+            (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'),
+            parent_window,
+            'el botón para abrir la tarea'
+        ).click()
+    except Exception:
+        # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
+        raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
+
+    time.sleep(1)
+    comment_input = wait_clickable_or_error(
+        driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')
+    comment_input.send_keys('SE RECIBE LA MERCADERIA')
+    time.sleep(1)
+    wait_clickable_or_error(
+        driver, (By.ID, 'btnGrabarEjecucionTarea'), parent_window, 'el botón Grabar Ejecución').click()
+    time.sleep(2)
+    wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación inicial').click()
+    time.sleep(2)
+
+    for detail in task["details"]:
+        tracking_button = wait_clickable_or_error(
+            driver,
+            (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']"),
+            parent_window,
+            'el botón de seguimiento'
+        )
+        tracking_button.click()
+        time.sleep(2)
+        tracking_input = wait_clickable_or_error(
+            driver,
+            (By.ID, 'txtSeguimientoTarea'),
+            parent_window,
+            'el campo de seguimiento'
+        )
+        tracking_message = f"SE INGRESA LA FACTURA {detail['Factura']} CON EL INGRESO {detail['Ingreso']}"
+        tracking_input.clear()
+        tracking_input.send_keys(tracking_message)
+        time.sleep(2)
+        wait_clickable_or_error(driver, (By.ID, 'btnIngresoSeguimiento'), parent_window, 'el botón Ingreso Seguimiento').click()
+        time.sleep(2)
+        wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación de seguimiento').click()
+        time.sleep(2)
+
+    wait_clickable_or_error(
+        driver,
+        (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
+        parent_window,
+        'el botón de reasignar'
+    ).click()
+    time.sleep(2)
+    department_input = wait_clickable_or_error(
+        driver,
+        (By.ID, 'txtDepartment'),
+        parent_window,
+        'el campo Departamento'
+    )
+    department_input.clear()
+    department_input.send_keys(dept_name)
+    time.sleep(1)
+    #elemento para pruebas compras
+    #department_input.send_keys(Keys.UP, Keys.RETURN)
+    #////////////elementopara produccion bodega
+    department_input.send_keys(Keys.DOWN, Keys.RETURN)
+    time.sleep(2)
+    department_input.send_keys(Keys.TAB)
+    time.sleep(2)
+    employee_input = WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.NAME, 'txtEmpleado'))
+    )
+    employee_input.click()
+    employee_input.send_keys(empleado)
+    time.sleep(1)
+    employee_input.send_keys(Keys.DOWN, Keys.RETURN)
+    time.sleep(2)
+    employee_input.send_keys(Keys.TAB)
+    time.sleep(2)
+    observation_textarea = wait_clickable_or_error(
+        driver,
+        (By.ID, 'txtaObsTareaFinalReasigna'),
+        parent_window,
+        'el área de observación'
+    )
+    observation_textarea.send_keys('TRABAJO REALIZADO')
+    try:
+        WebDriverWait(driver, 20).until(
+            EC.visibility_of_element_located((By.ID, "modalReasignarTarea"))
+        )
+    except Exception as e:
+        raise Exception("No se abrió la ventana de reasignación") from e
+    boton = wait_clickable_or_error(
+        driver,
+        (By.ID, "btnGrabarReasignaTarea"),
+        parent_window,
+        'el botón Guardar'
+    )
+    from selenium.webdriver.common.action_chains import ActionChains
+    ActionChains(driver).move_to_element(boton).perform()
+    boton.click()
+    final_confirm_button = WebDriverWait(driver, 20).until(
+        EC.element_to_be_clickable((By.ID, 'btnMensajeFinTarea'))
+    )
+    final_confirm_button.click()
+    time.sleep(2)
+
+
+def process_task_servicios(driver, task, parent_window):
+    task_number = task["task_number"]
     dept = str(task.get("reasignacion", "")).strip().upper()
     assignments = db.get_assignment_config()
     assignment_info = assignments.get(dept, {})
@@ -231,7 +360,7 @@ def process_task(driver, task, parent_window):
 
     element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
     driver.execute_script("arguments[0].click();", element)
-    
+
     search_input = wait_clickable_or_error(
         driver,
         (By.CSS_SELECTOR, 'input[type="search"].form-control.form-control-sm'),
@@ -241,7 +370,7 @@ def process_task(driver, task, parent_window):
     search_input.clear()
     search_input.send_keys(task_number)
     search_input.send_keys(Keys.RETURN)
-    
+
     try:
         time.sleep(0.5)
         wait_clickable_or_error(
@@ -253,7 +382,7 @@ def process_task(driver, task, parent_window):
     except Exception:
         # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
         raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
-    
+
     time.sleep(1)
     comment_input = wait_clickable_or_error(
         driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')

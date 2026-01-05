@@ -30,6 +30,20 @@ ESPERA_INICIAL = 0.3
 LONGITUD_MAXIMA_PROVEEDOR = 50
 
 
+def normalizar_nombre_archivo(nombre: str | None, longitud_maxima: int = LONGITUD_MAXIMA_PROVEEDOR) -> str:
+    """Normaliza *nombre* para uso seguro en nombres de archivo."""
+
+    texto = (nombre or "").strip()
+    if not texto:
+        return ""
+    texto = re.sub(r"[^\w\- ]", "_", texto)
+    texto = re.sub(r"\s+", "_", texto)
+    texto = re.sub(r"_+", "_", texto).strip("_")
+    if longitud_maxima and len(texto) > longitud_maxima:
+        texto = texto[:longitud_maxima].rstrip("_- ")
+    return texto.lower()
+
+
 def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
     if not nombre or not numero:
         return False
@@ -155,7 +169,7 @@ def _carpetas_origen(config: Config) -> list[Path]:
 def _destino_no_bienes(
     config: Config, orden: Mapping[str, Any] | None
 ) -> Path | None:
-    """Determina la carpeta destino para órdenes que no pertenecen a bienes."""
+    """Determina la carpeta destino apropiada para una OC que no es de bienes."""
 
     categoria = ""
     if isinstance(orden, Mapping):
@@ -182,47 +196,13 @@ def _destino_no_bienes(
             continue
     return None
 
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
-#=======
-#codex/fix-email-scanning-for-descarga-normal
-#>>>>>>> master
-REINTENTOS = 5
-ESPERA_INICIAL = 0.3
-
-
-def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
-    if not nombre or not numero:
-        return False
-    patron = rf"(?<!\d){re.escape(numero)}(?!\d)"
-    return re.search(patron, nombre) is not None
-
-
-def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
-    destino_dir.mkdir(parents=True, exist_ok=True)
-    destino = destino_dir / nombre
-    if not destino.exists():
-        return destino
-    base, ext = os.path.splitext(nombre)
-    i = 1
-    while True:
-        candidato = destino_dir / f"{base} ({i}){ext}"
-        if not candidato.exists():
-            return candidato
-        i += 1
-
-
-def normalizar_nombre_archivo(nombre: str, longitud_maxima: int = LONGITUD_MAXIMA_PROVEEDOR) -> str:
-    """Normaliza *nombre* para uso en nombres de archivo."""
-
-    limpio = re.sub(r"[^\w\- ]", "_", nombre or "").strip()
-    limpio = re.sub(r"\s+", " ", limpio)
-    if len(limpio) > longitud_maxima:
-        limpio = limpio[:longitud_maxima].rstrip()
-    return limpio
-
 
 def mover_oc(config: Config, ordenes=None):
-    """Renombra y mueve los PDF de las órdenes descargadas."""
+    """Renombra y mueve los PDF de las órdenes descargadas.
+
+    Devuelve (subidos, faltantes, errores, ubicaciones), donde ubicaciones es un
+    diccionario numero->ruta final del PDF.
+    """
 
     ordenes = ordenes or []
     numeros_oc = list(dict.fromkeys(o.get("numero") for o in ordenes))
@@ -234,7 +214,7 @@ def mover_oc(config: Config, ordenes=None):
     if not carpetas_origen:
         logger.error("Carpetas de descarga no configuradas")
         errores.append("Carpetas de descarga no configuradas")
-        return [], numeros_oc, errores
+        return [], numeros_oc, errores, {}
 
     archivos: list[Path] = []
     for carpeta in carpetas_origen:
@@ -273,6 +253,7 @@ def mover_oc(config: Config, ordenes=None):
 
     faltantes: list[str] = []
     subidos: list[str] = []
+    ubicaciones: dict[str, str] = {}
     es_bienes = bool(getattr(config, "compra_bienes", False))
 
     for numero in numeros_oc:
@@ -299,8 +280,6 @@ def mover_oc(config: Config, ordenes=None):
 
         extension = ruta_path.suffix or ".pdf"
         nombre_deseado = nombre_archivo_orden(numero, proveedor, extension)
-        ext = ruta_path.suffix or ".pdf"
-        nombre_deseado = nombre_archivo_orden(numero, prov, ext)
         nombre_original = ruta_path.name
         origen_descarga = ruta_path.parent
 
@@ -372,6 +351,6 @@ def mover_oc(config: Config, ordenes=None):
             logger.info("%s listo en %s", ruta_path.name, ruta_path.parent)
 
         subidos.append(numero)
+        ubicaciones[numero] = str(ruta_path)
 
-    return subidos, faltantes, errores
-
+    return subidos, faltantes, errores, ubicaciones
