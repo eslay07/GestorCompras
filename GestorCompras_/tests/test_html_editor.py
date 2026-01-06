@@ -47,7 +47,6 @@ def test_editor_normalizes_conflicting_font_sizes():
     assert "size_16" not in tags
     assert "font-size:16px" not in html
     assert "font-size:11px" in html
-#<<<<<<< codex/fix-email-scanning-for-descarga-normal-z71yhw
 
 
 def test_editor_removes_stale_size_tags_on_type():
@@ -72,5 +71,3 @@ def test_editor_removes_stale_size_tags_on_type():
     root.destroy()
     assert tags == ["size_11"]
     assert "font-size:8px" not in html
-#=======
-#>>>>>>> master
