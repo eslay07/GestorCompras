@@ -63,7 +63,7 @@ Uso
  - **Reasignación de tareas:** redistribuye actividades entre responsables.
  - **Correos masivos:** envío de comunicaciones a proveedores con plantillas.
  - **Seguimientos:** control y registro de seguimientos de compras desde la interfaz.
- - **Descargas OC:** abre el módulo auxiliar `DescargasOC-main` para descargar Órdenes de Compra de forma automática. Este módulo detecta correos con OCs y usa Selenium para ingresar al sistema web y bajar los PDF correspondientes.
+ - **Descargas OC:** abre el módulo auxiliar `DescargasOC-main` para descargar Órdenes de Compra de forma automática. Este módulo detecta correos con OCs o tambien cuenta con la opcion de ingreso de los numeros de OCs a descargar y usa Selenium para ingresar al sistema web y bajar los PDF correspondientes.
  - **Cotizador:** opción en desarrollo (visible en el menú, pero aún no disponible).
  - **Configuración:** preferencias generales de correo, plantillas y parámetros de trabajo.
 
