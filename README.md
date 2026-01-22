@@ -55,6 +55,26 @@ Uso
    - Cargar y gestionar tareas temporales notificadas por correo.
    - Enviar solicitudes de despacho a través de correos electrónicos predefinidos.
 
+ Menú principal y módulos disponibles
+ ------------------------------------
+ El menú principal se divide en dos flujos: **Compras Bienes** y **Compras Servicios**. Ambos comparten utilidades y, dependiendo del flujo, muestran opciones adicionales.
+
+ **Compras Bienes**
+ - **Reasignación de tareas:** redistribuye actividades entre responsables.
+ - **Correos masivos:** envío de comunicaciones a proveedores con plantillas.
+ - **Seguimientos:** control y registro de seguimientos de compras desde la interfaz.
+ - **Descargas OC:** abre el módulo auxiliar `DescargasOC-main` para descargar Órdenes de Compra de forma automática. Este módulo detecta correos con OCs y usa Selenium para ingresar al sistema web y bajar los PDF correspondientes.
+ - **Cotizador:** opción en desarrollo (visible en el menú, pero aún no disponible).
+ - **Configuración:** preferencias generales de correo, plantillas y parámetros de trabajo.
+
+ **Compras Servicios**
+ - **Configuraciones:** parámetros específicos del flujo de servicios.
+ - **Correos masivos:** envío de comunicaciones masivas.
+ - **Descargas OC:** misma integración con el módulo de descargas automatizadas por Selenium.
+ - **Reasignación de tareas:** redistribución de tareas para servicios.
+
+ Si se requiere más detalle sobre la automatización de descargas de OC (configuración de correos, carpetas y proceso con Selenium), revise el README dentro de `DescargasOC-main`.
+
 Pruebas
 -------
 Con las dependencias de desarrollo instaladas, ejecute las pruebas con:
