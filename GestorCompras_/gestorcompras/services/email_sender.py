@@ -6,13 +6,13 @@ from email.message import EmailMessage
 from jinja2 import Environment, FileSystemLoader
 
 from . import db
+from gestorcompras.core.smtp_config import get_smtp_settings
 
 # Configuración de la ruta donde se ubicarán las plantillas
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True)
 
-SMTP_SERVER = "smtp.telconet.ec"
-SMTP_PORT = 587
+SMTP_SERVER, SMTP_PORT, SMTP_STARTTLS = get_smtp_settings()
 
 def get_cc_address(key="EMAIL_CC_DESPACHO"):
     """Obtiene la dirección de correo en copia (CC) para la clave dada."""
@@ -64,7 +64,8 @@ def send_email(email_session, subject, template_text, template_html, context, at
 
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
+            if SMTP_STARTTLS:
+                server.starttls()
             server.login(email_session["address"], email_session["password"])
             server.send_message(msg)
     except Exception as e:
@@ -136,7 +137,8 @@ def send_email_custom(
 
     try:
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
+            if SMTP_STARTTLS:
+                server.starttls()
             server.login(email_session["address"], email_session["password"])
             server.send_message(msg)
     except Exception as e:

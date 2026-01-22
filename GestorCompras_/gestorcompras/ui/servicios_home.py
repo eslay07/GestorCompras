@@ -25,29 +25,36 @@ class ServiciosHome(ttk.Frame):
             text="Compras Servicios",
             style="Banner.TLabel",
         )
-        titulo.grid(row=0, column=0, pady=(10, 30))
+        titulo.grid(row=0, column=0, pady=(10, 10))
+
+        guide = (
+            "Guía rápida: 1) Configuraciones  2) Correos Masivos  3) Descargas OC  "
+            "4) Reasignación de tareas.\nEstado: flujo de servicios activo."
+        )
+        guide_label = ttk.Label(container, text=guide, style="MyLabel.TLabel", wraplength=520, justify="center")
+        guide_label.grid(row=1, column=0, pady=(0, 20))
 
         self._add_button(
             container,
-            row=1,
+            row=2,
             text="Configuraciones",
             command=lambda: config_gui.open(self.master, self.email_session, mode="servicios"),
         )
         self._add_button(
             container,
-            row=2,
+            row=3,
             text="Correos Masivos",
             command=lambda: correos_masivos_gui.open(self.master, self.email_session),
         )
         self._add_button(
             container,
-            row=3,
+            row=4,
             text="Descargas OC",
             command=lambda: descargas_oc_gui.open(self.master, self.email_session),
         )
         self._add_button(
             container,
-            row=4,
+            row=5,
             text="Reasignación de tareas",
             command=lambda: reasignacion_gui.open(self.master, self.email_session, mode="servicios"),
         )

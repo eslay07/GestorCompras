@@ -58,7 +58,15 @@ class BienesMenu(ttk.Frame):
         lbl_title.configure(font=("Segoe UI", 11, "bold"), foreground=color_titulos)
         lbl_title.grid(row=0, column=0, pady=15, sticky="n")
 
+        guide = (
+            "Guía rápida: 1) Reasignación de Tareas  2) Correos Masivos  3) Seguimientos  "
+            "4) Descargas OC  5) Configuración.\nEstado: Cotizador en desarrollo."
+        )
+        guide_label = ttk.Label(menu_frame, text=guide, style="MyLabel.TLabel", wraplength=520, justify="center")
+        guide_label.grid(row=1, column=0, pady=(0, 10))
+
         self.menu_frame = menu_frame
+        self._button_row_offset = 2
         self._show_button(0)
 
     def _animate_banner(self) -> None:
@@ -73,7 +81,7 @@ class BienesMenu(ttk.Frame):
         text, method_name = self._buttons[index]
         command = getattr(self, method_name)
         btn = ttk.Button(self.menu_frame, text=text, style="MyButton.TButton", command=command)
-        btn.grid(row=index + 1, column=0, padx=20, pady=5, sticky="ew")
+        btn.grid(row=index + self._button_row_offset, column=0, padx=20, pady=5, sticky="ew")
         add_hover_effect(btn)
         self._button_widgets.append(btn)
         self.after(120, self._show_button, index + 1)

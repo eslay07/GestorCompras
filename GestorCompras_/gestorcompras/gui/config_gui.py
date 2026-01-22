@@ -34,6 +34,7 @@ if _DESCARGAS_ROOT is not None:
         sys.path.insert(0, _path)
 
 from gestorcompras.services import db
+from gestorcompras.core.validators import normalize_emails, validate_email
 from gestorcompras.gui.html_editor import HtmlEditor
 from gestorcompras.services.email_sender import send_email_custom
 from descargas_oc.config import Config as DescargasConfig
@@ -396,8 +397,21 @@ class ConfigGUI(tk.Toplevel):
         self.cc_tracking_var = tk.StringVar()
         self.cc_tracking_var.set(db.get_config("EMAIL_CC_SEGUIMIENTO", ""))
 
-        ttk.Entry(frame, textvariable=self.cc_tracking_var,
-                  style="MyEntry.TEntry", width=50).pack(pady=5)
+        cc_entry = ttk.Entry(frame, textvariable=self.cc_tracking_var,
+                             style="MyEntry.TEntry", width=50)
+        cc_entry.pack(pady=5)
+
+        self.cc_tracking_status = ttk.Label(frame, text="", style="MyLabel.TLabel")
+        self.cc_tracking_status.pack(pady=(0, 5))
+        cc_entry.bind(
+            "<KeyRelease>",
+            lambda _event: self._update_cc_status(self.cc_tracking_var, self.cc_tracking_status),
+        )
+        cc_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._update_cc_status(self.cc_tracking_var, self.cc_tracking_status),
+        )
+        self._update_cc_status(self.cc_tracking_var, self.cc_tracking_status)
 
         ttk.Button(frame, text="Guardar Configuración",
                    style="MyButton.TButton",
@@ -429,8 +443,21 @@ class ConfigGUI(tk.Toplevel):
         self.cc_dispatch_var = tk.StringVar()
         self.cc_dispatch_var.set(db.get_config("EMAIL_CC_DESPACHO", ""))
 
-        ttk.Entry(frame, textvariable=self.cc_dispatch_var,
-                  style="MyEntry.TEntry", width=50).pack(pady=5)
+        cc_entry = ttk.Entry(frame, textvariable=self.cc_dispatch_var,
+                             style="MyEntry.TEntry", width=50)
+        cc_entry.pack(pady=5)
+
+        self.cc_dispatch_status = ttk.Label(frame, text="", style="MyLabel.TLabel")
+        self.cc_dispatch_status.pack(pady=(0, 5))
+        cc_entry.bind(
+            "<KeyRelease>",
+            lambda _event: self._update_cc_status(self.cc_dispatch_var, self.cc_dispatch_status),
+        )
+        cc_entry.bind(
+            "<FocusOut>",
+            lambda _event: self._update_cc_status(self.cc_dispatch_var, self.cc_dispatch_status),
+        )
+        self._update_cc_status(self.cc_dispatch_var, self.cc_dispatch_status)
 
         ttk.Button(frame, text="Guardar Configuración",
                    style="MyButton.TButton",
@@ -448,7 +475,13 @@ class ConfigGUI(tk.Toplevel):
     
     def save_tracking_config(self):
         cc_text = self.cc_tracking_var.get().strip()
-        emails = [e.strip() for e in re.split(r"[;,]+", cc_text) if e.strip()]
+        emails, invalid = normalize_emails(cc_text)
+        if invalid:
+            messagebox.showwarning(
+                "Advertencia",
+                f"Correos inválidos: {', '.join(invalid)}",
+            )
+            return
         if len(emails) > 9:
             messagebox.showwarning(
                 "Advertencia", "Se permiten máximo 9 correos en CC.")
@@ -457,7 +490,9 @@ class ConfigGUI(tk.Toplevel):
         db.set_config("GOOGLE_CREDS", self.google_creds_var.get().strip())
         db.set_config("GOOGLE_SHEET_ID", self.sheet_id_var.get().strip())
         db.set_config("GOOGLE_SHEET_NAME", self.sheet_name_var.get().strip())
-        db.set_config("EMAIL_CC_SEGUIMIENTO", ";".join(emails) if emails else "")
+        normalized = ";".join(emails) if emails else ""
+        self.cc_tracking_var.set(normalized)
+        db.set_config("EMAIL_CC_SEGUIMIENTO", normalized)
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
 
@@ -469,16 +504,35 @@ class ConfigGUI(tk.Toplevel):
             return
 
         cc_text = self.cc_dispatch_var.get().strip()
-        emails = [e.strip() for e in re.split(r"[;,]+", cc_text) if e.strip()]
+        emails, invalid = normalize_emails(cc_text)
+        if invalid:
+            messagebox.showwarning(
+                "Advertencia",
+                f"Correos inválidos: {', '.join(invalid)}",
+            )
+            return
         if len(emails) > 9:
             messagebox.showwarning(
                 "Advertencia", "Se permiten máximo 9 correos en CC.")
             return
 
         db.set_config("PDF_FOLDER", pdf_folder)
-        db.set_config("EMAIL_CC_DESPACHO", ";".join(emails) if emails else "")
+        normalized = ";".join(emails) if emails else ""
+        self.cc_dispatch_var.set(normalized)
+        db.set_config("EMAIL_CC_DESPACHO", normalized)
         messagebox.showinfo(
             "Información", "Configuración guardada correctamente.")
+
+    def _update_cc_status(self, var: tk.StringVar, label: ttk.Label) -> None:
+        emails, invalid = normalize_emails(var.get())
+        if invalid:
+            label.configure(text=f"Correos inválidos: {', '.join(invalid)}", foreground="firebrick")
+        elif len(emails) > 9:
+            label.configure(text="Se permiten máximo 9 correos en CC.", foreground="firebrick")
+        elif emails:
+            label.configure(text=f"{len(emails)} correo(s) listos para guardar.", foreground="darkgreen")
+        else:
+            label.configure(text="Sin correos configurados.", foreground="gray")
 
     def create_oc_tab(self):
         cfg = self.descargas_cfg
@@ -1158,10 +1212,20 @@ class SupplierForm(tk.Toplevel):
 
         ttk.Label(container, text="Correo 2 (opcional):", style="MyLabel.TLabel").pack(pady=5, anchor="w")
         ttk.Entry(container, textvariable=self.email2_var, style="MyEntry.TEntry").pack(pady=5, fill="x")
-        
-        ttk.Button(container, text="Guardar",
-                   style="MyButton.TButton",
-                   command=self.save_supplier).pack(pady=10)
+
+        self.status_label = ttk.Label(container, text="", style="MyLabel.TLabel")
+        self.status_label.pack(pady=(5, 0))
+
+        self.save_button = ttk.Button(
+            container,
+            text="Guardar",
+            style="MyButton.TButton",
+            command=self.save_supplier,
+        )
+        self.save_button.pack(pady=10)
+
+        for var in (self.name_var, self.ruc_var, self.email_var, self.email2_var):
+            var.trace_add("write", lambda *_: self._validate_fields())
         
         if self.supplier_data:
             self.name_var.set(self.supplier_data[1])
@@ -1169,6 +1233,28 @@ class SupplierForm(tk.Toplevel):
             self.email_var.set(self.supplier_data[3])
             if len(self.supplier_data) > 4:
                 self.email2_var.set(self.supplier_data[4])
+        self._validate_fields()
+
+    def _validate_fields(self) -> None:
+        name = self.name_var.get().strip()
+        ruc = self.ruc_var.get().strip()
+        email = self.email_var.get().strip()
+        email2 = self.email2_var.get().strip()
+
+        errors = []
+        if not (name and ruc and email):
+            errors.append("Complete Nombre, RUC y Correo.")
+        if email and not validate_email(email):
+            errors.append("Correo principal inválido.")
+        if email2 and not validate_email(email2):
+            errors.append("Correo 2 inválido.")
+
+        if errors:
+            self.status_label.configure(text=" ".join(errors), foreground="firebrick")
+            self.save_button.state(["disabled"])
+        else:
+            self.status_label.configure(text="Datos listos para guardar.", foreground="darkgreen")
+            self.save_button.state(["!disabled"])
 
     def save_supplier(self):
         name = self.name_var.get().strip()
@@ -1180,6 +1266,12 @@ class SupplierForm(tk.Toplevel):
                 "Advertencia",
                 "Nombre, RUC y el primer correo son obligatorios.",
             )
+            return
+        if not validate_email(email):
+            messagebox.showwarning("Advertencia", "El correo principal no es válido.")
+            return
+        if email2 and not validate_email(email2):
+            messagebox.showwarning("Advertencia", "El correo secundario no es válido.")
             return
         if self.supplier_data:
             db.update_supplier(self.supplier_data[0], name, ruc, email, email2)
@@ -1215,12 +1307,31 @@ class AssignmentForm(tk.Toplevel):
         ttk.Label(container, text="Persona:", style="MyLabel.TLabel").pack(anchor="w")
         ttk.Entry(container, textvariable=self.person_var, style="MyEntry.TEntry").pack(fill="x", pady=5)
 
-        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save).pack(pady=10)
+        self.status_label = ttk.Label(container, text="", style="MyLabel.TLabel")
+        self.status_label.pack(pady=(5, 0))
+
+        self.save_button = ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save)
+        self.save_button.pack(pady=10)
+
+        for var in (self.sub_var, self.dept_var, self.person_var):
+            var.trace_add("write", lambda *_: self._validate_fields())
 
         if self.data:
             self.sub_var.set(self.data[0])
             self.dept_var.set(self.data[1])
             self.person_var.set(self.data[2])
+        self._validate_fields()
+
+    def _validate_fields(self) -> None:
+        sub = self.sub_var.get().strip()
+        dept = self.dept_var.get().strip()
+        person = self.person_var.get().strip()
+        if not (sub and dept and person):
+            self.status_label.configure(text="Complete todos los campos.", foreground="firebrick")
+            self.save_button.state(["disabled"])
+        else:
+            self.status_label.configure(text="Datos listos para guardar.", foreground="darkgreen")
+            self.save_button.state(["!disabled"])
 
     def save(self):
         sub = self.sub_var.get().strip().upper()

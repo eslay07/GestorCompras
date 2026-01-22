@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from gestorcompras.core import config as core_config
+from gestorcompras.core.smtp_config import get_smtp_settings
 from gestorcompras.gui.status_bar import ResourceStatusBar
 from gestorcompras.services import db
 from gestorcompras import theme
@@ -33,8 +34,10 @@ email_session: dict[str, str] = {}
 
 def test_email_connection(email_address: str, email_password: str) -> bool:
     try:
-        with smtplib.SMTP("smtp.telconet.ec", 587) as server:
-            server.starttls()
+        server_host, server_port, starttls = get_smtp_settings()
+        with smtplib.SMTP(server_host, server_port) as server:
+            if starttls:
+                server.starttls()
             server.login(email_address, email_password)
         return True
     except Exception:
