@@ -75,8 +75,7 @@ def _create_driver(headless: bool):
 def _reanudar_panel(driver) -> None:
     try:
         from selenium.webdriver.common.by import By
-
-        from gestorcompras.gui.reasignacion_gui import wait_clickable_or_error
+        from gestorcompras.services.telcos_automation import wait_clickable_or_error
 
         boton = wait_clickable_or_error(
             driver,
@@ -99,7 +98,7 @@ def _run_selenium_batch(
     if not payloads:
         return []
 
-    from gestorcompras.gui.reasignacion_gui import login_telcos, process_task_servicios
+    from gestorcompras.services.telcos_automation import login_telcos, process_task_servicios
 
     driver = None
     resultados: List[Dict[str, Any]] = []

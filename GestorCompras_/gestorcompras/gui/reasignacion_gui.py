@@ -8,15 +8,11 @@ import imaplib
 import email
 import re
 import logging
-from typing import Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 SERVICIOS_HEADLESS_KEY = "SERVICIOS_HEADLESS"
-SERVICIOS_MENSAJE_KEY = "SERVICIOS_REASIGNACION_MSG"
-SERVICIOS_DEPARTAMENTO_KEY = "SERVICIOS_DEPARTAMENTO"
-SERVICIOS_USUARIO_KEY = "SERVICIOS_USUARIO"
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -27,6 +23,13 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+
+# Funciones Selenium puras centralizadas en la capa de servicios (sin dependencias GUI)
+from gestorcompras.services.telcos_automation import (
+    login_telcos,
+    wait_clickable_or_error,
+    process_task_servicios,
+)
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -54,23 +57,6 @@ def process_body(body):
         }
         tasks_data.append(task_info)
     return tasks_data
-
-
-def _normalize_template(template: str | None) -> str:
-    if template is None or not template.strip():
-        template = db.get_config(SERVICIOS_MENSAJE_KEY, 'Taller Asignado "{proveedor}"')
-    return template
-
-
-def _provider_from_details(task: dict[str, Any]) -> str:
-    detalles = task.get("details") or []
-    if isinstance(detalles, list):
-        for detalle in detalles:
-            if isinstance(detalle, dict):
-                proveedor = detalle.get("Proveedor") or detalle.get("supplier")
-                if proveedor:
-                    return str(proveedor)
-    return "N/D"
 
 
 class DateDialog(simpledialog.Dialog):
@@ -164,28 +150,6 @@ def cargar_tareas_correo(email_address, email_password, window):
                         logger.debug("Tasks after insert: %s", db.get_tasks_temp())
     mail.logout()
     messagebox.showinfo("Información", f"Se cargaron {loaded_count} tareas (sin duplicados).", parent=window)
-
-def login_telcos(driver, username, password):
-    driver.get('https://telcos.telconet.ec/inicio/?josso_back_to=http://telcos.telconet.ec/check&josso_partnerapp_host=telcos.telconet.ec')
-    user_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'josso_username')))
-    user_input.send_keys(username)
-    password_input = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.NAME, 'josso_password')))
-    password_input.send_keys(password)
-    password_input.send_keys(Keys.RETURN)
-    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, 'spanTareasPersonales')))
-
-
-def wait_clickable_or_error(driver, locator, parent, description, timeout=30, retries=3):
-    """Espera que un elemento sea clickeable reintentando varias veces."""
-    for intento in range(retries):
-        try:
-            return WebDriverWait(driver, timeout).until(
-                EC.element_to_be_clickable(locator)
-            )
-        except Exception as e:
-            if intento == retries - 1:
-                raise Exception(f"No se pudo encontrar {description}") from e
-            time.sleep(1)
 
 def process_task(driver, task, parent_window):
     task_number = task["task_number"]
@@ -315,145 +279,6 @@ def process_task(driver, task, parent_window):
     final_confirm_button.click()
     time.sleep(2)
 
-
-def process_task_servicios(driver, task, parent_window):
-    task_number = task["task_number"]
-    dept = str(task.get("reasignacion", "")).strip().upper()
-    assignments = db.get_assignment_config()
-    assignment_info = assignments.get(dept, {})
-
-    dept_name = (
-        task.get("department_override")
-        or task.get("department")
-        or assignment_info.get("department")
-        or db.get_config(SERVICIOS_DEPARTAMENTO_KEY, "")
-    )
-    empleado = (
-        task.get("employee_override")
-        or task.get("empleado")
-        or assignment_info.get("person")
-        or db.get_config(SERVICIOS_USUARIO_KEY, "SIN ASIGNAR")
-    )
-
-    if not dept_name or not empleado:
-        raise Exception(
-            "No existe configuración de departamento o usuario para la reasignación de la tarea "
-            f"{task_number}"
-        )
-
-    proveedor = task.get("proveedor") or _provider_from_details(task)
-    mecanico = task.get("mecanico", "")
-    telefono = task.get("telefono", "")
-    inf_vehiculo = task.get("inf_vehiculo", "")
-    template = _normalize_template(task.get("comentario_template"))
-    variables = {
-        "proveedor": proveedor or "N/D",
-        "mecanico": mecanico or "N/D",
-        "telefono": telefono or "N/D",
-        "inf_vehiculo": inf_vehiculo or "N/D",
-        "task_number": task_number,
-    }
-    try:
-        comentario = template.format(**variables).strip()
-    except Exception:
-        comentario = template.replace("{proveedor}", variables["proveedor"]).strip()
-
-    element = wait_clickable_or_error(driver, (By.ID, 'spanTareasPersonales'), parent_window, 'el menú de tareas')
-    driver.execute_script("arguments[0].click();", element)
-
-    search_input = wait_clickable_or_error(
-        driver,
-        (By.CSS_SELECTOR, 'input[type="search"].form-control.form-control-sm'),
-        parent_window,
-        'el campo de búsqueda'
-    )
-    search_input.clear()
-    search_input.send_keys(task_number)
-    search_input.send_keys(Keys.RETURN)
-
-    try:
-        time.sleep(0.5)
-        wait_clickable_or_error(
-            driver,
-            (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'),
-            parent_window,
-            'el botón para abrir la tarea'
-        ).click()
-    except Exception:
-        # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
-        raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
-
-    time.sleep(1)
-    comment_input = wait_clickable_or_error(
-        driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')
-    comment_input.send_keys(comentario)
-    time.sleep(1)
-    wait_clickable_or_error(
-        driver, (By.ID, 'btnGrabarEjecucionTarea'), parent_window, 'el botón Grabar Ejecución').click()
-    time.sleep(2)
-    wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación inicial').click()
-    time.sleep(2)
-
-    wait_clickable_or_error(
-        driver,
-        (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
-        parent_window,
-        'el botón de reasignar'
-    ).click()
-    time.sleep(2)
-    department_input = wait_clickable_or_error(
-        driver,
-        (By.ID, 'txtDepartment'),
-        parent_window,
-        'el campo Departamento'
-    )
-    department_input.clear()
-    department_input.send_keys(dept_name)
-    time.sleep(1)
-    #elemento para pruebas compras
-    #department_input.send_keys(Keys.UP, Keys.RETURN)
-    #////////////elementopara produccion bodega
-    department_input.send_keys(Keys.DOWN, Keys.RETURN)
-    time.sleep(2)
-    department_input.send_keys(Keys.TAB)
-    time.sleep(2)
-    employee_input = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable((By.NAME, 'txtEmpleado'))
-    )
-    employee_input.click()
-    employee_input.send_keys(empleado)
-    time.sleep(1)
-    employee_input.send_keys(Keys.DOWN, Keys.RETURN)
-    time.sleep(2)
-    employee_input.send_keys(Keys.TAB)
-    time.sleep(2)
-    observation_textarea = wait_clickable_or_error(
-        driver,
-        (By.ID, 'txtaObsTareaFinalReasigna'),
-        parent_window,
-        'el área de observación'
-    )
-    observation_textarea.send_keys('TALLER ASIGNADO')
-    try:
-        WebDriverWait(driver, 20).until(
-            EC.visibility_of_element_located((By.ID, "modalReasignarTarea"))
-        )
-    except Exception as e:
-        raise Exception("No se abrió la ventana de reasignación") from e
-    boton = wait_clickable_or_error(
-        driver,
-        (By.ID, "btnGrabarReasignaTarea"),
-        parent_window,
-        'el botón Guardar'
-    )
-    from selenium.webdriver.common.action_chains import ActionChains
-    ActionChains(driver).move_to_element(boton).perform()
-    boton.click()
-    final_confirm_button = WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable((By.ID, 'btnMensajeFinTarea'))
-    )
-    final_confirm_button.click()
-    time.sleep(2)
 
 def open_reasignacion(master, email_session):
     window = tk.Toplevel(master)

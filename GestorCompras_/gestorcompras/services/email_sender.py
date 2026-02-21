@@ -100,8 +100,8 @@ def send_email_custom(
         context["signature_image"] = image_to_data_uri(signature_path)
 
     content_html = render_email_string(html_template, context)
-    if context.get("signature_image"):
-        content_html += f'<br><img src="{context["signature_image"]}" alt="Firma" />'
+    # La firma ya se inyecta en el contexto para que la plantilla la use
+    # mediante {{ signature_image }}. No se agrega de nuevo aquí para evitar duplicados.
     content_text = re.sub(r"<[^>]+>", "", content_html)
 
     msg = EmailMessage()
