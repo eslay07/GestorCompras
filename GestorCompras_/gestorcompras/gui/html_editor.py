@@ -95,7 +95,7 @@ class HtmlEditor(ttk.Frame):
                 foreground="#000000",
             )
         else:
-            self._sig_label.config(text="(sin firma seleccionada)", foreground="#888888")
+            self._sig_label.config(text="(ninguna)", foreground="#888888")
 
     def _select_signature(self):
         path = filedialog.askopenfilename(
@@ -120,106 +120,97 @@ class HtmlEditor(ttk.Frame):
     # ── construcción de la interfaz ──────────────────────────────────────────
 
     def _create_widgets(self):
-        # ── Barra de herramientas principal ──
-        toolbar = ttk.Frame(self)
-        toolbar.pack(fill="x", padx=2, pady=(2, 0))
+        # ── Fila 1: Formato de texto ──
+        row1 = ttk.Frame(self)
+        row1.pack(fill="x", padx=2, pady=(2, 0))
 
-        # Deshacer / Rehacer
-        self._btn(toolbar, "↩ Deshacer", lambda: self.text.edit_undo(),
-                  "Deshacer la última acción  (Ctrl+Z)")
-        self._btn(toolbar, "↪ Rehacer", lambda: self.text.edit_redo(),
-                  "Rehacer la acción deshecha  (Ctrl+Y)")
-        self._sep(toolbar)
+        self._btn(row1, "↩ Deshacer", lambda: self.text.edit_undo(),
+                  "Deshacer (Ctrl+Z)")
+        self._btn(row1, "↪ Rehacer", lambda: self.text.edit_redo(),
+                  "Rehacer (Ctrl+Y)")
+        self._sep(row1)
 
-        # Formato básico
-        self._btn(toolbar, "Negrita", self._make_bold,
-                  "Aplicar o quitar Negrita al texto seleccionado  (Ctrl+B)")
-        self._btn(toolbar, "Cursiva", self._make_italic,
-                  "Aplicar o quitar Cursiva al texto seleccionado  (Ctrl+I)")
-        self._btn(toolbar, "Subrayado", self._make_underline,
-                  "Aplicar o quitar Subrayado al texto seleccionado  (Ctrl+U)")
-        self._btn(toolbar, "Tachado", self._make_strike,
-                  "Aplicar o quitar Tachado al texto seleccionado")
-        self._sep(toolbar)
+        self._btn(row1, "Negrita", self._make_bold,
+                  "Negrita (Ctrl+B)")
+        self._btn(row1, "Cursiva", self._make_italic,
+                  "Cursiva (Ctrl+I)")
+        self._btn(row1, "Subrayado", self._make_underline,
+                  "Subrayado (Ctrl+U)")
+        self._btn(row1, "Tachado", self._make_strike,
+                  "Tachado")
+        self._sep(row1)
 
-        # Colores
-        self._btn(toolbar, "🎨 Color texto", self._apply_color,
-                  "Cambiar el color del texto seleccionado")
-        self._btn(toolbar, "🖍 Resaltado", self._apply_bgcolor,
-                  "Cambiar el color de fondo (resaltado) del texto seleccionado")
-        self._sep(toolbar)
+        self._btn(row1, "🎨 Color", self._apply_color,
+                  "Cambiar color del texto")
+        self._btn(row1, "🖍 Resaltado", self._apply_bgcolor,
+                  "Cambiar color de fondo")
+        self._sep(row1)
 
         # Tipografía
         self.font_var = tk.StringVar(value="Calibri")
         fonts = sorted(set(tkfont.families()))
         font_box = ttk.Combobox(
-            toolbar, textvariable=self.font_var, values=fonts, width=12, state="readonly"
+            row1, textvariable=self.font_var, values=fonts, width=12, state="readonly"
         )
         font_box.pack(side="left", padx=2)
         font_box.bind("<<ComboboxSelected>>", lambda e: self._apply_font())
-        _Tooltip(font_box, "Tipografía — seleccionar texto y elegir fuente")
+        _Tooltip(font_box, "Tipografía")
 
-        # Tamaño
         self.size_var = tk.StringVar(value="11")
         sizes = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24"]
         size_box = ttk.Combobox(
-            toolbar, textvariable=self.size_var, values=sizes, width=4, state="readonly"
+            row1, textvariable=self.size_var, values=sizes, width=4, state="readonly"
         )
         size_box.pack(side="left", padx=2)
         size_box.bind("<<ComboboxSelected>>", lambda e: self._apply_size())
-        _Tooltip(size_box, "Tamaño de fuente en puntos")
-        self._sep(toolbar)
+        _Tooltip(size_box, "Tamaño (pt)")
 
-        # Lista / Sangría
-        self._btn(toolbar, "• Lista", self._insert_bullet,
-                  "Insertar viñeta al inicio de la línea actual")
-        self._btn(toolbar, "→ Sangría", self._indent_line,
-                  "Aumentar sangría de la línea actual (añade 4 espacios)")
-        self._btn(toolbar, "← Reducir", self._dedent_line,
-                  "Reducir sangría de la línea actual (quita 4 espacios)")
-        self._sep(toolbar)
+        # ── Fila 2: Párrafo, alineación, firma ──
+        row2 = ttk.Frame(self)
+        row2.pack(fill="x", padx=2, pady=(1, 0))
 
-        # Alineación
-        self._btn(toolbar, "◀ Izquierda", lambda: self._set_align("left"),
-                  "Alinear el texto a la izquierda")
-        self._btn(toolbar, "≡ Centro", lambda: self._set_align("center"),
-                  "Centrar el texto")
-        self._btn(toolbar, "▶ Derecha", lambda: self._set_align("right"),
-                  "Alinear el texto a la derecha")
-        self._sep(toolbar)
+        self._btn(row2, "• Lista", self._insert_bullet,
+                  "Insertar viñeta")
+        self._btn(row2, "→ Sangría", self._indent_line,
+                  "Aumentar sangría")
+        self._btn(row2, "← Reducir", self._dedent_line,
+                  "Reducir sangría")
+        self._sep(row2)
 
-        # Limpiar
-        self._btn(toolbar, "🗑 Limpiar todo", self._clear_all,
-                  "Borrar completamente el contenido del editor")
+        self._btn(row2, "◀ Izq", lambda: self._set_align("left"),
+                  "Alinear a la izquierda")
+        self._btn(row2, "≡ Centro", lambda: self._set_align("center"),
+                  "Centrar texto")
+        self._btn(row2, "▶ Der", lambda: self._set_align("right"),
+                  "Alinear a la derecha")
+        self._sep(row2)
 
-        # ── Barra de firma ──
-        sig_bar = ttk.Frame(self)
-        sig_bar.pack(fill="x", padx=2, pady=(2, 2))
+        self._btn(row2, "🗑 Limpiar", self._clear_all,
+                  "Borrar todo el contenido")
+        self._sep(row2)
 
-        ttk.Label(sig_bar, text="Firma del correo:").pack(side="left", padx=(2, 6))
+        # Firma integrada en la fila 2
+        ttk.Label(row2, text="Firma:").pack(side="left", padx=(4, 2))
         self._sig_label = ttk.Label(
-            sig_bar,
-            text="(sin firma seleccionada)",
-            foreground="#888888",
-            anchor="w",
-            width=35,
+            row2, text="(ninguna)", foreground="#888888", anchor="w",
         )
         self._sig_label.pack(side="left", padx=2)
-        _Tooltip(self._sig_label, "Imagen que se incluirá como firma al enviar el correo")
-        self._btn(
-            sig_bar, "📂 Seleccionar imagen de firma", self._select_signature,
-            "Elegir un archivo de imagen (PNG, JPG) para la firma del correo"
-        )
-        self._btn(
-            sig_bar, "✖ Quitar firma", self._remove_signature,
-            "Eliminar la imagen de firma seleccionada"
-        )
+        _Tooltip(self._sig_label, "Imagen de firma que se adjuntará al correo")
+        self._btn(row2, "📂 Seleccionar", self._select_signature,
+                  "Elegir imagen de firma (PNG, JPG)")
+        self._btn(row2, "✖ Quitar", self._remove_signature,
+                  "Eliminar la firma seleccionada")
 
-        # ── Área de texto ──
+        # ── Área de texto (fondo claro para buena legibilidad) ──
         text_frame = ttk.Frame(self)
-        text_frame.pack(fill="both", expand=True)
+        text_frame.pack(fill="both", expand=True, pady=(2, 0))
 
-        self.text = tk.Text(text_frame, wrap="word", undo=True, maxundo=-1)
+        self.text = tk.Text(
+            text_frame, wrap="word", undo=True, maxundo=-1,
+            background="#ffffff", foreground="#000000",
+            insertbackground="#000000",
+            selectbackground="#3399ff", selectforeground="#ffffff",
+        )
         vbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.text.yview)
         self.text.configure(yscrollcommand=vbar.set)
         self.text.pack(side="left", fill="both", expand=True)

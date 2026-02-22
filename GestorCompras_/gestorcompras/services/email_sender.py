@@ -99,13 +99,22 @@ def send_email_custom(
     cc_key="EMAIL_CC_DESPACHO",
 ):
     """Envía un correo usando una plantilla HTML personalizada."""
+    data_uri = ""
     if signature_path:
         context = dict(context)
-        context["signature_image"] = image_to_data_uri(signature_path)
+        data_uri = image_to_data_uri(signature_path)
+        context["signature_image"] = data_uri
 
     content_html = render_email_string(html_template, context)
-    # La firma ya se inyecta en el contexto para que la plantilla la use
-    # mediante {{ signature_image }}. No se agrega de nuevo aquí para evitar duplicados.
+
+    # Si la plantilla no contenía {{ signature_image }} la imagen no fue
+    # renderizada por Jinja2.  En ese caso la agregamos al final del HTML
+    # para que siempre aparezca como pie de correo.
+    if data_uri and data_uri not in content_html:
+        content_html += (
+            f'<br><img src="{data_uri}" '
+            f'style="max-width:600px" alt="Firma">'
+        )
     content_text = re.sub(r"<[^>]+>", "", content_html)
 
     msg = EmailMessage()
