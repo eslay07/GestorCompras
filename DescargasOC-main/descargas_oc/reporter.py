@@ -146,6 +146,15 @@ def _tabla_html(
     )
 
 
+def _extraer_no_aprobadas(errores: list[str]) -> list[str]:
+    """Extrae los números de OC marcadas como no autorizadas del listado de errores."""
+    return [
+        e.split(":", 1)[1]
+        for e in errores
+        if e.startswith("OC_NO_APROBADA:")
+    ]
+
+
 def enviar_reporte(
     exitosas,
     faltantes,
@@ -153,8 +162,10 @@ def enviar_reporte(
     cfg: Config,
     categoria: str | None = None,
     destinatario: str | None = None,
+    errores: list[str] | None = None,
 ) -> bool:
-    if not exitosas and not faltantes:
+    no_aprobadas = _extraer_no_aprobadas(errores or [])
+    if not exitosas and not faltantes and not no_aprobadas:
         return False
     if not ordenes:
         try:
@@ -260,6 +271,22 @@ def enviar_reporte(
                 filas_bad.append((num, tarea, prov, ruta))
         texto += _formatear_tabla(filas_bad, tabla_headers) + '\n'
         html += '<h3>No se ubicaron archivos locales para las siguientes OC:</h3>' + _tabla_html(filas_bad, tabla_headers)
+
+    if no_aprobadas:
+        no_aprobadas_uniq = list(dict.fromkeys(no_aprobadas))
+        texto += '\nÓrdenes de compra NO APROBADAS (descarga no permitida):\n'
+        filas_na: list[tuple[str, ...]] = []
+        headers_na = ("Orden", "Proveedor")
+        for num in no_aprobadas_uniq:
+            data = info.get(num, {})
+            prov = data.get('proveedor') or '-'
+            filas_na.append((num, prov))
+        texto += _formatear_tabla(filas_na, headers_na) + '\n'
+        html += (
+            '<h3 style="color:#c0392b;">⚠ Órdenes de compra NO APROBADAS (descarga no permitida):</h3>'
+            + _tabla_html(filas_na, headers_na)
+        )
+
     mensaje.set_content(texto)
     mensaje.add_alternative(html, subtype='html')
     candidatos: list[str] = []

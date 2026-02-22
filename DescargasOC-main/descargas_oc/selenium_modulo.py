@@ -328,6 +328,7 @@ def descargar_oc(
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
             exito = False
+            no_aprobada = False
             ultimo_error: Exception | None = None
             for intento in range(4):
                 try:
@@ -345,6 +346,41 @@ def descargar_oc(
                         boton_descarga.click()
                     except ElementClickInterceptedException:
                         driver.execute_script("arguments[0].click();", boton_descarga)
+
+                    # Esperar brevemente para que el portal muestre el toast
+                    # y/o inicie la descarga del archivo.
+                    time.sleep(3)
+
+                    # Verificar si el navegador ya comenzó a descargar un
+                    # archivo (PDF nuevo o .crdownload).  Si hay evidencia de
+                    # descarga la OC está aprobada y debemos esperar el PDF;
+                    # solo verificamos el toast cuando NO se inició ninguna
+                    # descarga.
+                    descarga_iniciada = False
+                    for _pdf in download_dir.glob("*.pdf"):
+                        _ant = existentes.get(_pdf)
+                        try:
+                            if _ant is None or _pdf.stat().st_mtime > _ant:
+                                descarga_iniciada = True
+                                break
+                        except FileNotFoundError:
+                            continue
+                    if not descarga_iniciada:
+                        for _crd in download_dir.glob("*.crdownload"):
+                            descarga_iniciada = True
+                            break
+
+                    if not descarga_iniciada:
+                        toasts_actuales = _leer_toasts()
+                        if any(
+                            "no est" in t.lower() and "permitida" in t.lower()
+                            for t in toasts_actuales
+                        ):
+                            # OC no autorizada — no reintentar
+                            no_aprobada = True
+                            oc["no_aprobada"] = True
+                            errores.append(f"OC_NO_APROBADA:{numero}")
+                            break
 
                     archivo = esperar_descarga_pdf(download_dir, existentes)
                     if not getattr(cfg, "compra_bienes", False):
@@ -381,7 +417,7 @@ def descargar_oc(
                     ultimo_error = exc
                     time.sleep(2)
                     continue
-            if not exito and ultimo_error:
+            if not exito and not no_aprobada and ultimo_error:
                 errores.append(f"OC {numero}: {ultimo_error}")
     finally:
         driver.quit()

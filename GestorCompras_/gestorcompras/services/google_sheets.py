@@ -18,7 +18,8 @@ def get_client(creds_path: str) -> gspread.Client:
     if not os.path.isfile(creds_path):
         raise FileNotFoundError(f"Credenciales no encontradas: {creds_path}")
     creds = Credentials.from_service_account_file(creds_path, scopes=SCOPE)
-    return gspread.authorize(creds)
+    # gspread.authorize() está deprecado desde gspread 6.x; se usa Client directamente
+    return gspread.Client(auth=creds)
 
 
 def read_report(creds_path: str, spreadsheet_id: str, sheet_name: str) -> List[Dict[str, str]]:

@@ -3,7 +3,7 @@ import re
 import pdfplumber
 from gestorcompras.services.db import (
     get_config,
-    get_suppliers,
+    get_supplier_by_ruc,
     get_email_template_by_name,
 )
 from gestorcompras.services.email_sender import send_email_custom
@@ -33,10 +33,8 @@ def buscar_archivo_mas_reciente(orden):
 
 def extraer_info_de_pdf(pdf_path):
     """
-    Extrae el RUC y la tarea del contenido del PDF.
-    Se corrige la decodificación utilizando 'latin1' y luego se decodifica a 'utf-8' con reemplazo de errores.
+    Extrae el RUC y la tarea del contenido del PDF usando pdfplumber.
     """
-    import re, pdfplumber
     ruc_pattern = re.compile(r"\b(\d{13})\b")
     tarea_pattern = re.compile(r"Tarea\s+(\d+)", re.IGNORECASE)
     ruc = None
@@ -47,12 +45,6 @@ def extraer_info_de_pdf(pdf_path):
                 text = page.extract_text()
                 if not text:
                     continue
-                # Se intenta reencodear en caso de problemas
-                try:
-                    # Convertimos el texto a bytes usando latin1 y luego lo decodificamos a utf-8
-                    text = text.encode('latin1', errors='replace').decode('utf-8', errors='replace')
-                except Exception:
-                    pass
                 if not ruc:
                     match_ruc = ruc_pattern.search(text)
                     if match_ruc:
@@ -73,13 +65,13 @@ def obtener_resumen_orden(orden):
     if not pdf_path:
         return None, f"No se encontró archivo para la OC {orden}."
     ruc, tarea = extraer_info_de_pdf(pdf_path)
-    suppliers = {
-        ruc_db: (email, email_alt)
-        for (_id, name, ruc_db, email, email_alt) in get_suppliers()
-    }
-    if not (ruc and ruc in suppliers):
+    if not ruc:
+        return None, f"No se pudo extraer el RUC del PDF (OC: {orden})."
+    supplier = get_supplier_by_ruc(ruc)
+    if not supplier:
         return None, f"No se encontró correo para el RUC {ruc} (OC: {orden})."
-    emails = list(filter(None, suppliers[ruc]))
+    email, email_alt = supplier
+    emails = list(filter(None, [email, email_alt]))
     return {
         "orden": orden,
         "tarea": tarea,
@@ -108,18 +100,18 @@ def process_order(email_session, orden, include_pdf=True, template_name=None, cc
         "folder_name": folder_name,
         "email_to": email_to,
     }
-    
+
     # Seleccionar formato de correo según la configuración
     formato = template_name or get_config("EMAIL_TEMPLATE", "FORMATO")
     template_db = get_email_template_by_name(formato)
     if not template_db or not template_db[2].strip():
         return f"⚠ Formato de correo '{formato}' no encontrado."
     _, _name, html_content, signature_path = template_db
-    
+
     # Construimos el asunto con carpeta y tarea
     subject = f"DESPACHO DE OC {orden}" + (f" TAREA {tarea}" if tarea else "") + f" - {folder_name}"
-    subject = subject.upper()  # Forzamos mayúsculas
-    
+    subject = subject.upper()
+
     try:
         send_email_custom(
             email_session,
@@ -187,4 +179,3 @@ def process_orders_grouped(email_session, orders, include_pdf=True, template_nam
                 f"❌ Error al enviar el correo para OCs {', '.join(ordenes)}: {str(e)}"
             )
     return results
-

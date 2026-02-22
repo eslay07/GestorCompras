@@ -43,9 +43,10 @@ def send_email(email_session, subject, template_text, template_html, context, at
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address(cc_key)
-    if cc:
-        msg["Cc"] = cc
+    if cc_key:
+        cc = get_cc_address(cc_key)
+        if cc:
+            msg["Cc"] = cc
     # Renderizamos el contenido
     content_text = render_email(template_text, context)
     content_html = render_email(template_html, context)
@@ -82,6 +83,9 @@ def image_to_data_uri(path):
     with open(path, "rb") as f:
         data = base64.b64encode(f.read()).decode("utf-8")
     ext = os.path.splitext(path)[1].lower().strip(".") or "png"
+    # Los navegadores requieren "image/jpeg", no "image/jpg"
+    if ext == "jpg":
+        ext = "jpeg"
     return f"data:image/{ext};base64,{data}"
 
 def send_email_custom(
@@ -95,22 +99,32 @@ def send_email_custom(
     cc_key="EMAIL_CC_DESPACHO",
 ):
     """Envía un correo usando una plantilla HTML personalizada."""
+    data_uri = ""
     if signature_path:
         context = dict(context)
-        context["signature_image"] = image_to_data_uri(signature_path)
+        data_uri = image_to_data_uri(signature_path)
+        context["signature_image"] = data_uri
 
     content_html = render_email_string(html_template, context)
-    if context.get("signature_image"):
-        content_html += f'<br><img src="{context["signature_image"]}" alt="Firma" />'
+
+    # Si la plantilla no contenía {{ signature_image }} la imagen no fue
+    # renderizada por Jinja2.  En ese caso la agregamos al final del HTML
+    # para que siempre aparezca como pie de correo.
+    if data_uri and data_uri not in content_html:
+        content_html += (
+            f'<br><img src="{data_uri}" '
+            f'style="max-width:600px" alt="Firma">'
+        )
     content_text = re.sub(r"<[^>]+>", "", content_html)
 
     msg = EmailMessage()
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address(cc_key)
-    if cc:
-        msg["Cc"] = cc
+    if cc_key:
+        cc = get_cc_address(cc_key)
+        if cc:
+            msg["Cc"] = cc
 
     msg.set_content(content_text)
     msg.add_alternative(content_html, subtype="html")

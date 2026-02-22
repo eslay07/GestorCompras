@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import smtplib
+import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -138,6 +139,8 @@ class LoginScreen(tk.Frame):
         self._banner_index = 0
         self._banner_colors = [color_primario, color_acento]
         self._color_index = 0
+        self._animating = True
+        self._after_id = None
         self.create_widgets()
         self.animate_banner()
 
@@ -166,19 +169,39 @@ class LoginScreen(tk.Frame):
         self.pass_entry.config(font=fuente_entry)
         self.pass_entry.bind("<Return>", lambda event: self.attempt_login())
 
-        btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
-        btn_login.grid(row=5, column=0, pady=15)
-        add_hover_effect(btn_login)
+        self.btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
+        self.btn_login.grid(row=5, column=0, pady=15)
+        add_hover_effect(self.btn_login)
+
+        self.lbl_status = ttk.Label(login_frame, text="", style="MyLabel.TLabel")
+        self.lbl_status.grid(row=6, column=0, pady=(0, 5))
 
     def animate_banner(self) -> None:
+        if not self._animating:
+            return
         text = self._banner_text[: self._banner_index]
         color = self._banner_colors[self._color_index]
-        self.banner.config(text=text, foreground=color)
+        try:
+            self.banner.config(text=text, foreground=color)
+        except tk.TclError:
+            # El widget fue destruido; detener la animación
+            self._animating = False
+            return
         self._banner_index += 1
         if self._banner_index > len(self._banner_text):
             self._banner_index = 0
             self._color_index = (self._color_index + 1) % len(self._banner_colors)
-        self.after(150, self.animate_banner)
+        self._after_id = self.after(150, self.animate_banner)
+
+    def _stop_animation(self) -> None:
+        """Detiene la animación del banner de forma segura."""
+        self._animating = False
+        if self._after_id is not None:
+            try:
+                self.after_cancel(self._after_id)
+            except Exception:
+                pass
+            self._after_id = None
 
     def attempt_login(self) -> None:
         username = self.user_entry.get().strip()
@@ -187,10 +210,35 @@ class LoginScreen(tk.Frame):
             messagebox.showerror("Error", "Debe ingresar usuario y contraseña.", parent=self)
             return
         email_address = f"{username}@telconet.ec"
-        if test_email_connection(email_address, password):
+
+        # Deshabilitar controles mientras se conecta para evitar dobles clics
+        self.btn_login.config(state="disabled")
+        self.user_entry.config(state="disabled")
+        self.pass_entry.config(state="disabled")
+        self.lbl_status.config(text="Conectando...")
+
+        def _do_login():
+            success = test_email_connection(email_address, password)
+            # Volver al hilo principal para actualizar la UI
+            self.after(0, lambda: self._on_login_result(success, email_address, password))
+
+        threading.Thread(target=_do_login, daemon=True).start()
+
+    def _on_login_result(self, success: bool, email_address: str, password: str) -> None:
+        """Maneja el resultado del login en el hilo principal de Tkinter."""
+        try:
+            self.btn_login.config(state="normal")
+            self.user_entry.config(state="normal")
+            self.pass_entry.config(state="normal")
+            self.lbl_status.config(text="")
+        except tk.TclError:
+            return
+
+        if success:
             email_session["address"] = email_address
             email_session["password"] = password
             core_config.set_user_email(email_address)
+            self._stop_animation()
             messagebox.showinfo("Éxito", "Inicio de sesión correcto.", parent=self)
             self.on_success()
         else:
@@ -198,7 +246,7 @@ class LoginScreen(tk.Frame):
 
 
 def main() -> None:
-    db.init_db()
+    # db.init_db() ya se ejecuta automáticamente al importar el módulo db
     root = tk.Tk()
     root.title("Sistema de Automatización")
     root.geometry("800x600")

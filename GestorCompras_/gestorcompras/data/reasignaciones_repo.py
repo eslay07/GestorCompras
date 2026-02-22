@@ -36,41 +36,49 @@ def upsert(record: Dict[str, Any]) -> Dict[str, Any]:
 
     normalized = _normalize_record(record)
     conn = db.get_connection()
-    cur = conn.cursor()
+    try:
+        cur = conn.cursor()
 
-    existing = None
-    if normalized.get("message_id"):
-        cur.execute(
-            f"SELECT id FROM {_TABLE} WHERE message_id=?",
-            (normalized["message_id"],),
-        )
-        existing = cur.fetchone()
-    if existing is None and normalized.get("raw_hash"):
-        cur.execute(
-            f"SELECT id FROM {_TABLE} WHERE raw_hash=?",
-            (normalized["raw_hash"],),
-        )
-        existing = cur.fetchone()
+        existing_id = None
+        if normalized.get("message_id"):
+            cur.execute(
+                f"SELECT id FROM {_TABLE} WHERE message_id=?",
+                (normalized["message_id"],),
+            )
+            row = cur.fetchone()
+            if row:
+                existing_id = row[0]
+        if existing_id is None and normalized.get("raw_hash"):
+            cur.execute(
+                f"SELECT id FROM {_TABLE} WHERE raw_hash=?",
+                (normalized["raw_hash"],),
+            )
+            row = cur.fetchone()
+            if row:
+                existing_id = row[0]
 
-    if existing:
-        set_clause = ", ".join(f"{col}=?" for col in _COLUMNS if col != "message_id")
-        values = [normalized[col] for col in _COLUMNS if col != "message_id"]
-        values.append(normalized.get("message_id"))
-        cur.execute(
-            f"UPDATE {_TABLE} SET {set_clause} WHERE message_id=?",
-            values,
-        )
-        record_id = existing[0]
-    else:
-        placeholders = ",".join("?" for _ in _COLUMNS)
-        cur.execute(
-            f"INSERT OR IGNORE INTO {_TABLE} ({', '.join(_COLUMNS)}) VALUES ({placeholders})",
-            [normalized[col] for col in _COLUMNS],
-        )
-        record_id = cur.lastrowid
+        if existing_id is not None:
+            # UPDATE por id (siempre válido, independientemente de cómo se encontró el registro)
+            set_clause = ", ".join(f"{col}=?" for col in _COLUMNS)
+            values = [normalized[col] for col in _COLUMNS]
+            values.append(existing_id)
+            cur.execute(
+                f"UPDATE {_TABLE} SET {set_clause} WHERE id=?",
+                values,
+            )
+            record_id = existing_id
+        else:
+            placeholders = ",".join("?" for _ in _COLUMNS)
+            cur.execute(
+                f"INSERT OR IGNORE INTO {_TABLE} ({', '.join(_COLUMNS)}) VALUES ({placeholders})",
+                [normalized[col] for col in _COLUMNS],
+            )
+            record_id = cur.lastrowid
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
+
     record_copy = dict(record)
     record_copy["id"] = record_id
     return record_copy
