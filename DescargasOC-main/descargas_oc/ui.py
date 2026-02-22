@@ -125,15 +125,36 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 registrar_procesados(uidls_sin_duplicados, ultimo_guardar)
         else:
             append("No se encontraron nuevas órdenes\n")
-        enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg)
+        enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg, errores=errores)
         if ordenes:
-            if errores:
-                summary = "Errores durante la descarga:\n" + "\n".join(errores)
-            elif enviado:
-                summary = "ORDENES DE COMPRA DESCARGADAS Y REPORTE ENVIADO"
-            else:
-                summary = "No se pudo enviar el reporte"
-            text_widget.after(0, lambda: messagebox.showinfo("Resultado", summary))
+            no_aprobadas = [
+                e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")
+            ]
+            otros_errores = [e for e in errores if not e.startswith("OC_NO_APROBADA:")]
+            partes_summary: list[str] = []
+            if exitosas:
+                partes_summary.append(
+                    f"✔ Descargadas correctamente ({len(exitosas)}): "
+                    + ", ".join(str(n) for n in exitosas)
+                )
+            if faltantes:
+                partes_summary.append(
+                    f"❌ No encontradas ({len(faltantes)}): "
+                    + ", ".join(str(n) for n in faltantes)
+                )
+            if no_aprobadas:
+                partes_summary.append(
+                    f"⚠ OC no aprobadas — descarga no permitida ({len(no_aprobadas)}): "
+                    + ", ".join(no_aprobadas)
+                )
+            if otros_errores:
+                partes_summary.append("Errores adicionales:\n" + "\n".join(otros_errores))
+            if not partes_summary:
+                partes_summary.append("No se encontraron nuevas órdenes")
+            if enviado:
+                partes_summary.append("📧 Reporte enviado por correo.")
+            summary = "\n\n".join(partes_summary)
+            text_widget.after(0, lambda s=summary: messagebox.showinfo("Resultado", s))
         append("Proceso finalizado\n")
         lbl_last.config(
             text="Último UIDL: {} - {}".format(
@@ -260,12 +281,22 @@ def main():
                     append(f"✔️ OC {num} procesada\n")
                 for num in no_encontrados:
                     append(f"❌ OC {num} faltante\n")
-                enviar_reporte(subidos, no_encontrados, ordenes, cfg)
-                if errores:
-                    summary = "Errores durante la descarga:\n" + "\n".join(errores)
-                else:
-                    summary = "Proceso finalizado"
-                text.after(0, lambda: messagebox.showinfo("Resultado", summary))
+                enviar_reporte(subidos, no_encontrados, ordenes, cfg, errores=errores)
+                no_aprobadas = [
+                    e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")
+                ]
+                otros_errores = [e for e in errores if not e.startswith("OC_NO_APROBADA:")]
+                partes: list[str] = []
+                if subidos:
+                    partes.append(f"✔ Descargadas ({len(subidos)}): " + ", ".join(str(n) for n in subidos))
+                if no_encontrados:
+                    partes.append(f"❌ No encontradas ({len(no_encontrados)}): " + ", ".join(str(n) for n in no_encontrados))
+                if no_aprobadas:
+                    partes.append(f"⚠ OC no aprobadas ({len(no_aprobadas)}): " + ", ".join(no_aprobadas))
+                if otros_errores:
+                    partes.append("Errores adicionales:\n" + "\n".join(otros_errores))
+                summary = "\n\n".join(partes) if partes else "Proceso finalizado"
+                text.after(0, lambda s=summary: messagebox.showinfo("Resultado", s))
             finally:
                 scanning_lock.release()
                 text.after(0, lambda: btn_ejecutar.config(state=tk.DISABLED))

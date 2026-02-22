@@ -1,16 +1,54 @@
+import os
 import tkinter as tk
-from tkinter import ttk, colorchooser
+from tkinter import ttk, colorchooser, filedialog
 from tkinter import font as tkfont
 from html import escape
 
+
+class _Tooltip:
+    """Tooltip simple que aparece al pasar el cursor sobre un widget."""
+
+    def __init__(self, widget: tk.Widget, text: str):
+        self._widget = widget
+        self._text = text
+        self._tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, event=None):
+        if self._tip:
+            return
+        x = self._widget.winfo_rootx() + 20
+        y = self._widget.winfo_rooty() + self._widget.winfo_height() + 4
+        self._tip = tk.Toplevel(self._widget)
+        self._tip.wm_overrideredirect(True)
+        self._tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            self._tip,
+            text=self._text,
+            background="#ffffe0",
+            relief="solid",
+            borderwidth=1,
+            font=("TkDefaultFont", 9),
+            padx=4,
+            pady=2,
+        ).pack()
+
+    def _hide(self, event=None):
+        if self._tip:
+            self._tip.destroy()
+            self._tip = None
+
+
 class HtmlEditor(ttk.Frame):
-    """Simple rich text editor that exports/imports basic HTML."""
+    """Editor de texto enriquecido con barra descriptiva y selector de firma integrado."""
+
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
+        self._signature_path = ""
         self._create_widgets()
         self._setup_tags()
-        # Track active styles to apply to newly typed text
-        self.active_tags = set()
+        self.active_tags: set = set()
         self.default_font = self.font_var.get()
         self.default_size = self.size_var.get()
         self.current_font = self.default_font
@@ -23,51 +61,161 @@ class HtmlEditor(ttk.Frame):
         self.text.bind("<FocusIn>", self._update_current_styles)
         for seq in ("<<Paste>>", "<Control-v>", "<Command-v>"):
             self.text.bind(seq, self._handle_paste)
+        self.text.bind("<Control-b>", lambda e: self._make_bold() or "break")
+        self.text.bind("<Control-i>", lambda e: self._make_italic() or "break")
+        self.text.bind("<Control-u>", lambda e: self._make_underline() or "break")
         self._update_current_styles()
 
+    # ── pequeñas utilidades ───────────────────────────────────────────────────
+
+    def _btn(self, parent, text: str, command, tooltip: str, **kw) -> ttk.Button:
+        btn = ttk.Button(parent, text=text, command=command, **kw)
+        btn.pack(side="left", padx=1, pady=1)
+        _Tooltip(btn, tooltip)
+        return btn
+
+    def _sep(self, parent):
+        ttk.Separator(parent, orient="vertical").pack(side="left", fill="y", padx=3, pady=2)
+
+    def _set_status(self, msg: str):
+        self._status_var.set(msg)
+
+    # ── gestión de firma ─────────────────────────────────────────────────────
+
+    def get_signature_path(self) -> str:
+        """Retorna la ruta de la imagen de firma configurada."""
+        return self._signature_path
+
+    def set_signature_path(self, path: str):
+        """Establece la ruta de la imagen de firma y actualiza la etiqueta."""
+        self._signature_path = path or ""
+        if self._signature_path:
+            self._sig_label.config(
+                text=os.path.basename(self._signature_path),
+                foreground="#000000",
+            )
+        else:
+            self._sig_label.config(text="(sin firma seleccionada)", foreground="#888888")
+
+    def _select_signature(self):
+        path = filedialog.askopenfilename(
+            title="Seleccionar imagen de firma",
+            filetypes=[
+                ("Imágenes", "*.png *.jpg *.jpeg *.gif *.bmp"),
+                ("Todos los archivos", "*.*"),
+            ],
+        )
+        if path:
+            self.set_signature_path(path)
+            self._set_status(f"Firma seleccionada: {os.path.basename(path)}")
+
+    def _remove_signature(self):
+        self.set_signature_path("")
+        self._set_status("Imagen de firma eliminada")
+
+    def _clear_all(self):
+        self.text.delete("1.0", "end")
+        self._set_status("Contenido del editor borrado")
+
+    # ── construcción de la interfaz ──────────────────────────────────────────
+
     def _create_widgets(self):
+        # ── Barra de herramientas principal ──
         toolbar = ttk.Frame(self)
-        toolbar.pack(fill="x")
+        toolbar.pack(fill="x", padx=2, pady=(2, 0))
 
-        ttk.Button(toolbar, text="B", width=2, command=self._make_bold).pack(side="left")
-        ttk.Button(toolbar, text="I", width=2, command=self._make_italic).pack(side="left")
-        ttk.Button(toolbar, text="U", width=2, command=self._make_underline).pack(side="left")
-        ttk.Button(toolbar, text="S", width=2, command=self._make_strike).pack(side="left")
-        ttk.Button(toolbar, text="\u25A3", width=2, command=self._apply_bgcolor).pack(side="left")
-        ttk.Button(toolbar, text="A", width=2, command=self._apply_color).pack(side="left", padx=2)
-        ttk.Button(toolbar, text="\u2022", width=2, command=self._insert_bullet).pack(side="left", padx=2)
-        ttk.Button(toolbar, text="\u21E5", width=2, command=self._indent_line).pack(side="left")
-        ttk.Button(toolbar, text="\u21E4", width=2, command=self._dedent_line).pack(side="left")
-        ttk.Button(toolbar, text="L", width=2, command=lambda: self._set_align("left")).pack(side="left", padx=(5,0))
-        ttk.Button(toolbar, text="C", width=2, command=lambda: self._set_align("center")).pack(side="left")
-        ttk.Button(toolbar, text="R", width=2, command=lambda: self._set_align("right")).pack(side="left")
+        # Deshacer / Rehacer
+        self._btn(toolbar, "↩ Deshacer", lambda: self.text.edit_undo(),
+                  "Deshacer la última acción  (Ctrl+Z)")
+        self._btn(toolbar, "↪ Rehacer", lambda: self.text.edit_redo(),
+                  "Rehacer la acción deshecha  (Ctrl+Y)")
+        self._sep(toolbar)
 
+        # Formato básico
+        self._btn(toolbar, "Negrita", self._make_bold,
+                  "Aplicar o quitar Negrita al texto seleccionado  (Ctrl+B)")
+        self._btn(toolbar, "Cursiva", self._make_italic,
+                  "Aplicar o quitar Cursiva al texto seleccionado  (Ctrl+I)")
+        self._btn(toolbar, "Subrayado", self._make_underline,
+                  "Aplicar o quitar Subrayado al texto seleccionado  (Ctrl+U)")
+        self._btn(toolbar, "Tachado", self._make_strike,
+                  "Aplicar o quitar Tachado al texto seleccionado")
+        self._sep(toolbar)
+
+        # Colores
+        self._btn(toolbar, "🎨 Color texto", self._apply_color,
+                  "Cambiar el color del texto seleccionado")
+        self._btn(toolbar, "🖍 Resaltado", self._apply_bgcolor,
+                  "Cambiar el color de fondo (resaltado) del texto seleccionado")
+        self._sep(toolbar)
+
+        # Tipografía
         self.font_var = tk.StringVar(value="Calibri")
         fonts = sorted(set(tkfont.families()))
         font_box = ttk.Combobox(
-            toolbar,
-            textvariable=self.font_var,
-            values=fonts,
-            width=10,
-            state="readonly",
+            toolbar, textvariable=self.font_var, values=fonts, width=12, state="readonly"
         )
-        font_box.pack(side="left", padx=5)
+        font_box.pack(side="left", padx=2)
         font_box.bind("<<ComboboxSelected>>", lambda e: self._apply_font())
-        ttk.Button(toolbar, text="Font", command=self._apply_font).pack(side="left")
+        _Tooltip(font_box, "Tipografía — seleccionar texto y elegir fuente")
 
+        # Tamaño
         self.size_var = tk.StringVar(value="11")
         sizes = ["8", "9", "10", "11", "12", "14", "16", "18", "20", "24"]
         size_box = ttk.Combobox(
-            toolbar,
-            textvariable=self.size_var,
-            values=sizes,
-            width=3,
-            state="readonly",
+            toolbar, textvariable=self.size_var, values=sizes, width=4, state="readonly"
         )
-        size_box.pack(side="left", padx=5)
+        size_box.pack(side="left", padx=2)
         size_box.bind("<<ComboboxSelected>>", lambda e: self._apply_size())
-        ttk.Button(toolbar, text="Size", command=self._apply_size).pack(side="left")
+        _Tooltip(size_box, "Tamaño de fuente en puntos")
+        self._sep(toolbar)
 
+        # Lista / Sangría
+        self._btn(toolbar, "• Lista", self._insert_bullet,
+                  "Insertar viñeta al inicio de la línea actual")
+        self._btn(toolbar, "→ Sangría", self._indent_line,
+                  "Aumentar sangría de la línea actual (añade 4 espacios)")
+        self._btn(toolbar, "← Reducir", self._dedent_line,
+                  "Reducir sangría de la línea actual (quita 4 espacios)")
+        self._sep(toolbar)
+
+        # Alineación
+        self._btn(toolbar, "◀ Izquierda", lambda: self._set_align("left"),
+                  "Alinear el texto a la izquierda")
+        self._btn(toolbar, "≡ Centro", lambda: self._set_align("center"),
+                  "Centrar el texto")
+        self._btn(toolbar, "▶ Derecha", lambda: self._set_align("right"),
+                  "Alinear el texto a la derecha")
+        self._sep(toolbar)
+
+        # Limpiar
+        self._btn(toolbar, "🗑 Limpiar todo", self._clear_all,
+                  "Borrar completamente el contenido del editor")
+
+        # ── Barra de firma ──
+        sig_bar = ttk.Frame(self)
+        sig_bar.pack(fill="x", padx=2, pady=(2, 2))
+
+        ttk.Label(sig_bar, text="Firma del correo:").pack(side="left", padx=(2, 6))
+        self._sig_label = ttk.Label(
+            sig_bar,
+            text="(sin firma seleccionada)",
+            foreground="#888888",
+            anchor="w",
+            width=35,
+        )
+        self._sig_label.pack(side="left", padx=2)
+        _Tooltip(self._sig_label, "Imagen que se incluirá como firma al enviar el correo")
+        self._btn(
+            sig_bar, "📂 Seleccionar imagen de firma", self._select_signature,
+            "Elegir un archivo de imagen (PNG, JPG) para la firma del correo"
+        )
+        self._btn(
+            sig_bar, "✖ Quitar firma", self._remove_signature,
+            "Eliminar la imagen de firma seleccionada"
+        )
+
+        # ── Área de texto ──
         text_frame = ttk.Frame(self)
         text_frame.pack(fill="both", expand=True)
 
@@ -76,6 +224,12 @@ class HtmlEditor(ttk.Frame):
         self.text.configure(yscrollcommand=vbar.set)
         self.text.pack(side="left", fill="both", expand=True)
         vbar.pack(side="right", fill="y")
+
+        # ── Barra de estado ──
+        self._status_var = tk.StringVar(value="Listo")
+        ttk.Label(
+            self, textvariable=self._status_var, anchor="w", relief="sunken"
+        ).pack(fill="x", padx=2, pady=(0, 2))
 
     def _setup_tags(self):
         self.text.tag_configure("bold")
@@ -97,7 +251,6 @@ class HtmlEditor(ttk.Frame):
         except tk.TclError:
             return False
         if toggle:
-            # Determine if every character in the selection already has the tag
             idx = start
             fully_tagged = True
             while self.text.compare(idx, "<", end):
@@ -127,6 +280,7 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.remove("bold")
             else:
                 self.active_tags.add("bold")
+        self._set_status("Negrita activada" if "bold" in self.active_tags else "Negrita desactivada")
 
     def _make_italic(self):
         font = tkfont.Font(
@@ -141,6 +295,7 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.remove("italic")
             else:
                 self.active_tags.add("italic")
+        self._set_status("Cursiva activada" if "italic" in self.active_tags else "Cursiva desactivada")
 
     def _make_underline(self):
         if not self._apply_tag_to_sel("underline", toggle=True):
@@ -148,6 +303,7 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.remove("underline")
             else:
                 self.active_tags.add("underline")
+        self._set_status("Subrayado activado" if "underline" in self.active_tags else "Subrayado desactivado")
 
     def _make_strike(self):
         if not self._apply_tag_to_sel("strike", toggle=True):
@@ -155,6 +311,7 @@ class HtmlEditor(ttk.Frame):
                 self.active_tags.remove("strike")
             else:
                 self.active_tags.add("strike")
+        self._set_status("Tachado activado" if "strike" in self.active_tags else "Tachado desactivado")
 
     def _insert_bullet(self):
         line_start = self.text.index("insert linestart")
@@ -162,11 +319,13 @@ class HtmlEditor(ttk.Frame):
         line_end = self.text.index(f"{line_start} lineend")
         self.text.tag_add("list", line_start, f"{line_end}+1c")
         self.text.mark_set("insert", f"{line_start}+2c")
+        self._set_status("Viñeta insertada")
 
     def _indent_line(self):
         index = self.text.index("insert")
         line_start = self.text.index(f"{index} linestart")
         self.text.insert(line_start, "    ")
+        self._set_status("Sangría aumentada")
 
     def _dedent_line(self):
         index = self.text.index("insert")
@@ -174,6 +333,7 @@ class HtmlEditor(ttk.Frame):
         leading = self.text.get(line_start, f"{line_start}+4c")
         if leading.startswith("    "):
             self.text.delete(line_start, f"{line_start}+4c")
+            self._set_status("Sangría reducida")
 
     def _apply_font(self):
         family = self.font_var.get()
@@ -185,12 +345,14 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             self.current_font = family
+            self._set_status(f"Tipografía activa: {family}")
             return
         self.current_font = family
         for t in self.text.tag_names():
             if t.startswith("font_"):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
+        self._set_status(f"Tipografía aplicada: {family}")
 
     def _apply_size(self):
         size = self.size_var.get()
@@ -202,12 +364,14 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             self.current_size = size
+            self._set_status(f"Tamaño activo: {size} pt")
             return
         self.current_size = size
         for t in self.text.tag_names():
             if t.startswith("size_"):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
+        self._set_status(f"Tamaño aplicado: {size} pt")
 
     def _set_align(self, mode):
         tag = f"align_{mode}"
@@ -221,9 +385,11 @@ class HtmlEditor(ttk.Frame):
         for t in ("align_left", "align_center", "align_right"):
             self.text.tag_remove(t, start, end)
         self.text.tag_add(tag, start, end)
+        labels = {"left": "izquierda", "center": "centro", "right": "derecha"}
+        self._set_status(f"Alineación: {labels.get(mode, mode)}")
 
     def _apply_color(self):
-        color = colorchooser.askcolor()[1]
+        color = colorchooser.askcolor(title="Seleccionar color del texto")[1]
         if not color:
             return
         tag = f"color_{color.lstrip('#')}"
@@ -234,14 +400,16 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             self.current_color = color
+            self._set_status(f"Color de texto activo: {color}")
             return
         for t in self.text.tag_names():
             if t.startswith("color_"):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
+        self._set_status(f"Color de texto aplicado: {color}")
 
     def _apply_bgcolor(self):
-        color = colorchooser.askcolor()[1]
+        color = colorchooser.askcolor(title="Seleccionar color de resaltado")[1]
         if not color:
             return
         tag = f"bg_{color.lstrip('#')}"
@@ -252,32 +420,20 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index("sel.last")
         except tk.TclError:
             self.current_bg = color
+            self._set_status(f"Color de resaltado activo: {color}")
             return
         for t in self.text.tag_names():
             if t.startswith("bg_"):
                 self.text.tag_remove(t, start, end)
         self._apply_tag_to_sel(tag)
+        self._set_status(f"Resaltado aplicado: {color}")
 
     def _on_key_release(self, event=None):
         navigation = {
-            "Shift_L",
-            "Shift_R",
-            "Control_L",
-            "Control_R",
-            "Alt_L",
-            "Alt_R",
-            "Caps_Lock",
-            "Num_Lock",
-            "Scroll_Lock",
-            "Left",
-            "Right",
-            "Up",
-            "Down",
-            "Home",
-            "End",
-            "Prior",
-            "Next",
-            "Escape",
+            "Shift_L", "Shift_R", "Control_L", "Control_R",
+            "Alt_L", "Alt_R", "Caps_Lock", "Num_Lock", "Scroll_Lock",
+            "Left", "Right", "Up", "Down",
+            "Home", "End", "Prior", "Next", "Escape",
         }
         if event is not None:
             if event.keysym in navigation or event.char == "":
@@ -349,7 +505,9 @@ class HtmlEditor(ttk.Frame):
             end = self.text.index(f"{index}+1c")
         except tk.TclError:
             end = index
-        group_map: dict[str, list[str]] = {"font_": [], "size_": [], "color_": [], "bg_": [], "align_": []}
+        group_map: dict[str, list[str]] = {
+            "font_": [], "size_": [], "color_": [], "bg_": [], "align_": []
+        }
         group_order: list[str] = []
         filtered: list[str] = []
         for tag in tags:
@@ -583,16 +741,7 @@ class HtmlEditor(ttk.Frame):
 
     # ---------- HTML Import/Export ----------
     def get_html(self):
-        """Return the current text as sanitized HTML.
-
-        The Text widget exposes formatting through tags.  To reliably
-        convert the content we walk each character and compare the tags
-        present at that index against the tags from the previous
-        character.  Closing tags are emitted for styles that end and new
-        tags are opened in a deterministic order before writing the
-        actual character.  This ensures that nested styling is exported
-        with valid markup and that unrecognised tags are ignored.
-        """
+        """Return the current text as sanitized HTML."""
         end_index = self.text.index("end-1c")
         index = "1.0"
         prev_tags = []
@@ -625,10 +774,8 @@ class HtmlEditor(ttk.Frame):
             char = self.text.get(index)
             raw_tags = [t for t in self.text.tag_names(index) if self._tag_start_html(t)]
             curr_tags = self._resolve_tag_conflicts(index, raw_tags, clean=False)
-            # Close tags that no longer apply
             for t in reversed([tg for tg in prev_tags if tg not in curr_tags]):
                 html_chunks.append(self._tag_end_html(t))
-            # Open new tags
             for t in sorted([tg for tg in curr_tags if tg not in prev_tags], key=tag_priority):
                 html_chunks.append(self._tag_start_html(t))
             if char == " ":
@@ -663,7 +810,7 @@ class HtmlEditor(ttk.Frame):
                 super().__init__()
                 self.widget = widget
                 self.tag_stack = []
-                self.span_stack = []  # Track tags introduced by <span>
+                self.span_stack = []
 
             def handle_starttag(self, tag, attrs):
                 if tag in ("b", "strong"):
@@ -750,6 +897,7 @@ class HtmlEditor(ttk.Frame):
                 end = self.widget.index("end-1c")
                 for t in self.tag_stack:
                     self.widget.tag_add(t, start, end)
+
         self.text.delete("1.0", "end")
         Parser(self.text).feed(html_string)
         self._update_current_styles()
@@ -799,4 +947,3 @@ class HtmlEditor(ttk.Frame):
         if tag == "list":
             return "</div>"
         return ""
-

@@ -1033,23 +1033,13 @@ class TemplateForm(tk.Toplevel):
         container.columnconfigure(0, weight=1)
 
         self.name_var = tk.StringVar()
-        self.signature_var = tk.StringVar()
 
         row = 0
         ttk.Label(container, text="Nombre:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
         row += 1
         ttk.Entry(container, textvariable=self.name_var, style="MyEntry.TEntry").grid(row=row, column=0, sticky="ew", pady=5)
         row += 1
-
-        ttk.Label(container, text="Imagen de firma:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
-        row += 1
-        frame_img = ttk.Frame(container, style="MyFrame.TFrame")
-        frame_img.grid(row=row, column=0, sticky="ew")
-        frame_img.columnconfigure(0, weight=1)
-        ttk.Entry(frame_img, textvariable=self.signature_var, style="MyEntry.TEntry").grid(row=0, column=0, sticky="ew", pady=5)
-        ttk.Button(frame_img, text="Seleccionar", style="MyButton.TButton", command=self.select_image).grid(row=0, column=1, padx=5)
-        row += 1
-        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).grid(row=row, column=0, pady=(5,10), sticky="w")
+        ttk.Button(container, text="Guardar", style="MyButton.TButton", command=self.save_template).grid(row=row, column=0, pady=(5, 10), sticky="w")
         row += 1
 
         ttk.Label(container, text="Contenido HTML:", style="MyLabel.TLabel").grid(row=row, column=0, sticky="w", pady=5)
@@ -1072,12 +1062,7 @@ class TemplateForm(tk.Toplevel):
             self.name_var.set(self.template_data[1])
             self.editor.set_html(self.template_data[2])
             if self.template_data[3]:
-                self.signature_var.set(self.template_data[3])
-
-    def select_image(self):
-        path = filedialog.askopenfilename(title="Seleccionar imagen", filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.gif")])
-        if path:
-            self.signature_var.set(path)
+                self.editor.set_signature_path(self.template_data[3])
 
     def save_template(self):
         # Recreate missing tables if the database was not initialized
@@ -1088,7 +1073,7 @@ class TemplateForm(tk.Toplevel):
         html = self.editor.get_html().strip()
         if not html and raw_text:
             html = escape(raw_text).replace("\n", "<br>")
-        signature = self.signature_var.get().strip()
+        signature = self.editor.get_signature_path()
         if not (name and raw_text):
             messagebox.showwarning(
                 "Advertencia",
@@ -1122,7 +1107,8 @@ class TemplateForm(tk.Toplevel):
                 subject=f"Prueba {name}",
                 html_template=html,
                 context={"email_to": email},
-                signature_path=self.signature_var.get().strip() or None,
+                signature_path=self.editor.get_signature_path() or None,
+                cc_key="",
             )
             messagebox.showinfo("Información", "Correo de prueba enviado correctamente.")
         except Exception as e:

@@ -43,9 +43,10 @@ def send_email(email_session, subject, template_text, template_html, context, at
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address(cc_key)
-    if cc:
-        msg["Cc"] = cc
+    if cc_key:
+        cc = get_cc_address(cc_key)
+        if cc:
+            msg["Cc"] = cc
     # Renderizamos el contenido
     content_text = render_email(template_text, context)
     content_html = render_email(template_html, context)
@@ -82,6 +83,9 @@ def image_to_data_uri(path):
     with open(path, "rb") as f:
         data = base64.b64encode(f.read()).decode("utf-8")
     ext = os.path.splitext(path)[1].lower().strip(".") or "png"
+    # Los navegadores requieren "image/jpeg", no "image/jpg"
+    if ext == "jpg":
+        ext = "jpeg"
     return f"data:image/{ext};base64,{data}"
 
 def send_email_custom(
@@ -108,9 +112,10 @@ def send_email_custom(
     msg["Subject"] = subject.upper()
     msg["From"] = email_session["address"]
     msg["To"] = context.get("email_to", "")
-    cc = get_cc_address(cc_key)
-    if cc:
-        msg["Cc"] = cc
+    if cc_key:
+        cc = get_cc_address(cc_key)
+        if cc:
+            msg["Cc"] = cc
 
     msg.set_content(content_text)
     msg.add_alternative(content_html, subtype="html")

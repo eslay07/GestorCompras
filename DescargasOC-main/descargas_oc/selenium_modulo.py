@@ -328,6 +328,7 @@ def descargar_oc(
             numero = oc.get("numero")
             proveedor = oc.get("proveedor", "")
             exito = False
+            no_aprobada = False
             ultimo_error: Exception | None = None
             for intento in range(4):
                 try:
@@ -345,6 +346,20 @@ def descargar_oc(
                         boton_descarga.click()
                     except ElementClickInterceptedException:
                         driver.execute_script("arguments[0].click();", boton_descarga)
+
+                    # Esperar brevemente y verificar toast de "no autorizada"
+                    # antes de intentar esperar la descarga del PDF
+                    time.sleep(2)
+                    toasts_actuales = _leer_toasts()
+                    if any(
+                        "no est" in t.lower() and "permitida" in t.lower()
+                        for t in toasts_actuales
+                    ):
+                        # OC no autorizada — no reintentar, pasar a la siguiente
+                        no_aprobada = True
+                        oc["no_aprobada"] = True
+                        errores.append(f"OC_NO_APROBADA:{numero}")
+                        break
 
                     archivo = esperar_descarga_pdf(download_dir, existentes)
                     if not getattr(cfg, "compra_bienes", False):
@@ -381,7 +396,7 @@ def descargar_oc(
                     ultimo_error = exc
                     time.sleep(2)
                     continue
-            if not exito and ultimo_error:
+            if not exito and not no_aprobada and ultimo_error:
                 errores.append(f"OC {numero}: {ultimo_error}")
     finally:
         driver.quit()
