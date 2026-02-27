@@ -1,115 +1,103 @@
-GestorCompras - Versión Preliminar
- 
- Descripción del Proyecto
- -------------------------
- GestorCompras es una herramienta de gestión automatizada de compras diseñada para facilitar la administración de proveedores, la asignación de tareas y el envío de solicitudes de despacho mediante una interfaz gráfica desarrollada en Python con Tkinter. Este software ha sido desarrollado de forma autónoma e independiente por Jimmy Toapanta, como iniciativa personal, y NO constituye un encargo realizado para ninguna empresa.
- 
- Estado del Proyecto
- -------------------
- ADVERTENCIA:
- Este proyecto se encuentra en fase de pruebas y desarrollo. La versión actual es preliminar y NO se recomienda su uso en entornos de producción hasta que se confirme su estabilidad y se complete la versión final.
- 
- Características Principales
- ----------------------------
-- Gestión de Proveedores: Registro, edición y eliminación de proveedores.
-- Cada proveedor puede tener un correo de respaldo para notificaciones.
- - Configuración de Asignaciones: Asignación única de personas a departamentos.
- - Gestión de Tareas Temporales: Carga, procesamiento y eliminación de tareas notificadas por correo.
-- Automatización de Despachos: Envío automatizado de solicitudes de despacho mediante correo electrónico, con plantillas configurables.
-- Formatos de Correo Personalizados: desde la configuración es posible crear, editar y eliminar plantillas en HTML, ahora con un editor visual que permite aplicar negritas, colores, tamaños de letra y viñetas, además de incluir una imagen de firma.
- - Interfaz Gráfica Profesional: Desarrollada en Tkinter, ofreciendo una experiencia intuitiva y ordenada.
- - Integración con Base de Datos SQLite: Manejo local de datos a través de una base de datos autogenerada.
- 
- Instalación y Configuración
- ---------------------------
- Requisitos:
-   - Python 3.x
-   - Librerías de Python (entre otras): tkinter, sqlite3, pdfplumber, smtplib, jinja2, selenium, webdriver_manager
-   - Conexión a Internet para autenticación SMTP y servicios externos.
- 
- Pasos de Instalación:
-   1. Clonar el repositorio:
-        git clone https://github.com/eslay07/GestorCompras.git
-   2. Instalar las dependencias:
-        pip install -r requirements.txt
-      (Asegúrese de tener instaladas todas las librerías necesarias según su entorno de desarrollo.)
-      Para ejecutar las pruebas unitarias, instale además:
-        pip install -r requirements-dev.txt
-  3. Configuración de la Base de Datos:
-     La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación. Los datos se almacenan en el directorio "data".
-  4. Configurar correos en copia (CC) *(opcional)*:
-     Ahora existen dos campos en la ventana de **Configuración** para definir las copias de seguimiento y de solicitudes de despacho.
-     En cada uno se pueden ingresar hasta 9 direcciones separadas por `;`.
-     También puede definir las variables de entorno `EMAIL_CC_SEGUIMIENTO` o `EMAIL_CC_DESPACHO` con el mismo formato.
-  5. Carga rápida de Proveedores:
-     Se incluye el script "import_proveedores.py" que permite agregar de forma rápida proveedores a la base de datos a partir de un archivo Excel (correos.xlsx). Para ejecutarlo, desde el directorio del proyecto, ejecute:
-       python import_proveedores.py
-  6. Ejecutar la Aplicación:
-       python run.py
+# GestorCompras
 
-Uso
----
- Al iniciar la aplicación se presenta una pantalla de inicio de sesión. Una vez autenticado, el usuario accede a un menú principal que permite:
-   - Administrar proveedores.
-   - Configurar asignaciones de departamentos.
-   - Cargar y gestionar tareas temporales notificadas por correo.
-   - Enviar solicitudes de despacho a través de correos electrónicos predefinidos.
+Aplicación de escritorio para gestión de compras, proveedores y automatización de comunicaciones operativas.
 
- Menú principal y módulos disponibles
- ------------------------------------
- El menú principal se divide en dos flujos: **Compras Bienes** y **Compras Servicios**. Ambos comparten utilidades y, dependiendo del flujo, muestran opciones adicionales.
+## Estado del proyecto
 
- **Compras Bienes**
- - **Reasignación de tareas:** redistribuye actividades entre responsables.
- - **Correos masivos:** envío de comunicaciones a proveedores con plantillas.
- - **Seguimientos:** control y registro de seguimientos de compras desde la interfaz.
- - **Descargas OC:** abre el módulo auxiliar `DescargasOC-main` para descargar Órdenes de Compra de forma automática. Este módulo detecta correos con OCs o tambien cuenta con la opcion de ingreso de los numeros de OCs a descargar y usa Selenium para ingresar al sistema web y bajar los PDF correspondientes.
- - **Cotizador:** opción en desarrollo (visible en el menú, pero aún no disponible).
- - **Configuración:** preferencias generales de correo, plantillas y parámetros de trabajo.
+Proyecto en uso interno y en evolución continua. Incluye funcionalidades de operación diaria para los flujos de **Compras Bienes** y **Compras Servicios**.
 
- **Compras Servicios**
- - **Configuraciones:** parámetros específicos del flujo de servicios.
- - **Correos masivos:** envío de comunicaciones masivas.
- - **Descargas OC:** misma integración con el módulo de descargas automatizadas por Selenium.
- - **Reasignación de tareas:** redistribución de tareas para servicios.
+## Funcionalidades principales
 
- Si se requiere más detalle sobre la automatización de descargas de OC (configuración de correos, carpetas y proceso con Selenium), revise el README dentro de `DescargasOC-main`.
+- Inicio de sesión SMTP corporativo y validación de credenciales.
+- Menú principal con dos flujos:
+  - **Compras Bienes**
+  - **Compras Servicios**
+- **Correos Masivos (Despacho)**:
+  - envío por OC individual o agrupado por proveedor,
+  - uso de plantillas HTML configurables,
+  - adjuntos PDF automáticos,
+  - soporte de correos en copia (CC) desde Configuración.
+- **Seguimientos** con formato de correo configurable y CC independiente.
+- **Reasignación de tareas** (bienes/servicios) con filtros y actualización de estado.
+- **Configuración centralizada**:
+  - proveedores (correo principal y alterno),
+  - asignaciones por subdepartamento,
+  - carpeta de PDFs,
+  - credenciales de Google Sheets,
+  - plantillas de correo.
+- **Editor HTML de formatos de correo**:
+  - edición visual,
+  - firma en imagen,
+  - envío de correo de prueba.
+- Integración con módulo auxiliar **DescargasOC-main** para descarga y procesamiento de OCs.
 
-Pruebas
--------
-Con las dependencias de desarrollo instaladas, ejecute las pruebas con:
+## Mejoras incorporadas en la versión actual
+
+- Interfaz unificada con estilos consistentes en Tkinter/ttk.
+- Separación clara de módulos para GUI, lógica y servicios.
+- Soporte para segundo correo por proveedor.
+- Selección de formato por envío (no solo formato global).
+- Validaciones operativas para evitar envíos incompletos.
+- Configuración de CC separada por proceso:
+  - `EMAIL_CC_DESPACHO`
+  - `EMAIL_CC_SEGUIMIENTO`
+- Compatibilidad de ejecución desde raíz con `run.py`.
+
+## Estructura general
+
+- `run.py`: lanzador principal desde la raíz.
+- `GestorCompras_/run.py`: lanzador interno del paquete.
+- `GestorCompras_/gestorcompras/main.py`: arranque de la app y ruteo UI.
+- `GestorCompras_/gestorcompras/gui/`: pantallas y ventanas principales.
+- `GestorCompras_/gestorcompras/logic/`: lógica de negocio.
+- `GestorCompras_/gestorcompras/services/`: acceso a DB, correo y servicios auxiliares.
+- `GestorCompras_/tests/`: pruebas automatizadas del paquete principal.
+- `DescargasOC-main/`: módulo de descargas de órdenes de compra.
+
+## Requisitos
+
+- Python 3.10+
+- Dependencias del proyecto:
+  - `pip install -r requirements.txt`
+- Dependencias de desarrollo (pruebas):
+  - `pip install -r requirements-dev.txt`
+
+## Ejecución
+
+Desde la raíz del repositorio:
+
+```bash
+python run.py
 ```
+
+Alternativa desde el subproyecto principal:
+
+```bash
+cd GestorCompras_
+python run.py
+```
+
+## Configuración recomendada inicial
+
+1. Abrir **Configuración**.
+2. Registrar carpeta de PDFs para despacho.
+3. Cargar proveedores y correos.
+4. Definir CC por módulo (Despacho y Seguimiento).
+5. Crear/editar formatos de correo.
+6. Probar formato con correo de prueba.
+
+## Pruebas
+
+```bash
 pytest
 ```
- 
- Aclaraciones y Disclaimer Legal
- ---------------------------------
- Propiedad Intelectual:
-   Todo el código, documentación y recursos incluidos en este repositorio son propiedad exclusiva de Jimmy Toapanta.
- 
- Proyecto Autónomo:
-   Este proyecto ha sido desarrollado por iniciativa propia y NO representa ni ha sido solicitado por ninguna empresa. Su desarrollo se realiza de forma completamente independiente.
- 
- Estado Preliminar:
-   La versión actual es preliminar y se encuentra en fase de pruebas. Se recomienda que cualquier usuario realice pruebas y validaciones antes de utilizar el software en un entorno real o productivo.
- 
- Deslinde de Responsabilidad:
-   El autor no asume responsabilidad alguna por el uso de este software. Cualquier riesgo o daño derivado de su implementación será responsabilidad exclusiva del usuario final. Este proyecto se ofrece "tal cual", sin garantías de ningún tipo, expresas o implícitas.
- 
- Futuras Mejoras
- ---------------
-- Se está diseñando un nuevo módulo para solicitar cotizaciones de manera automática, tanto mediante correo electrónico como a través de la plataforma Katuk, con el objetivo de optimizar aún más el proceso.
-- Se continuarán ampliando las funciones del editor de plantillas para ofrecer cada vez más opciones de personalización.
- 
- Contribuciones y Mejoras
- ------------------------
- Las contribuciones son bienvenidas siempre que se mantenga el enfoque del proyecto y se respeten los derechos de autor. Para sugerencias, mejoras o reportar errores, por favor utilice los canales de contacto indicados a continuación.
- 
-Contacto
---------
 
+## Módulo complementario: Descargas OC
 
- 
- Última actualización: 25/06/2025
- 
- Este README ha sido actualizado para reflejar la versión actual del proyecto, garantizando claridad en sus funcionalidades, estado de desarrollo y un completo deslinde de responsabilidad legal.
+Para detalles de instalación y uso del módulo de descarga automatizada de OCs, revisar:
+
+- `DescargasOC-main/README.md`
+
+## Licencia y uso
+
+Uso interno según lineamientos del propietario del repositorio.
