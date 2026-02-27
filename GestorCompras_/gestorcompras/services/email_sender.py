@@ -22,6 +22,8 @@ def get_cc_address(key="EMAIL_CC_DESPACHO"):
     else:
         cc_raw = db.get_config(key, "")
 
+    # En configuración se guardan separados por ';', pero el encabezado SMTP
+    # debe enviarse en formato RFC (separado por ',').
     cc_list = [addr.strip() for addr in re.split(r"[;,]+", cc_raw or "") if addr.strip()]
     return ", ".join(cc_list)
 
