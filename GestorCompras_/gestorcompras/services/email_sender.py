@@ -18,8 +18,14 @@ def get_cc_address(key="EMAIL_CC_DESPACHO"):
     """Obtiene la dirección de correo en copia (CC) para la clave dada."""
     env_cc = os.getenv(key)
     if env_cc:
-        return env_cc
-    return db.get_config(key, "")
+        cc_raw = env_cc
+    else:
+        cc_raw = db.get_config(key, "")
+
+    # En configuración se guardan separados por ';', pero el encabezado SMTP
+    # debe enviarse en formato RFC (separado por ',').
+    cc_list = [addr.strip() for addr in re.split(r"[;,]+", cc_raw or "") if addr.strip()]
+    return ", ".join(cc_list)
 
 def render_email(template_name, context):
     """
