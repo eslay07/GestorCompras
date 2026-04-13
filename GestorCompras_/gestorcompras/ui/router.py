@@ -9,6 +9,7 @@ from gestorcompras.ui.servicios_home import ServiciosHome
 
 _container: tk.Misc | None = None
 _email_session: dict[str, str] | None = None
+_origin: str | None = None
 
 
 def configure(container: tk.Misc, email_session: dict[str, str]) -> None:
@@ -43,3 +44,14 @@ def open_servicios_menu() -> None:
         raise RuntimeError("Sesión de correo no inicializada")
     _clear_container()
     ServiciosHome(_container, _email_session).pack(fill="both", expand=True)
+
+
+def open_actua_tareas(origin: str = "bienes") -> None:
+    if _email_session is None:
+        raise RuntimeError("Sesión de correo no inicializada")
+    global _origin
+    _origin = origin
+    _clear_container()
+    from gestorcompras.ui.actua_tareas_gui import ActuaTareasScreen
+
+    ActuaTareasScreen(_container, _email_session, origin=origin).pack(fill="both", expand=True)

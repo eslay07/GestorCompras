@@ -135,6 +135,33 @@ def open_despacho(master, email_session):
                             result = f"Error en el procesamiento: {str(e)}"
                         results.append(result)
                         log_func(result)
+            try:
+                from gestorcompras.services import task_inbox, actua_tareas_repo
+                from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox
+
+                tareas = []
+                for orden, info in infos.items():
+                    tareas.append(
+                        {
+                            "task_number": str(info.get("tarea") or ""),
+                            "oc": str(orden),
+                            "ruc": info.get("ruc", ""),
+                            "emails": info.get("emails", []),
+                        }
+                    )
+                tareas = [t for t in tareas if t["task_number"]]
+                if tareas:
+                    task_inbox.push("correos_masivos", tareas)
+                    if messagebox.askyesno(
+                        "Actua. Tareas",
+                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
+                        parent=window,
+                    ):
+                        flujos = actua_tareas_repo.list_flujos()
+                        if flujos:
+                            run_flow_from_inbox(window, email_session, "correos_masivos", int(flujos[0]["id"]))
+            except Exception as exc:
+                log_func(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
             messagebox.showinfo("Resultado", "\n".join(results))
             window.after(0, lambda: btn_procesar.configure(state="normal"))
 

@@ -2,8 +2,10 @@ import tkinter as tk
 import threading
 import logging
 import re
+import sys
 from datetime import datetime
 from tkinter import messagebox
+from pathlib import Path
 
 try:  # permite ejecutar como script
     from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
@@ -21,6 +23,17 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 scanning_lock = threading.Lock()
+
+try:
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.append(str(_ROOT))
+    from gestorcompras.services import task_inbox, actua_tareas_repo  # type: ignore
+    from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox  # type: ignore
+except Exception:  # pragma: no cover
+    task_inbox = None
+    actua_tareas_repo = None
+    run_flow_from_inbox = None
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -126,6 +139,33 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         else:
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg, errores=errores)
+        try:
+            if task_inbox and ordenes:
+                tasks = []
+                for orden in ordenes:
+                    tasks.append(
+                        {
+                            "task_number": str(orden.get("tarea") or ""),
+                            "oc": orden.get("numero", ""),
+                            "proveedor": orden.get("proveedor", ""),
+                            "fecha_orden": orden.get("fecha_orden", ""),
+                        }
+                    )
+                tasks = [t for t in tasks if t["task_number"]]
+                if tasks:
+                    task_inbox.push("descargas_oc", tasks)
+                    if messagebox.askyesno(
+                        "Actua. Tareas",
+                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
+                    ):
+                        flujos = actua_tareas_repo.list_flujos() if actua_tareas_repo else []
+                        if flujos and run_flow_from_inbox:
+                            run_flow_from_inbox(text_widget.winfo_toplevel(), {
+                                "address": cfg.usuario_oc,
+                                "password": cfg.password_oc,
+                            }, "descargas_oc", int(flujos[0]["id"]))
+        except Exception as exc:
+            append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
         if ordenes:
             no_aprobadas = [
                 e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")

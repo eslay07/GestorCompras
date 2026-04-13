@@ -6,6 +6,7 @@ from tkinter import ttk
 
 from gestorcompras.modules import correos_masivos_gui, descargas_oc_gui, config_gui, reasignacion_gui
 from gestorcompras.ui.common import add_hover_effect
+from gestorcompras.ui import router
 
 
 class ServiciosHome(ttk.Frame):
@@ -50,6 +51,18 @@ class ServiciosHome(ttk.Frame):
             row=4,
             text="Reasignación de tareas",
             command=lambda: reasignacion_gui.open(self.master, self.email_session, mode="servicios"),
+        )
+        self._add_button(
+            container,
+            row=5,
+            text="Actua. Tareas",
+            command=lambda: router.open_actua_tareas(origin="servicios"),
+        )
+        self._add_button(
+            container,
+            row=6,
+            text="◀ Regresar al menú inicial",
+            command=router.open_home,
         )
 
     def _add_button(self, container: ttk.Frame, row: int, text: str, command) -> None:

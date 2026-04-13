@@ -661,6 +661,38 @@ class ServiciosReasignacion(tk.Toplevel):
         except Exception:
             logger.exception("No se pudo enviar el reporte de reasignación")
 
+        try:
+            from gestorcompras.services import task_inbox, actua_tareas_repo
+            from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox
+
+            tareas_ok = []
+            for record in objetivos:
+                estado = str(record.get("estado", "")).lower()
+                if estado not in {"ok", "reasignada"}:
+                    continue
+                tareas_ok.append(
+                    {
+                        "task_number": str(record.get("task_number", "")),
+                        "proveedor": record.get("taller", ""),
+                        "mecanico": record.get("mecanico", ""),
+                        "telefono": record.get("telefono", ""),
+                        "inf_vehiculo": record.get("inf_vehiculo", ""),
+                        "taller": record.get("taller", ""),
+                    }
+                )
+            if tareas_ok:
+                task_inbox.push("reasignacion", tareas_ok)
+                if messagebox.askyesno(
+                    "Actua. Tareas",
+                    "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
+                    parent=self,
+                ):
+                    flujos = actua_tareas_repo.list_flujos(mode="servicios")
+                    if flujos:
+                        run_flow_from_inbox(self, self.email_session, "reasignacion", int(flujos[0]["id"]))
+        except Exception:
+            logger.exception("Hook Actua. Tareas (reasignación) falló sin afectar el flujo principal.")
+
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:
     """Abre la ventana correspondiente según el flujo seleccionado."""
