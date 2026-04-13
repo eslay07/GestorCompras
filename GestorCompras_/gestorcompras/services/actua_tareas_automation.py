@@ -5,6 +5,14 @@ from typing import Any
 
 from gestorcompras.services.telcos_automation import wait_clickable_or_error
 
+MOTIVOS_PAUSA_PERMITIDOS = (
+    "CLIENTE NO DISPONIBLE",
+    "FALTA INFORMACIÓN",
+    "MATERIAL PENDIENTE",
+    "PERMISO/ACCESO",
+    "OTROS",
+)
+
 
 def _resolve(value: str, ctx: dict[str, Any]) -> str:
     text = str(value or "")
@@ -176,15 +184,20 @@ def motivo_pausa(driver, valor_o_label: str, **_params):
     from selenium.webdriver.support.ui import Select
 
     select = Select(wait_clickable_or_error(driver, (By.ID, "cmbMotivoPausa"), None, "Motivo de pausa"))
-    try:
-        select.select_by_value(valor_o_label)
-    except Exception:
-        needle = valor_o_label.lower().strip()
-        for op in select.options:
-            if needle in op.text.lower():
-                op.click()
-                return
-        raise
+    requested = (valor_o_label or "").strip().upper()
+    if requested not in MOTIVOS_PAUSA_PERMITIDOS:
+        permitidos = ", ".join(MOTIVOS_PAUSA_PERMITIDOS)
+        raise ValueError(
+            "Motivo de pausa no permitido. Debe ser uno de: "
+            f"{permitidos}"
+        )
+    for option in select.options:
+        label = option.text.strip().upper()
+        value = (option.get_attribute("value") or "").strip().upper()
+        if requested == label or requested == value:
+            option.click()
+            return
+    raise ValueError(f"El motivo de pausa '{requested}' no está disponible en Telcos.")
 
 
 def aceptar_pausa(driver, **_params):
@@ -215,7 +228,19 @@ ACCIONES = [
     {"id": "observacion_reasignacion", "label": "Obs. reasignación", "descripcion": "Escribe observación.", "params": [{"name": "texto", "label": "Observación", "tipo": "texto"}]},
     {"id": "guardar_reasignacion", "label": "Guardar reasignación", "descripcion": "Guarda reasignación.", "params": []},
     {"id": "pausar_tarea", "label": "Pausar tarea", "descripcion": "Pausa tarea activa.", "params": []},
-    {"id": "motivo_pausa", "label": "Motivo de pausa", "descripcion": "Selecciona motivo.", "params": [{"name": "valor_o_label", "label": "Motivo", "tipo": "texto"}]},
+    {
+        "id": "motivo_pausa",
+        "label": "Motivo de pausa",
+        "descripcion": "Selecciona motivo (catálogo cerrado).",
+        "params": [
+            {
+                "name": "valor_o_label",
+                "label": "Motivo",
+                "tipo": "select",
+                "opciones": list(MOTIVOS_PAUSA_PERMITIDOS),
+            }
+        ],
+    },
     {"id": "aceptar_pausa", "label": "Aceptar pausa", "descripcion": "Confirma pausa.", "params": []},
 ]
 

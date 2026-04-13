@@ -223,7 +223,13 @@ class ActuaTareasScreen(ttk.Frame):
             v = tk.StringVar(value=str((paso.get("params") or {}).get(prm["name"], "")))
             values[prm["name"]] = v
             if prm.get("tipo") == "select":
-                ttk.Combobox(win, textvariable=v, values=prm.get("opciones", []), width=40).grid(row=i, column=1, padx=6, pady=4)
+                ttk.Combobox(
+                    win,
+                    textvariable=v,
+                    values=prm.get("opciones", []),
+                    state="readonly",
+                    width=40,
+                ).grid(row=i, column=1, padx=6, pady=4)
             else:
                 ttk.Entry(win, textvariable=v, width=42).grid(row=i, column=1, padx=6, pady=4)
 
