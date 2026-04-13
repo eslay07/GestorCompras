@@ -44,7 +44,10 @@ class ActuaTareasScreen(ttk.Frame):
 
     def _build(self):
         self.columnconfigure(1, weight=1)
-        self.rowconfigure(2, weight=1)
+        # La fila de "Flujo/Acciones" debe conservar altura visible;
+        # de lo contrario el bloque de ejecución puede colapsarla.
+        self.rowconfigure(2, weight=1, minsize=230)
+        self.rowconfigure(3, weight=0)
 
         head = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
         head.grid(row=0, column=0, columnspan=2, sticky="ew")
@@ -91,7 +94,8 @@ class ActuaTareasScreen(ttk.Frame):
 
         left = ttk.LabelFrame(self, text="Acciones", style="MyLabelFrame.TLabelframe", padding=8)
         left.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=(0, 10))
-        self.rowconfigure(2, weight=1)
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(0, weight=1)
 
         act_canvas = tk.Canvas(left, highlightthickness=0)
         act_scroll = ttk.Scrollbar(left, orient="vertical", command=act_canvas.yview)
@@ -99,8 +103,14 @@ class ActuaTareasScreen(ttk.Frame):
         act_canvas.configure(yscrollcommand=act_scroll.set)
         act_canvas.pack(side="left", fill="both", expand=True)
         act_scroll.pack(side="right", fill="y")
-        act_canvas.create_window((0, 0), window=act_container, anchor="nw")
-        act_container.bind("<Configure>", lambda _e: act_canvas.configure(scrollregion=act_canvas.bbox("all")))
+        act_window = act_canvas.create_window((0, 0), window=act_container, anchor="nw")
+
+        def _sync_actions_canvas(_event=None):
+            act_canvas.configure(scrollregion=act_canvas.bbox("all"))
+            act_canvas.itemconfigure(act_window, width=act_canvas.winfo_width())
+
+        act_container.bind("<Configure>", _sync_actions_canvas)
+        act_canvas.bind("<Configure>", _sync_actions_canvas)
 
         for i, accion in enumerate(auto.ACCIONES):
             btn = ttk.Button(
@@ -118,7 +128,7 @@ class ActuaTareasScreen(ttk.Frame):
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
-        self.tree = ttk.Treeview(right, columns=("n", "accion", "params"), show="headings")
+        self.tree = ttk.Treeview(right, columns=("n", "accion", "params"), show="headings", height=8)
         self.tree.heading("n", text="#")
         self.tree.heading("accion", text="Acción")
         self.tree.heading("params", text="Parámetros")
@@ -144,7 +154,7 @@ class ActuaTareasScreen(ttk.Frame):
         ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar", variable=self.mostrar_nav_var).grid(row=1, column=0, columnspan=2, sticky="w", pady=6)
         ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=1, column=2, columnspan=3, sticky="w")
 
-        self.log = ScrolledText(bottom, height=8, state="disabled")
+        self.log = ScrolledText(bottom, height=5, state="disabled")
         self.log.grid(row=2, column=0, columnspan=5, sticky="ew", pady=4)
 
         run_btn = ttk.Button(bottom, text="Ejecutar flujo", style="MyButton.TButton", command=self._run_flow)
