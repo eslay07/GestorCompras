@@ -28,9 +28,12 @@ try:
     _ROOT = Path(__file__).resolve().parents[2]
     if str(_ROOT) not in sys.path:
         sys.path.append(str(_ROOT))
-    from gestorcompras.ui.actua_tareas_gui import ejecutar_flujo_desde_modulo  # type: ignore
+    _GESTOR = (_ROOT / "GestorCompras_").resolve()
+    if _GESTOR.exists() and str(_GESTOR) not in sys.path:
+        sys.path.append(str(_GESTOR))
+    from gestorcompras.ui.actua_tareas_gui import abrir_panel_tareas  # type: ignore
 except Exception:  # pragma: no cover
-    ejecutar_flujo_desde_modulo = None
+    abrir_panel_tareas = None
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -137,7 +140,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg, errores=errores)
         try:
-            if ejecutar_flujo_desde_modulo and ordenes:
+            if abrir_panel_tareas and ordenes:
                 tasks = []
                 for orden in ordenes:
                     tasks.append(
@@ -150,19 +153,22 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                     )
                 tasks = [t for t in tasks if t["task_number"]]
                 if tasks:
-                    if messagebox.askyesno(
-                        "Actua. Tareas",
-                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
-                    ):
-                        ejecutar_flujo_desde_modulo(
-                            text_widget.winfo_toplevel(),
-                            {
-                                "address": cfg.usuario_oc,
-                                "password": cfg.password_oc,
-                            },
-                            "descargas_oc",
-                            tasks,
-                        )
+                    def _abrir_panel(_tasks=tasks):
+                        if messagebox.askyesno(
+                            "Actua. Tareas",
+                            "¿Desea abrir el panel de Actua. Tareas con las OC procesadas?",
+                        ):
+                            abrir_panel_tareas(
+                                text_widget.winfo_toplevel(),
+                                {
+                                    "address": cfg.usuario_oc,
+                                    "password": cfg.password_oc,
+                                },
+                                "descargas_oc",
+                                _tasks,
+                            )
+
+                    text_widget.after(0, _abrir_panel)
         except Exception as exc:
             append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
         if ordenes:

@@ -420,6 +420,7 @@ def open_reasignacion(master, email_session):
         errors: list[str] = []
         tasks_in_db = db.get_tasks_temp()
         tasks_dict = {t["id"]: t for t in tasks_in_db}
+        procesadas_ok: list[dict] = []
 
         service = Service(ChromeDriverManager().install())
         chrome_options = Options()
@@ -444,6 +445,7 @@ def open_reasignacion(master, email_session):
                     try:
                         process_task(driver, task, window)
                         db.delete_task_temp(t_id)
+                        procesadas_ok.append(task)
                     except Exception as e:
                         errors.append(str(e))
         finally:
@@ -457,6 +459,40 @@ def open_reasignacion(master, email_session):
 
         process_btn.config(state="normal", text="Reasignar Tareas")
         actualizar_tareas()
+
+        try:
+            from gestorcompras.ui.actua_tareas_gui import abrir_panel_tareas
+
+            tareas_panel = []
+            for task in procesadas_ok:
+                detalles = task.get("details") or []
+                primer_detalle = detalles[0] if detalles else {}
+                tareas_panel.append(
+                    {
+                        "task_number": str(task.get("task_number", "")),
+                        "proveedor": primer_detalle.get("Proveedor", ""),
+                        "oc": primer_detalle.get("OC", ""),
+                        "factura": primer_detalle.get("Factura", ""),
+                        "ingreso": primer_detalle.get("Ingreso", ""),
+                        "reasignacion": task.get("reasignacion", ""),
+                    }
+                )
+            if tareas_panel and messagebox.askyesno(
+                "Actua. Tareas",
+                "¿Desea ejecutar un flujo de Actua. Tareas sobre las tareas reasignadas?",
+                parent=window,
+            ):
+                abrir_panel_tareas(
+                    window,
+                    email_session,
+                    "reasignacion",
+                    tareas_panel,
+                    mode="bienes",
+                )
+                return
+        except Exception:
+            logger.exception("No se pudo abrir el panel de Actua. Tareas")
+
         window.destroy()
 
     process_btn.configure(command=process_tasks)

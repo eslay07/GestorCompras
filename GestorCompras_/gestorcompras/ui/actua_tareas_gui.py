@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -17,6 +18,58 @@ _ORIGEN_MAP = {
     "Desde Descargas OC": "descargas_oc",
     "Desde Correos Masivos": "correos_masivos",
 }
+
+
+# Columnas mostradas en el cuadro de tareas ejecutadas para cada módulo.
+# Se definen aquí para que los módulos origen no necesiten duplicar el mapeo.
+_ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
+    "reasignacion": [
+        ("task_number", "N° Tarea"),
+        ("proveedor", "Proveedor / Taller"),
+        ("mecanico", "Mecánico"),
+        ("telefono", "Teléfono"),
+        ("inf_vehiculo", "Vehículo"),
+    ],
+    "correos_masivos": [
+        ("task_number", "N° Tarea"),
+        ("oc", "OC"),
+        ("proveedor", "Proveedor"),
+        ("ruc", "RUC"),
+        ("factura", "Factura"),
+        ("emails", "Correos"),
+    ],
+    "descargas_oc": [
+        ("task_number", "N° Tarea"),
+        ("oc", "OC"),
+        ("proveedor", "Proveedor"),
+        ("fecha_orden", "Fecha"),
+    ],
+}
+
+
+def _required_keys_for_flow(pasos: list[dict]) -> set[str]:
+    """Extrae las claves de contexto ({clave}) requeridas por un flujo."""
+    keys: set[str] = set()
+    placeholder = re.compile(r"\{(\w+)\}")
+    for paso in pasos or []:
+        action_id = paso.get("id")
+        params = paso.get("params") or {}
+        if action_id == "ingresar_numero_tarea":
+            if not str(params.get("numero", "")).strip():
+                keys.add("task_number")
+        for value in params.values():
+            for match in placeholder.findall(str(value or "")):
+                keys.add(match)
+    return keys
+
+
+def _task_value(task: dict, key: str) -> str:
+    value = task.get(key)
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v) for v in value if v)
+    return str(value)
 
 
 class ActionTooltip:
@@ -280,6 +333,8 @@ class ActuaTareasScreen(ttk.Frame):
 
         win = tk.Toplevel(self)
         win.title(f"Editar: {meta['label']}")
+        win.transient(self.winfo_toplevel())
+        win.grab_set()
         values: dict[str, tk.StringVar] = {}
         for i, prm in enumerate(editable_params):
             ttk.Label(win, text=prm["label"]).grid(row=i, column=0, sticky="w", padx=6, pady=4)
@@ -357,10 +412,14 @@ class ActuaTareasScreen(ttk.Frame):
         self.flujo_combo.configure(values=nombres)
         if selected_name and selected_name in nombres:
             self.flujo_var.set(selected_name)
+            self._load_selected_flujo()
         elif nombres:
             self.flujo_var.set(nombres[0])
+            self._load_selected_flujo()
         else:
             self.flujo_var.set("")
+            self.pasos = []
+            self._refresh_tree()
 
     def _pick_folder(self):
         p = filedialog.askdirectory(parent=self)
@@ -455,8 +514,10 @@ class ActuaTareasScreen(ttk.Frame):
         self.status_var.set("Ejecutando...")
 
         def _worker():
+            driver = None
             try:
-                pending = task_inbox.list_pending(_ORIGEN_MAP.get(self.origen_var.get())) if _ORIGEN_MAP.get(self.origen_var.get()) else []
+                origen_valor = _ORIGEN_MAP.get(self.origen_var.get())
+                pending = task_inbox.list_pending(origen_valor) if origen_valor else []
                 if pending and self.selected_inbox_ids:
                     pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
                 if not pending:
@@ -466,35 +527,42 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
-                try:
-                    username = (self.email_session.get("address") or "").split("@")[0]
-                    password = self.email_session.get("password") or ""
-                    login_telcos(driver, username, password)
+                username = (self.email_session.get("address") or "").split("@")[0]
+                password = self.email_session.get("password") or ""
+                login_telcos(driver, username, password)
 
-                    consumidas_ok: list[int] = []
-                    for row in pending:
-                        ctx = {
-                            "task_number": row.get("task_number"),
-                            "numero_tarea": row.get("task_number"),
-                            "carpeta_base": self.carpeta_base_var.get().strip(),
-                            "file_aliases": self.aliases,
-                        }
-                        ctx.update(row.get("payload") or {})
+                consumidas_ok: list[int] = []
+                for row in pending:
+                    ctx = {
+                        "task_number": row.get("task_number"),
+                        "numero_tarea": row.get("task_number"),
+                        "carpeta_base": self.carpeta_base_var.get().strip(),
+                        "file_aliases": self.aliases,
+                    }
+                    ctx.update(row.get("payload") or {})
 
-                        def on_step(n, action_id, params):
-                            self.after(0, lambda: self._log(f"[{row.get('task_number')}] Paso {n}: {action_id} {params}"))
+                    def on_step(n, action_id, params, _task=row.get("task_number")):
+                        self.after(0, lambda: self._log(f"[{_task}] Paso {n}: {action_id} {params}"))
 
-                        ctx["on_step"] = on_step
+                    ctx["on_step"] = on_step
+                    try:
                         auto.ejecutar_flujo(driver, self.pasos, ctx)
                         if row.get("id"):
                             consumidas_ok.append(int(row["id"]))
-                    task_inbox.mark_consumed(consumidas_ok)
-                    self.after(0, lambda: self.status_var.set("Ejecución completada"))
-                finally:
-                    driver.quit()
+                        self.after(0, lambda t=row.get("task_number"): self._log(f"✓ Tarea {t} completada"))
+                    except Exception as exc:
+                        self.after(0, lambda t=row.get("task_number"), e=exc: self._log(f"✗ Tarea {t}: {e}"))
+                task_inbox.mark_consumed(consumidas_ok)
+                self.after(0, lambda: self.status_var.set("Ejecución completada"))
             except Exception as exc:
-                self.after(0, lambda: messagebox.showerror("Actua. Tareas", str(exc), parent=self))
+                self.after(0, lambda e=exc: messagebox.showerror("Actua. Tareas", str(e), parent=self))
                 self.after(0, lambda: self.status_var.set("Error durante la ejecución"))
+            finally:
+                if driver is not None:
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -517,79 +585,405 @@ class ActuaTareasScreen(ttk.Frame):
         return result.get().strip()
 
 
-def run_flow_from_inbox(master: tk.Misc, email_session: dict[str, str], origen: str, flujo_id: int) -> None:
-    flujo = actua_tareas_repo.load_flujo(flujo_id)
-    if not flujo:
-        messagebox.showerror("Actua. Tareas", "Flujo no encontrado", parent=master)
-        return
+class ActuaExecutionPanel(tk.Toplevel):
+    """Panel reutilizable que muestra las tareas detectadas por el módulo origen,
+    permite elegir un flujo guardado, valida que cada tarea contenga la
+    información requerida por el flujo y lanza la ejecución en segundo plano
+    (visible u oculto a voluntad del usuario)."""
 
-    modal = tk.Toplevel(master)
-    modal.title("Ejecutando flujo Actua. Tareas")
-    txt = ScrolledText(modal, width=90, height=20)
-    txt.pack(fill="both", expand=True, padx=8, pady=8)
-    progress = ttk.Progressbar(modal, mode="determinate")
-    progress.pack(fill="x", padx=8, pady=(0, 8))
+    def __init__(
+        self,
+        master: tk.Misc,
+        email_session: dict[str, str],
+        origen: str,
+        tareas: list[dict],
+        mode: str | None = None,
+    ):
+        super().__init__(master)
+        self.title("Actua. Tareas - Ejecutar flujo")
+        self.geometry("960x620")
+        self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
+        self.grab_set()
+        self.email_session = email_session or {}
+        self.origen = origen
+        self.mode = mode
+        self.tareas = [dict(t) for t in (tareas or [])]
+        self.flujos = actua_tareas_repo.list_flujos(mode=mode)
+        self.flujo_var = tk.StringVar()
+        self.headless_var = tk.BooleanVar(
+            value=db.get_config("ACTUA_HEADLESS", "1") != "0"
+        )
+        self.status_var = tk.StringVar(value="Listo")
+        self._running = False
+        self._driver = None
 
-    def log(msg: str):
-        txt.after(0, lambda: (txt.insert(tk.END, msg + "\n"), txt.see(tk.END)))
+        self._build()
+        self._populate_tareas()
+        self._populate_flujos()
 
-    def _worker():
-        pend = task_inbox.list_pending(origen)
-        if not pend:
-            log("No hay tareas pendientes en bandeja.")
-            return
-        progress.after(0, lambda: progress.configure(maximum=len(pend), value=0))
-        ids_ok = []
-        driver = _create_driver(headless=True)
+    # ------------------------------------------------------------------ UI
+    def _build(self) -> None:
+        wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
+        wrapper.pack(fill="both", expand=True)
+        wrapper.columnconfigure(0, weight=1)
+        wrapper.rowconfigure(1, weight=1)
+        wrapper.rowconfigure(4, weight=1)
+
+        header = ttk.Frame(wrapper, style="MyFrame.TFrame")
+        header.grid(row=0, column=0, sticky="ew")
+        header.columnconfigure(1, weight=1)
+        ttk.Label(
+            header,
+            text="Tareas detectadas por el módulo",
+            style="MyLabel.TLabel",
+        ).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            header,
+            text=f"Origen: {self.origen}",
+            style="MyLabel.TLabel",
+        ).grid(row=0, column=1, sticky="e")
+
+        columnas = _ORIGEN_COLUMNS.get(self.origen) or [("task_number", "N° Tarea")]
+        columnas = list(columnas) + [("estado", "Estado")]
+        self._columnas = columnas
+
+        tabla_frame = ttk.LabelFrame(
+            wrapper, text="Detalle de tareas", style="MyLabelFrame.TLabelframe", padding=8
+        )
+        tabla_frame.grid(row=1, column=0, sticky="nsew", pady=(6, 6))
+        tabla_frame.columnconfigure(0, weight=1)
+        tabla_frame.rowconfigure(0, weight=1)
+
+        cols = [c[0] for c in columnas]
+        self.tree = ttk.Treeview(
+            tabla_frame, columns=cols, show="headings", style="MyTreeview.Treeview"
+        )
+        for key, label in columnas:
+            self.tree.heading(key, text=label)
+            self.tree.column(key, width=150 if key != "estado" else 120, anchor="w")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+
+        scroll = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
+        scroll.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=scroll.set)
+
+        flow_frame = ttk.LabelFrame(
+            wrapper,
+            text="Flujo guardado a ejecutar",
+            style="MyLabelFrame.TLabelframe",
+            padding=8,
+        )
+        flow_frame.grid(row=2, column=0, sticky="ew")
+        flow_frame.columnconfigure(1, weight=1)
+        ttk.Label(flow_frame, text="Flujo:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
+        self.flujo_combo = ttk.Combobox(
+            flow_frame,
+            textvariable=self.flujo_var,
+            state="readonly",
+            width=50,
+        )
+        self.flujo_combo.grid(row=0, column=1, sticky="ew", padx=6)
+        self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_flujo_changed())
+
+        ttk.Checkbutton(
+            flow_frame,
+            text="Mostrar navegador al ejecutar (desmarque para modo oculto)",
+            variable=self.headless_var,
+            onvalue=False,
+            offvalue=True,
+            style="MyCheckbutton.TCheckbutton",
+        ).grid(row=0, column=2, padx=(10, 0))
+
+        self.validation_var = tk.StringVar(value="Seleccione un flujo para validar los datos.")
+        ttk.Label(
+            flow_frame,
+            textvariable=self.validation_var,
+            style="MyLabel.TLabel",
+            wraplength=800,
+            justify="left",
+        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
+
+        log_frame = ttk.LabelFrame(
+            wrapper, text="Bitácora de ejecución", style="MyLabelFrame.TLabelframe", padding=6
+        )
+        log_frame.grid(row=4, column=0, sticky="nsew", pady=(6, 6))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.log = ScrolledText(log_frame, height=8, state="disabled")
+        self.log.grid(row=0, column=0, sticky="nsew")
+
+        self.progress = ttk.Progressbar(wrapper, mode="determinate")
+        self.progress.grid(row=3, column=0, sticky="ew")
+
+        buttons = ttk.Frame(wrapper, style="MyFrame.TFrame")
+        buttons.grid(row=5, column=0, sticky="ew", pady=(6, 0))
+        buttons.columnconfigure(0, weight=1)
+
+        ttk.Label(buttons, textvariable=self.status_var, style="MyLabel.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
+        self.btn_validar = ttk.Button(
+            buttons, text="Validar", style="MyButton.TButton", command=self._validar
+        )
+        self.btn_validar.grid(row=0, column=1, padx=4)
+        add_hover_effect(self.btn_validar)
+        self.btn_ejecutar = ttk.Button(
+            buttons,
+            text="Ejecutar flujo en segundo plano",
+            style="MyButton.TButton",
+            command=self._ejecutar,
+        )
+        self.btn_ejecutar.grid(row=0, column=2, padx=4)
+        add_hover_effect(self.btn_ejecutar)
+        self.btn_cerrar = ttk.Button(
+            buttons, text="Cerrar", style="MyButton.TButton", command=self._on_close
+        )
+        self.btn_cerrar.grid(row=0, column=3, padx=4)
+        add_hover_effect(self.btn_cerrar)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ---------------------------------------------------------- helpers UI
+    def _log(self, msg: str) -> None:
+        def _append():
+            self.log.configure(state="normal")
+            self.log.insert(tk.END, msg + "\n")
+            self.log.see(tk.END)
+            self.log.configure(state="disabled")
+
         try:
-            username = (email_session.get("address") or "").split("@")[0]
-            login_telcos(driver, username, email_session.get("password") or "")
-            for i, row in enumerate(pend, start=1):
-                log(f"Iniciando tarea {i}/{len(pend)}: {row['task_number']}")
-                ctx = {"task_number": row["task_number"]}
-                ctx.update(row.get("payload") or {})
-                auto.ejecutar_flujo(driver, flujo.get("pasos") or [], ctx)
-                ids_ok.append(row["id"])
-                progress.after(0, lambda v=i: progress.configure(value=v))
-                log(f"✓ {row['task_number']}")
-            task_inbox.mark_consumed(ids_ok)
-            log("Finalizado")
-        except Exception as exc:
-            log(f"Error: {exc}")
+            self.after(0, _append)
+        except tk.TclError:
+            pass
+
+    def _populate_tareas(self) -> None:
+        self.tree.delete(*self.tree.get_children())
+        for idx, task in enumerate(self.tareas):
+            valores = [
+                _task_value(task, key) for key, _ in self._columnas if key != "estado"
+            ]
+            valores.append("Pendiente")
+            self.tree.insert("", "end", iid=str(idx), values=valores)
+
+    def _set_estado(self, idx: int, estado: str) -> None:
+        iid = str(idx)
+        if not self.tree.exists(iid):
+            return
+        vals = list(self.tree.item(iid, "values"))
+        vals[-1] = estado
+        self.after(0, lambda v=vals: self.tree.item(iid, values=v))
+
+    def _populate_flujos(self) -> None:
+        nombres = [f"{f['nombre']} (#{f['id']})" for f in self.flujos]
+        self.flujo_combo.configure(values=nombres)
+        if nombres:
+            self.flujo_var.set(nombres[0])
+            self._on_flujo_changed()
+        else:
+            self.validation_var.set(
+                "No hay flujos guardados para este módulo. Cree uno desde 'Actua. Tareas'."
+            )
+            self.btn_ejecutar.configure(state="disabled")
+            self.btn_validar.configure(state="disabled")
+
+    def _current_flujo(self) -> dict | None:
+        valor = self.flujo_var.get()
+        if not valor:
+            return None
+        try:
+            idx = [f"{f['nombre']} (#{f['id']})" for f in self.flujos].index(valor)
+        except ValueError:
+            return None
+        return self.flujos[idx]
+
+    def _on_flujo_changed(self) -> None:
+        self._validar(silent=True)
+
+    # -------------------------------------------------------- Validación
+    def _validar(self, silent: bool = False) -> bool:
+        flujo = self._current_flujo()
+        if not flujo:
+            self.validation_var.set("Seleccione un flujo válido.")
+            return False
+        pasos = flujo.get("pasos") or []
+        required = _required_keys_for_flow(pasos)
+        if not required:
+            self.validation_var.set(
+                f"Flujo '{flujo['nombre']}' no requiere datos adicionales. Listo para ejecutar."
+            )
+            return True
+
+        faltantes_por_tarea: list[str] = []
+        for task in self.tareas:
+            missing = [k for k in required if not _task_value(task, k).strip()]
+            if missing:
+                task_num = task.get("task_number") or "?"
+                faltantes_por_tarea.append(f"Tarea {task_num}: faltan {', '.join(missing)}")
+
+        if faltantes_por_tarea:
+            resumen = (
+                f"Flujo '{flujo['nombre']}' requiere: {', '.join(sorted(required))}.\n"
+                + "\n".join(faltantes_por_tarea[:6])
+            )
+            if len(faltantes_por_tarea) > 6:
+                resumen += f"\n…y {len(faltantes_por_tarea) - 6} tareas más."
+            self.validation_var.set(resumen)
+            if not silent:
+                messagebox.showwarning(
+                    "Validación",
+                    "Algunas tareas no contienen toda la información requerida por el flujo.",
+                    parent=self,
+                )
+            return False
+
+        self.validation_var.set(
+            f"Flujo '{flujo['nombre']}' validado. Requiere: {', '.join(sorted(required))}."
+        )
+        return True
+
+    # ---------------------------------------------------------- Ejecución
+    def _ejecutar(self) -> None:
+        if self._running:
+            return
+        if not self.tareas:
+            messagebox.showwarning("Actua. Tareas", "No hay tareas para ejecutar.", parent=self)
+            return
+        flujo = self._current_flujo()
+        if not flujo:
+            messagebox.showwarning("Actua. Tareas", "Seleccione un flujo.", parent=self)
+            return
+        if not self._validar(silent=True):
+            if not messagebox.askyesno(
+                "Validación",
+                "Algunas tareas no cuentan con toda la información requerida. ¿Desea continuar de todos modos?",
+                parent=self,
+            ):
+                return
+
+        db.set_config("ACTUA_HEADLESS", "1" if self.headless_var.get() else "0")
+
+        self._running = True
+        self.btn_ejecutar.configure(state="disabled")
+        self.btn_validar.configure(state="disabled")
+        self.flujo_combo.configure(state="disabled")
+        self.status_var.set("Ejecutando…")
+        self.progress.configure(maximum=len(self.tareas), value=0)
+
+        pasos = flujo.get("pasos") or []
+        headless = bool(self.headless_var.get())
+        tareas_snapshot = [dict(t) for t in self.tareas]
+
+        thread = threading.Thread(
+            target=self._worker, args=(pasos, tareas_snapshot, headless), daemon=True
+        )
+        thread.start()
+
+    def _worker(self, pasos: list[dict], tareas: list[dict], headless: bool) -> None:
+        exitos = 0
+        fallos = 0
+        try:
+            try:
+                self._driver = _create_driver(headless=headless)
+            except Exception as exc:
+                self._log(f"No se pudo iniciar el navegador: {exc}")
+                self.after(0, lambda: self.status_var.set("Error iniciando navegador"))
+                return
+
+            try:
+                username = (self.email_session.get("address") or "").split("@")[0]
+                password = self.email_session.get("password") or ""
+                if not username or not password:
+                    raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
+                self._log(f"Iniciando sesión en Telcos como {username}…")
+                login_telcos(self._driver, username, password)
+            except Exception as exc:
+                self._log(f"Fallo en el inicio de sesión: {exc}")
+                self.after(0, lambda: self.status_var.set("Error autenticando en Telcos"))
+                return
+
+            for idx, task in enumerate(tareas):
+                task_number = str(task.get("task_number") or "")
+                self._set_estado(idx, "En ejecución")
+                self._log(f"→ Tarea {task_number or '(sin número)'} ({idx + 1}/{len(tareas)})")
+                ctx = {
+                    "task_number": task_number,
+                    "numero_tarea": task_number,
+                    "carpeta_base": actua_tareas_repo.get_carpeta_base(""),
+                    "file_aliases": {},
+                }
+                # Propaga datos del módulo (proveedor, ruc, oc, etc.) como ctx
+                for k, v in task.items():
+                    if k == "task_number":
+                        continue
+                    if isinstance(v, (list, tuple)):
+                        ctx[k] = ", ".join(str(x) for x in v if x)
+                    elif v is not None:
+                        ctx[k] = v
+
+                def on_step(n, action_id, params, _t=task_number):
+                    self._log(f"   [{_t}] Paso {n}: {action_id} {params}")
+
+                ctx["on_step"] = on_step
+                try:
+                    auto.ejecutar_flujo(self._driver, pasos, ctx)
+                    exitos += 1
+                    self._set_estado(idx, "OK")
+                    self._log(f"✓ Tarea {task_number} completada")
+                except Exception as exc:
+                    fallos += 1
+                    self._set_estado(idx, f"Error: {exc}")
+                    self._log(f"✗ Tarea {task_number}: {exc}")
+                self.after(0, lambda v=idx + 1: self.progress.configure(value=v))
+
+            resumen = f"Finalizado. {exitos} exitosas / {fallos} con error."
+            self.after(0, lambda: self.status_var.set(resumen))
+            self._log(resumen)
         finally:
-            driver.quit()
+            if self._driver is not None:
+                try:
+                    self._driver.quit()
+                except Exception:
+                    pass
+                self._driver = None
+            self._running = False
+            self.after(0, lambda: self.btn_ejecutar.configure(state="normal"))
+            self.after(0, lambda: self.btn_validar.configure(state="normal"))
+            self.after(0, lambda: self.flujo_combo.configure(state="readonly"))
 
-    threading.Thread(target=_worker, daemon=True).start()
+    def _on_close(self) -> None:
+        if self._running:
+            if not messagebox.askyesno(
+                "Actua. Tareas",
+                "Hay una ejecución en curso. ¿Desea cerrar de todos modos?",
+                parent=self,
+            ):
+                return
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        self.destroy()
 
 
-def seleccionar_flujo_guardado(master: tk.Misc, mode: str | None = None) -> int | None:
-    flujos = actua_tareas_repo.list_flujos(mode=mode)
-    if not flujos:
-        messagebox.showwarning("Actua. Tareas", "No existen flujos guardados.", parent=master)
+def abrir_panel_tareas(
+    master: tk.Misc,
+    email_session: dict[str, str],
+    origen: str,
+    tareas: list[dict],
+    mode: str | None = None,
+) -> ActuaExecutionPanel | None:
+    """Abre el panel unificado de Actua. Tareas para las tareas recolectadas
+    por el módulo origen. Muestra la tabla con la información relevante y deja
+    que el usuario escoja el flujo a ejecutar."""
+    if not tareas:
+        messagebox.showinfo(
+            "Actua. Tareas",
+            "El módulo no detectó tareas para procesar en Actua. Tareas.",
+            parent=master,
+        )
         return None
-
-    dialog = tk.Toplevel(master)
-    dialog.title("Seleccionar flujo de Actua. Tareas")
-    dialog.transient(master)
-    dialog.grab_set()
-
-    ttk.Label(dialog, text="Seleccione el flujo a ejecutar:", style="MyLabel.TLabel").pack(padx=10, pady=(10, 4))
-    opciones = [f"{f['nombre']} (#{f['id']})" for f in flujos]
-    selected = tk.StringVar(value=opciones[0])
-    combo = ttk.Combobox(dialog, values=opciones, textvariable=selected, state="readonly", width=45)
-    combo.pack(padx=10, pady=6)
-
-    result: dict[str, int | None] = {"id": None}
-
-    def _ok():
-        idx = opciones.index(selected.get())
-        result["id"] = int(flujos[idx]["id"])
-        dialog.destroy()
-
-    ttk.Button(dialog, text="Cancelar", command=dialog.destroy).pack(side="right", padx=10, pady=10)
-    ttk.Button(dialog, text="Aceptar", command=_ok).pack(side="right", pady=10)
-    master.wait_window(dialog)
-    return result["id"]
+    panel = ActuaExecutionPanel(master, email_session, origen, tareas, mode=mode)
+    return panel
 
 
 def ejecutar_flujo_desde_modulo(
@@ -599,27 +993,30 @@ def ejecutar_flujo_desde_modulo(
     tareas: list[dict],
     mode: str | None = None,
 ) -> None:
-    if not tareas:
-        messagebox.showwarning("Actua. Tareas", "No se detectaron tareas para ejecutar.", parent=master)
+    """Compatibilidad hacia atrás: delega en ``abrir_panel_tareas``."""
+    abrir_panel_tareas(master, email_session, origen, tareas, mode=mode)
+
+
+def run_flow_from_inbox(
+    master: tk.Misc,
+    email_session: dict[str, str],
+    origen: str,
+    flujo_id: int,
+    headless: bool = True,
+) -> None:
+    """Ejecuta el flujo indicado sobre las tareas pendientes en bandeja.
+    Se conserva como atajo sin UI para flujos automatizados."""
+    flujo = actua_tareas_repo.load_flujo(flujo_id)
+    if not flujo:
+        messagebox.showerror("Actua. Tareas", "Flujo no encontrado", parent=master)
         return
-    flow_id = seleccionar_flujo_guardado(master, mode=mode)
-    if not flow_id:
+    pend = task_inbox.list_pending(origen)
+    if not pend:
+        messagebox.showinfo("Actua. Tareas", "No hay tareas pendientes en bandeja.", parent=master)
         return
-
-    dlg = tk.Toplevel(master)
-    dlg.title("Actua. Tareas - Ejecutar flujo")
-    dlg.transient(master)
-    dlg.grab_set()
-    ttk.Label(dlg, text="Tareas detectadas del módulo:", style="MyLabel.TLabel").pack(anchor="w", padx=10, pady=(10, 2))
-    txt = ScrolledText(dlg, width=70, height=8)
-    txt.pack(fill="both", expand=True, padx=10, pady=4)
-    txt.insert("1.0", "\n".join(str(t.get("task_number", "")) for t in tareas))
-    txt.configure(state="disabled")
-
-    def _run():
-        task_inbox.push(origen, tareas)
-        run_flow_from_inbox(master, email_session, origen, int(flow_id))
-        dlg.destroy()
-
-    ttk.Button(dlg, text="Ejecutar flujo", command=_run).pack(side="right", padx=10, pady=10)
-    ttk.Button(dlg, text="Cancelar", command=dlg.destroy).pack(side="right", pady=10)
+    tareas = []
+    for row in pend:
+        payload = dict(row.get("payload") or {})
+        payload["task_number"] = row.get("task_number")
+        tareas.append(payload)
+    abrir_panel_tareas(master, email_session, origen, tareas, mode=flujo.get("mode"))

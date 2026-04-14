@@ -135,8 +135,10 @@ def open_despacho(master, email_session):
                             result = f"Error en el procesamiento: {str(e)}"
                         results.append(result)
                         log_func(result)
+            messagebox.showinfo("Resultado", "\n".join(results))
+            window.after(0, lambda: btn_procesar.configure(state="normal"))
             try:
-                from gestorcompras.ui.actua_tareas_gui import ejecutar_flujo_desde_modulo
+                from gestorcompras.ui.actua_tareas_gui import abrir_panel_tareas
 
                 tareas = []
                 for orden, info in infos.items():
@@ -145,26 +147,29 @@ def open_despacho(master, email_session):
                             "task_number": str(info.get("tarea") or ""),
                             "oc": str(orden),
                             "ruc": info.get("ruc", ""),
-                            "emails": info.get("emails", []),
+                            "proveedor": info.get("folder_name", ""),
+                            "emails": info.get("emails", []) or [],
+                            "folder_name": info.get("folder_name", ""),
                         }
                     )
                 tareas = [t for t in tareas if t["task_number"]]
                 if tareas:
-                    if messagebox.askyesno(
-                        "Actua. Tareas",
-                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
-                        parent=window,
-                    ):
-                        ejecutar_flujo_desde_modulo(
-                            window,
-                            email_session,
-                            "correos_masivos",
-                            tareas,
-                        )
+                    def _abrir_panel():
+                        if messagebox.askyesno(
+                            "Actua. Tareas",
+                            "¿Desea abrir el panel de Actua. Tareas con las OC procesadas?",
+                            parent=window,
+                        ):
+                            abrir_panel_tareas(
+                                window,
+                                email_session,
+                                "correos_masivos",
+                                tareas,
+                            )
+
+                    window.after(0, _abrir_panel)
             except Exception as exc:
                 log_func(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
-            messagebox.showinfo("Resultado", "\n".join(results))
-            window.after(0, lambda: btn_procesar.configure(state="normal"))
 
         threading.Thread(target=process_all_orders).start()
 
