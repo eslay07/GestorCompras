@@ -152,19 +152,53 @@ def ingresar_observacion(driver, texto: str, **_params):
     campo.send_keys(texto)
 
 
+def _click_with_fallback(driver, locators, descripcion: str, timeout: int = 15):
+    """Intenta hacer clic probando varios locators. Si el clic normal falla
+    (por overlays u otros elementos que lo intercepten) recurre a un clic vía
+    JavaScript. Útil para los botones "Aceptar"/"OK" que a veces son <span>."""
+    last_error: Exception | None = None
+    for locator in locators:
+        try:
+            elem = wait_clickable_or_error(driver, locator, None, descripcion, timeout=timeout, retries=1)
+            try:
+                elem.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", elem)
+            return
+        except Exception as exc:
+            last_error = exc
+    raise Exception(f"No se pudo hacer clic en {descripcion}") from last_error
+
+
 def aceptar_observacion(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"), None, "Aceptar").click()
+    _click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnGrabarEjecucionTarea"),
+            (By.XPATH, "//*[@id='btnGrabarEjecucionTarea']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='Aceptar']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"),
+        ],
+        "Aceptar observación",
+    )
 
 
 def cerrar_mensaje_ok(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    try:
-        wait_clickable_or_error(driver, (By.ID, "btnSmsCustomOk"), None, "OK", timeout=8).click()
-    except Exception:
-        wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'OK')]"), None, "OK fallback", timeout=8).click()
+    _click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnSmsCustomOk"),
+            (By.XPATH, "//*[@id='btnSmsCustomOk']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='OK']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'OK')]"),
+        ],
+        "OK",
+        timeout=8,
+    )
 
 
 def abrir_seguimiento(driver, **_params):
@@ -281,7 +315,16 @@ def motivo_pausa(driver, valor_o_label: str, **_params):
 def aceptar_pausa(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"), None, "Aceptar pausa").click()
+    _click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnGrabarPausaTarea"),
+            (By.XPATH, "//*[@id='btnGrabarPausaTarea']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='Aceptar']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"),
+        ],
+        "Aceptar pausa",
+    )
 
 
 ACCIONES = [
