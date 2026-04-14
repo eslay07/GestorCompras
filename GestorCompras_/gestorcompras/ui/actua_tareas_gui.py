@@ -73,6 +73,7 @@ class ActuaTareasScreen(ttk.Frame):
         self.mostrar_nav_var = tk.BooleanVar(value=True)
         self.origen_var = tk.StringVar(value="Manual")
         self.status_var = tk.StringVar(value="Listo")
+        self.action_help_var = tk.StringVar(value="Seleccione una acción para ver su descripción.")
 
         self._build()
         self._load_aliases()
@@ -155,10 +156,19 @@ class ActuaTareasScreen(ttk.Frame):
                 style="MyButton.TButton",
                 command=lambda a=accion: self._agregar_paso(a),
             )
-            btn.grid(row=i, column=0, sticky="ew", pady=3)
+            btn.grid(row=i, column=0, sticky="ew", pady=3, padx=(0, 4))
             add_hover_effect(btn)
-            ActionTooltip(btn, accion.get("descripcion", ""))
-            ttk.Label(act_container, text=accion.get("descripcion", ""), style="MyLabel.TLabel").grid(row=i, column=1, padx=6, sticky="w")
+            descripcion = accion.get("descripcion", "")
+            ActionTooltip(btn, descripcion)
+            btn.bind("<Enter>", lambda _e, d=descripcion: self.action_help_var.set(d), add="+")
+
+        ttk.Label(
+            left,
+            textvariable=self.action_help_var,
+            style="MyLabel.TLabel",
+            wraplength=360,
+            justify="left",
+        ).pack(fill="x", padx=4, pady=(4, 0))
 
         right = ttk.LabelFrame(self, text="Flujo", style="MyLabelFrame.TLabelframe", padding=8)
         right.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
@@ -509,6 +519,7 @@ def run_flow_from_inbox(master: tk.Misc, email_session: dict[str, str], origen: 
             username = (email_session.get("address") or "").split("@")[0]
             login_telcos(driver, username, email_session.get("password") or "")
             for i, row in enumerate(pend, start=1):
+                log(f"Iniciando tarea {i}/{len(pend)}: {row['task_number']}")
                 ctx = {"task_number": row["task_number"]}
                 ctx.update(row.get("payload") or {})
                 auto.ejecutar_flujo(driver, flujo.get("pasos") or [], ctx)
@@ -523,3 +534,33 @@ def run_flow_from_inbox(master: tk.Misc, email_session: dict[str, str], origen: 
             driver.quit()
 
     threading.Thread(target=_worker, daemon=True).start()
+
+
+def seleccionar_flujo_guardado(master: tk.Misc, mode: str | None = None) -> int | None:
+    flujos = actua_tareas_repo.list_flujos(mode=mode)
+    if not flujos:
+        messagebox.showwarning("Actua. Tareas", "No existen flujos guardados.", parent=master)
+        return None
+
+    dialog = tk.Toplevel(master)
+    dialog.title("Seleccionar flujo de Actua. Tareas")
+    dialog.transient(master)
+    dialog.grab_set()
+
+    ttk.Label(dialog, text="Seleccione el flujo a ejecutar:", style="MyLabel.TLabel").pack(padx=10, pady=(10, 4))
+    opciones = [f"{f['nombre']} (#{f['id']})" for f in flujos]
+    selected = tk.StringVar(value=opciones[0])
+    combo = ttk.Combobox(dialog, values=opciones, textvariable=selected, state="readonly", width=45)
+    combo.pack(padx=10, pady=6)
+
+    result: dict[str, int | None] = {"id": None}
+
+    def _ok():
+        idx = opciones.index(selected.get())
+        result["id"] = int(flujos[idx]["id"])
+        dialog.destroy()
+
+    ttk.Button(dialog, text="Cancelar", command=dialog.destroy).pack(side="right", padx=10, pady=10)
+    ttk.Button(dialog, text="Aceptar", command=_ok).pack(side="right", pady=10)
+    master.wait_window(dialog)
+    return result["id"]

@@ -28,12 +28,12 @@ try:
     _ROOT = Path(__file__).resolve().parents[2]
     if str(_ROOT) not in sys.path:
         sys.path.append(str(_ROOT))
-    from gestorcompras.services import task_inbox, actua_tareas_repo  # type: ignore
-    from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox  # type: ignore
+    from gestorcompras.services import task_inbox  # type: ignore
+    from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox, seleccionar_flujo_guardado  # type: ignore
 except Exception:  # pragma: no cover
     task_inbox = None
-    actua_tareas_repo = None
     run_flow_from_inbox = None
+    seleccionar_flujo_guardado = None
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -158,12 +158,16 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                         "Actua. Tareas",
                         "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
                     ):
-                        flujos = actua_tareas_repo.list_flujos() if actua_tareas_repo else []
-                        if flujos and run_flow_from_inbox:
+                        flujo_id = (
+                            seleccionar_flujo_guardado(text_widget.winfo_toplevel())
+                            if seleccionar_flujo_guardado
+                            else None
+                        )
+                        if flujo_id and run_flow_from_inbox:
                             run_flow_from_inbox(text_widget.winfo_toplevel(), {
                                 "address": cfg.usuario_oc,
                                 "password": cfg.password_oc,
-                            }, "descargas_oc", int(flujos[0]["id"]))
+                            }, "descargas_oc", int(flujo_id))
         except Exception as exc:
             append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
         if ordenes:
