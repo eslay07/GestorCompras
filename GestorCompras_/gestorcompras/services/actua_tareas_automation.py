@@ -207,30 +207,30 @@ def aceptar_pausa(driver, **_params):
 
 
 ACCIONES = [
-    {"id": "abrir_tareas_personales", "label": "Abrir tareas personales", "descripcion": "Abre el panel de tareas.", "params": []},
-    {"id": "ingresar_numero_tarea", "label": "Ingresar N° tarea", "descripcion": "Escribe el número de tarea.", "params": [{"name": "numero", "label": "Número", "tipo": "texto"}]},
-    {"id": "consultar", "label": "Consultar", "descripcion": "Ejecuta consulta.", "params": []},
-    {"id": "filtrar_tareas", "label": "Filtrar tareas", "descripcion": "Filtra tabla de tareas.", "params": [{"name": "texto", "label": "Texto", "tipo": "texto"}]},
-    {"id": "seleccionar_tarea", "label": "Seleccionar tarea", "descripcion": "Selecciona primera tarea.", "params": [{"name": "numero", "label": "Número (referencia)", "tipo": "texto"}]},
-    {"id": "reanudar_tarea", "label": "▶ Reanudar tarea", "descripcion": "Reanuda la tarea.", "params": []},
-    {"id": "ingresar_observacion", "label": "Ingresar observación", "descripcion": "Escribe observación.", "params": [{"name": "texto", "label": "Observación", "tipo": "texto"}]},
-    {"id": "aceptar_observacion", "label": "Aceptar observación", "descripcion": "Confirma observación.", "params": []},
-    {"id": "cerrar_mensaje_ok", "label": "Cerrar OK", "descripcion": "Cierra modal OK.", "params": []},
-    {"id": "abrir_seguimiento", "label": "Abrir seguimiento", "descripcion": "Abre módulo seguimiento.", "params": []},
-    {"id": "guardar_seguimiento", "label": "Guardar seguimiento", "descripcion": "Guarda seguimiento.", "params": []},
-    {"id": "abrir_subida_archivo", "label": "📄 Subida de archivo", "descripcion": "Abre módulo carga.", "params": []},
-    {"id": "seleccionar_archivo", "label": "Seleccionar archivo", "descripcion": "Carga ruta de archivo.", "params": [{"name": "ruta", "label": "Ruta / alias", "tipo": "archivo"}]},
-    {"id": "subir_archivo", "label": "Subir archivo", "descripcion": "Ejecuta subida.", "params": []},
-    {"id": "cerrar_mensaje_fin_tarea", "label": "Cerrar fin tarea", "descripcion": "Cierra confirmación final.", "params": []},
-    {"id": "abrir_reasignar", "label": "Abrir reasignar", "descripcion": "Abre modal de reasignación.", "params": []},
-    {"id": "ingresar_departamento", "label": "Departamento", "descripcion": "Selecciona departamento.", "params": [{"name": "nombre", "label": "Departamento", "tipo": "texto"}]},
-    {"id": "ingresar_empleado", "label": "Empleado", "descripcion": "Selecciona empleado.", "params": [{"name": "nombre", "label": "Empleado", "tipo": "texto"}]},
-    {"id": "observacion_reasignacion", "label": "Obs. reasignación", "descripcion": "Escribe observación.", "params": [{"name": "texto", "label": "Observación", "tipo": "texto"}]},
-    {"id": "guardar_reasignacion", "label": "Guardar reasignación", "descripcion": "Guarda reasignación.", "params": []},
-    {"id": "pausar_tarea", "label": "Pausar tarea", "descripcion": "Pausa tarea activa.", "params": []},
+    {"id": "abrir_tareas_personales", "label": "Navegación → Abrir 'Tareas personales'", "descripcion": "Abre el panel principal de tareas en Telcos.", "params": []},
+    {"id": "ingresar_numero_tarea", "label": "Búsqueda → Escribir N° de tarea", "descripcion": "Escribe el número de tarea en el campo principal.", "params": [{"name": "numero", "label": "Número", "tipo": "texto"}]},
+    {"id": "consultar", "label": "Búsqueda → Consultar", "descripcion": "Ejecuta la búsqueda de tareas.", "params": []},
+    {"id": "filtrar_tareas", "label": "Tabla → Filtrar resultados", "descripcion": "Filtra la tabla de tareas por texto.", "params": [{"name": "texto", "label": "Texto", "tipo": "texto"}]},
+    {"id": "seleccionar_tarea", "label": "Tabla → Seleccionar primera tarea", "descripcion": "Selecciona la primera fila visible de la tabla.", "params": [{"name": "numero", "label": "Número (referencia)", "tipo": "texto"}]},
+    {"id": "reanudar_tarea", "label": "Ejecución → Reanudar tarea", "descripcion": "Abre/reanuda la tarea seleccionada.", "params": []},
+    {"id": "ingresar_observacion", "label": "Ejecución → Escribir observación", "descripcion": "Escribe la observación de ejecución.", "params": [{"name": "texto", "label": "Observación", "tipo": "texto"}]},
+    {"id": "aceptar_observacion", "label": "Ejecución → Aceptar observación", "descripcion": "Confirma la observación ingresada.", "params": []},
+    {"id": "cerrar_mensaje_ok", "label": "Modal → Cerrar mensaje OK", "descripcion": "Cierra el mensaje de confirmación tipo OK.", "params": []},
+    {"id": "abrir_seguimiento", "label": "Seguimiento → Abrir panel", "descripcion": "Abre la ventana de seguimiento de la tarea.", "params": []},
+    {"id": "guardar_seguimiento", "label": "Seguimiento → Guardar", "descripcion": "Guarda la información del seguimiento.", "params": []},
+    {"id": "abrir_subida_archivo", "label": "Archivos → Abrir carga", "descripcion": "Abre el módulo para cargar archivos.", "params": []},
+    {"id": "seleccionar_archivo", "label": "Archivos → Seleccionar archivo", "descripcion": "Selecciona archivo (ruta o alias).", "params": [{"name": "ruta", "label": "Ruta / alias", "tipo": "archivo"}]},
+    {"id": "subir_archivo", "label": "Archivos → Subir archivo", "descripcion": "Ejecuta la carga del archivo seleccionado.", "params": []},
+    {"id": "cerrar_mensaje_fin_tarea", "label": "Modal → Cerrar fin de tarea", "descripcion": "Cierra la confirmación final de tarea.", "params": []},
+    {"id": "abrir_reasignar", "label": "Reasignación → Abrir panel", "descripcion": "Abre la ventana de reasignación.", "params": []},
+    {"id": "ingresar_departamento", "label": "Reasignación → Elegir departamento", "descripcion": "Selecciona el departamento destino.", "params": [{"name": "nombre", "label": "Departamento", "tipo": "texto"}]},
+    {"id": "ingresar_empleado", "label": "Reasignación → Elegir empleado", "descripcion": "Selecciona el empleado destino.", "params": [{"name": "nombre", "label": "Empleado", "tipo": "texto"}]},
+    {"id": "observacion_reasignacion", "label": "Reasignación → Escribir observación", "descripcion": "Escribe observación para la reasignación.", "params": [{"name": "texto", "label": "Observación", "tipo": "texto"}]},
+    {"id": "guardar_reasignacion", "label": "Reasignación → Guardar", "descripcion": "Guarda y confirma la reasignación.", "params": []},
+    {"id": "pausar_tarea", "label": "Ejecución → Pausar tarea", "descripcion": "Abre el flujo de pausa de tarea.", "params": []},
     {
         "id": "motivo_pausa",
-        "label": "Motivo de pausa",
+        "label": "Ejecución → Seleccionar motivo de pausa",
         "descripcion": "Selecciona motivo (catálogo cerrado).",
         "params": [
             {
@@ -241,7 +241,7 @@ ACCIONES = [
             }
         ],
     },
-    {"id": "aceptar_pausa", "label": "Aceptar pausa", "descripcion": "Confirma pausa.", "params": []},
+    {"id": "aceptar_pausa", "label": "Ejecución → Confirmar pausa", "descripcion": "Confirma y guarda la pausa.", "params": []},
 ]
 
 _DISPATCH = {item["id"]: globals()[item["id"]] for item in ACCIONES}

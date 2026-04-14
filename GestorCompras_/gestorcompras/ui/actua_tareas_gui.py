@@ -19,6 +19,42 @@ _ORIGEN_MAP = {
 }
 
 
+class ActionTooltip:
+    def __init__(self, widget: tk.Widget, text: str):
+        self.widget = widget
+        self.text = text
+        self.tip_window: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event=None):
+        if self.tip_window or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 18
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 2
+        self.tip_window = tk.Toplevel(self.widget)
+        self.tip_window.wm_overrideredirect(True)
+        self.tip_window.wm_geometry(f"+{x}+{y}")
+        lbl = tk.Label(
+            self.tip_window,
+            text=self.text,
+            justify="left",
+            bg="#fff7d1",
+            fg="#1f1f1f",
+            relief="solid",
+            borderwidth=1,
+            padx=8,
+            pady=4,
+            font=("Segoe UI", 9),
+        )
+        lbl.pack()
+
+    def _hide(self, _event=None):
+        if self.tip_window is not None:
+            self.tip_window.destroy()
+            self.tip_window = None
+
+
 class ActuaTareasScreen(ttk.Frame):
     def __init__(self, master: tk.Misc, email_session: dict[str, str], origin: str):
         super().__init__(master, style="MyFrame.TFrame")
@@ -121,6 +157,7 @@ class ActuaTareasScreen(ttk.Frame):
             )
             btn.grid(row=i, column=0, sticky="ew", pady=3)
             add_hover_effect(btn)
+            ActionTooltip(btn, accion.get("descripcion", ""))
             ttk.Label(act_container, text=accion.get("descripcion", ""), style="MyLabel.TLabel").grid(row=i, column=1, padx=6, sticky="w")
 
         right = ttk.LabelFrame(self, text="Flujo", style="MyLabelFrame.TLabelframe", padding=8)
