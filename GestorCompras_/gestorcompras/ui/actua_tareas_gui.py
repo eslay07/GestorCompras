@@ -197,22 +197,27 @@ class ActuaTareasScreen(ttk.Frame):
         ttk.Label(bottom, text="Carpeta base:", style="MyLabel.TLabel").grid(row=0, column=2, padx=(10, 0), sticky="w")
         ttk.Entry(bottom, textvariable=self.carpeta_base_var, width=40).grid(row=0, column=3, padx=4)
         ttk.Button(bottom, text="Examinar…", command=self._pick_folder).grid(row=0, column=4)
+        ttk.Label(bottom, text="Tareas manuales (1 por línea):", style="MyLabel.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(4, 0)
+        )
+        self.manual_tasks_text = tk.Text(bottom, height=3, width=36)
+        self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(4, 0))
 
-        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar", variable=self.mostrar_nav_var).grid(row=1, column=0, columnspan=2, sticky="w", pady=6)
-        ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=1, column=2, columnspan=3, sticky="w")
+        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar", variable=self.mostrar_nav_var).grid(row=2, column=0, columnspan=2, sticky="w", pady=6)
+        ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=2, column=2, columnspan=3, sticky="w")
 
         self.log = ScrolledText(bottom, height=5, state="disabled")
-        self.log.grid(row=2, column=0, columnspan=5, sticky="ew", pady=4)
+        self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=4)
 
         run_btn = ttk.Button(bottom, text="Ejecutar flujo", style="MyButton.TButton", command=self._run_flow)
-        run_btn.grid(row=3, column=3, sticky="e", pady=5)
+        run_btn.grid(row=4, column=3, sticky="e", pady=5)
         add_hover_effect(run_btn)
         back_btn = ttk.Button(bottom, text="◀ Regresar", style="MyButton.TButton", command=self._go_back)
-        back_btn.grid(row=3, column=4, sticky="e", padx=6)
+        back_btn.grid(row=4, column=4, sticky="e", padx=6)
         add_hover_effect(back_btn)
 
         alias_frame = ttk.LabelFrame(bottom, text="Alias de archivos", style="MyLabelFrame.TLabelframe", padding=6)
-        alias_frame.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(6, 0))
+        alias_frame.grid(row=5, column=0, columnspan=5, sticky="ew", pady=(6, 0))
         self.alias_name = tk.StringVar()
         self.alias_path = tk.StringVar()
         ttk.Entry(alias_frame, textvariable=self.alias_name, width=20).grid(row=0, column=0, padx=4)
@@ -455,7 +460,10 @@ class ActuaTareasScreen(ttk.Frame):
                 if pending and self.selected_inbox_ids:
                     pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
                 if not pending:
-                    pending = [{"id": None, "task_number": self.task_default_var.get().strip(), "payload": {}}]
+                    manual_tasks = self._manual_tasks()
+                    pending = [{"id": None, "task_number": num, "payload": {}} for num in manual_tasks]
+                if not pending:
+                    raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
                 try:
@@ -489,6 +497,13 @@ class ActuaTareasScreen(ttk.Frame):
                 self.after(0, lambda: self.status_var.set("Error durante la ejecución"))
 
         threading.Thread(target=_worker, daemon=True).start()
+
+    def _manual_tasks(self) -> list[str]:
+        raw = self.manual_tasks_text.get("1.0", tk.END)
+        values = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not values and self.task_default_var.get().strip():
+            values = [self.task_default_var.get().strip()]
+        return values
 
     def _ask_text(self, title: str) -> str:
         dialog = tk.Toplevel(self)
@@ -575,3 +590,36 @@ def seleccionar_flujo_guardado(master: tk.Misc, mode: str | None = None) -> int 
     ttk.Button(dialog, text="Aceptar", command=_ok).pack(side="right", pady=10)
     master.wait_window(dialog)
     return result["id"]
+
+
+def ejecutar_flujo_desde_modulo(
+    master: tk.Misc,
+    email_session: dict[str, str],
+    origen: str,
+    tareas: list[dict],
+    mode: str | None = None,
+) -> None:
+    if not tareas:
+        messagebox.showwarning("Actua. Tareas", "No se detectaron tareas para ejecutar.", parent=master)
+        return
+    flow_id = seleccionar_flujo_guardado(master, mode=mode)
+    if not flow_id:
+        return
+
+    dlg = tk.Toplevel(master)
+    dlg.title("Actua. Tareas - Ejecutar flujo")
+    dlg.transient(master)
+    dlg.grab_set()
+    ttk.Label(dlg, text="Tareas detectadas del módulo:", style="MyLabel.TLabel").pack(anchor="w", padx=10, pady=(10, 2))
+    txt = ScrolledText(dlg, width=70, height=8)
+    txt.pack(fill="both", expand=True, padx=10, pady=4)
+    txt.insert("1.0", "\n".join(str(t.get("task_number", "")) for t in tareas))
+    txt.configure(state="disabled")
+
+    def _run():
+        task_inbox.push(origen, tareas)
+        run_flow_from_inbox(master, email_session, origen, int(flow_id))
+        dlg.destroy()
+
+    ttk.Button(dlg, text="Ejecutar flujo", command=_run).pack(side="right", padx=10, pady=10)
+    ttk.Button(dlg, text="Cancelar", command=dlg.destroy).pack(side="right", pady=10)

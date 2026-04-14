@@ -97,10 +97,12 @@ def abrir_tareas_personales(driver, **_params):
     driver.execute_script("arguments[0].click();", btn)
 
 
-def ingresar_numero_tarea(driver, numero: str, **_params):
+def ingresar_numero_tarea(driver, numero: str = "", **_params):
     from selenium.webdriver.common.by import By
     from selenium.webdriver.common.keys import Keys
 
+    if not str(numero or "").strip():
+        raise ValueError("Debe indicar un número de tarea para la acción 'Ingresar N° de tarea'.")
     campo = wait_clickable_or_error(driver, (By.ID, "txtActividad"), None, "Número de tarea")
     campo.clear()
     campo.send_keys(str(numero))
@@ -346,6 +348,8 @@ def ejecutar_flujo(driver, pasos: list[dict[str, Any]], ctx: dict[str, Any] | No
         params = dict(paso.get("params") or {})
         for key, value in list(params.items()):
             params[key] = _resolve(value, ctx)
+        if action_id == "ingresar_numero_tarea" and not str(params.get("numero", "")).strip():
+            params["numero"] = str(ctx.get("task_number", "")).strip()
         if action_id == "seleccionar_archivo" and "ruta" in params:
             params["ruta"] = _resolver_archivo(params["ruta"], ctx)
         _DISPATCH[action_id](driver, **params)

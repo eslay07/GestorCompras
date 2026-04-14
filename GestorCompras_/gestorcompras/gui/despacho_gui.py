@@ -136,8 +136,7 @@ def open_despacho(master, email_session):
                         results.append(result)
                         log_func(result)
             try:
-                from gestorcompras.services import task_inbox
-                from gestorcompras.ui.actua_tareas_gui import run_flow_from_inbox, seleccionar_flujo_guardado
+                from gestorcompras.ui.actua_tareas_gui import ejecutar_flujo_desde_modulo
 
                 tareas = []
                 for orden, info in infos.items():
@@ -151,15 +150,17 @@ def open_despacho(master, email_session):
                     )
                 tareas = [t for t in tareas if t["task_number"]]
                 if tareas:
-                    task_inbox.push("correos_masivos", tareas)
                     if messagebox.askyesno(
                         "Actua. Tareas",
                         "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
                         parent=window,
                     ):
-                        flujo_id = seleccionar_flujo_guardado(window)
-                        if flujo_id:
-                            run_flow_from_inbox(window, email_session, "correos_masivos", flujo_id)
+                        ejecutar_flujo_desde_modulo(
+                            window,
+                            email_session,
+                            "correos_masivos",
+                            tareas,
+                        )
             except Exception as exc:
                 log_func(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
             messagebox.showinfo("Resultado", "\n".join(results))
