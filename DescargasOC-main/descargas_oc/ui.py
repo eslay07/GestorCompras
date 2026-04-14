@@ -2,8 +2,10 @@ import tkinter as tk
 import threading
 import logging
 import re
+import sys
 from datetime import datetime
 from tkinter import messagebox
+from pathlib import Path
 
 try:  # permite ejecutar como script
     from .escuchador import buscar_ocs, cargar_ultimo_uidl, registrar_procesados
@@ -21,6 +23,14 @@ except ImportError:  # pragma: no cover
 logger = get_logger(__name__)
 
 scanning_lock = threading.Lock()
+
+try:
+    _ROOT = Path(__file__).resolve().parents[2]
+    if str(_ROOT) not in sys.path:
+        sys.path.append(str(_ROOT))
+    from gestorcompras.ui.actua_tareas_gui import ejecutar_flujo_desde_modulo  # type: ignore
+except Exception:  # pragma: no cover
+    ejecutar_flujo_desde_modulo = None
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -126,6 +136,35 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
         else:
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg, errores=errores)
+        try:
+            if ejecutar_flujo_desde_modulo and ordenes:
+                tasks = []
+                for orden in ordenes:
+                    tasks.append(
+                        {
+                            "task_number": str(orden.get("tarea") or ""),
+                            "oc": orden.get("numero", ""),
+                            "proveedor": orden.get("proveedor", ""),
+                            "fecha_orden": orden.get("fecha_orden", ""),
+                        }
+                    )
+                tasks = [t for t in tasks if t["task_number"]]
+                if tasks:
+                    if messagebox.askyesno(
+                        "Actua. Tareas",
+                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
+                    ):
+                        ejecutar_flujo_desde_modulo(
+                            text_widget.winfo_toplevel(),
+                            {
+                                "address": cfg.usuario_oc,
+                                "password": cfg.password_oc,
+                            },
+                            "descargas_oc",
+                            tasks,
+                        )
+        except Exception as exc:
+            append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
         if ordenes:
             no_aprobadas = [
                 e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")

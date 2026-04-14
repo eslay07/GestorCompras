@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 
 from gestorcompras.gui import config_gui, seguimientos_gui
 from gestorcompras.modules import correos_masivos_gui, descargas_oc_gui, reasignacion_gui
@@ -22,8 +22,9 @@ def _button_specs():
         ("Correos Masivos", "open_correos_masivos"),
         ("Seguimientos", "open_seguimientos"),
         ("Descargas OC", "open_descargas_oc"),
-        ("Cotizador", "open_cotizador"),
+        ("Actua. Tareas", "open_actua_tareas"),
         ("Configuración", "open_config"),
+        ("◀ Regresar al menú inicial", "open_home"),
         ("Salir", "quit"),
     ]
 
@@ -50,9 +51,27 @@ class BienesMenu(ttk.Frame):
         self.banner.pack(pady=(20, 10))
         self.after(0, self._animate_banner)
 
-        menu_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
-        menu_frame.pack(pady=20)
+        canvas_holder = ttk.Frame(container, style="MyFrame.TFrame")
+        canvas_holder.pack(fill="both", expand=True, padx=10, pady=10)
+        canvas_holder.columnconfigure(0, weight=1)
+        canvas_holder.rowconfigure(0, weight=1)
+
+        canvas = tk.Canvas(canvas_holder, highlightthickness=0, bg=bg_frame)
+        scrollbar = ttk.Scrollbar(canvas_holder, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+
+        menu_frame = ttk.Frame(canvas, style="MyFrame.TFrame", padding=20)
+        window_id = canvas.create_window((0, 0), window=menu_frame, anchor="n")
         menu_frame.columnconfigure(0, weight=1)
+
+        def _sync_scroll_region(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfigure(window_id, width=canvas.winfo_width())
+
+        menu_frame.bind("<Configure>", _sync_scroll_region)
+        canvas.bind("<Configure>", _sync_scroll_region)
 
         lbl_title = ttk.Label(menu_frame, text="Compras Bienes", style="MyLabel.TLabel")
         lbl_title.configure(font=("Segoe UI", 11, "bold"), foreground=color_titulos)
@@ -95,8 +114,13 @@ class BienesMenu(ttk.Frame):
     def open_config(self) -> None:
         config_gui.open_config_gui(self.master, self.email_session)
 
-    def open_cotizador(self) -> None:
-        messagebox.showinfo("Cotizador", "Esta opción se encuentra en desarrollo", parent=self.master)
+    def open_actua_tareas(self) -> None:
+        from gestorcompras.ui import router
+        router.open_actua_tareas(origin="bienes")
+
+    def open_home(self) -> None:
+        from gestorcompras.ui import router
+        router.open_home()
 
     def quit(self) -> None:
         if isinstance(self.master, tk.Tk):
