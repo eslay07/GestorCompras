@@ -261,24 +261,23 @@ class ActuaTareasScreen(ttk.Frame):
         meta = next((a for a in auto.ACCIONES if a["id"] == paso["id"]), None)
         if not meta:
             return
+        editable_params = [p for p in meta.get("params", []) if p.get("tipo") == "texto"]
+        if not editable_params:
+            messagebox.showinfo(
+                "Actua. Tareas",
+                "Esta acción es un botón y no contiene texto.",
+                parent=self,
+            )
+            return
 
         win = tk.Toplevel(self)
         win.title(f"Editar: {meta['label']}")
         values: dict[str, tk.StringVar] = {}
-        for i, prm in enumerate(meta.get("params", [])):
+        for i, prm in enumerate(editable_params):
             ttk.Label(win, text=prm["label"]).grid(row=i, column=0, sticky="w", padx=6, pady=4)
             v = tk.StringVar(value=str((paso.get("params") or {}).get(prm["name"], "")))
             values[prm["name"]] = v
-            if prm.get("tipo") == "select":
-                ttk.Combobox(
-                    win,
-                    textvariable=v,
-                    values=prm.get("opciones", []),
-                    state="readonly",
-                    width=40,
-                ).grid(row=i, column=1, padx=6, pady=4)
-            else:
-                ttk.Entry(win, textvariable=v, width=42).grid(row=i, column=1, padx=6, pady=4)
+            ttk.Entry(win, textvariable=v, width=42).grid(row=i, column=1, padx=6, pady=4)
 
         def _save():
             paso["params"] = {k: v.get() for k, v in values.items()}
