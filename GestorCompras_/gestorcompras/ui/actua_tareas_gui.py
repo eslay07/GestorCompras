@@ -767,11 +767,18 @@ class ActuaExecutionPanel(tk.Toplevel):
 
     def _set_estado(self, idx: int, estado: str) -> None:
         iid = str(idx)
-        if not self.tree.exists(iid):
-            return
-        vals = list(self.tree.item(iid, "values"))
-        vals[-1] = estado
-        self.after(0, lambda v=vals: self.tree.item(iid, values=v))
+
+        def _apply():
+            if not self.tree.exists(iid):
+                return
+            vals = list(self.tree.item(iid, "values"))
+            vals[-1] = estado
+            self.tree.item(iid, values=vals)
+
+        try:
+            self.after(0, _apply)
+        except tk.TclError:
+            pass
 
     def _populate_flujos(self) -> None:
         nombres = [f"{f['nombre']} (#{f['id']})" for f in self.flujos]
@@ -1004,19 +1011,87 @@ def run_flow_from_inbox(
     flujo_id: int,
     headless: bool = True,
 ) -> None:
-    """Ejecuta el flujo indicado sobre las tareas pendientes en bandeja.
-    Se conserva como atajo sin UI para flujos automatizados."""
+    """Ejecuta el flujo ``flujo_id`` sobre las tareas pendientes en bandeja
+    sin requerir interacción del usuario. Es un atajo pensado para flujos
+    automatizados: honra los parámetros ``flujo_id`` y ``headless`` y no abre
+    el selector interactivo."""
     flujo = actua_tareas_repo.load_flujo(flujo_id)
     if not flujo:
         messagebox.showerror("Actua. Tareas", "Flujo no encontrado", parent=master)
         return
     pend = task_inbox.list_pending(origen)
     if not pend:
-        messagebox.showinfo("Actua. Tareas", "No hay tareas pendientes en bandeja.", parent=master)
+        messagebox.showinfo(
+            "Actua. Tareas", "No hay tareas pendientes en bandeja.", parent=master
+        )
         return
-    tareas = []
-    for row in pend:
-        payload = dict(row.get("payload") or {})
-        payload["task_number"] = row.get("task_number")
-        tareas.append(payload)
-    abrir_panel_tareas(master, email_session, origen, tareas, mode=flujo.get("mode"))
+
+    modal = tk.Toplevel(master)
+    modal.title(f"Ejecutando flujo Actua. Tareas ({flujo.get('nombre', flujo_id)})")
+    txt = ScrolledText(modal, width=90, height=18, state="disabled")
+    txt.pack(fill="both", expand=True, padx=8, pady=8)
+    progress = ttk.Progressbar(modal, mode="determinate", maximum=len(pend))
+    progress.pack(fill="x", padx=8, pady=(0, 8))
+
+    def log(msg: str) -> None:
+        def _append():
+            txt.configure(state="normal")
+            txt.insert(tk.END, msg + "\n")
+            txt.see(tk.END)
+            txt.configure(state="disabled")
+
+        try:
+            modal.after(0, _append)
+        except tk.TclError:
+            pass
+
+    def _worker():
+        driver = None
+        ids_ok: list[int] = []
+        pasos = flujo.get("pasos") or []
+        try:
+            try:
+                driver = _create_driver(headless=headless)
+            except Exception as exc:
+                log(f"No se pudo iniciar el navegador: {exc}")
+                return
+
+            try:
+                username = (email_session.get("address") or "").split("@")[0]
+                password = email_session.get("password") or ""
+                if not username or not password:
+                    raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
+                log(f"Iniciando sesión en Telcos como {username}…")
+                login_telcos(driver, username, password)
+            except Exception as exc:
+                log(f"Fallo en el inicio de sesión: {exc}")
+                return
+
+            for i, row in enumerate(pend, start=1):
+                task_number = row.get("task_number")
+                log(f"[{i}/{len(pend)}] Tarea {task_number}")
+                ctx = {"task_number": task_number, "numero_tarea": task_number}
+                ctx.update(row.get("payload") or {})
+                try:
+                    auto.ejecutar_flujo(driver, pasos, ctx)
+                    if row.get("id") is not None:
+                        ids_ok.append(int(row["id"]))
+                    log(f"✓ Tarea {task_number} completada")
+                except Exception as exc:
+                    log(f"✗ Tarea {task_number}: {exc}")
+                try:
+                    modal.after(0, lambda v=i: progress.configure(value=v))
+                except tk.TclError:
+                    pass
+
+            if ids_ok:
+                task_inbox.mark_consumed(ids_ok)
+            log(f"Finalizado. {len(ids_ok)} tarea(s) marcada(s) como consumida(s).")
+        finally:
+            if driver is not None:
+                try:
+                    driver.quit()
+                except Exception:
+                    pass
+
+    threading.Thread(target=_worker, daemon=True).start()

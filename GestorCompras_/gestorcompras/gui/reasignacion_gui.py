@@ -30,6 +30,7 @@ from gestorcompras.services.telcos_automation import (
     wait_clickable_or_error,
     process_task_servicios,
 )
+from gestorcompras.services.selenium_utils import click_with_fallback, click_robust
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -173,12 +174,15 @@ def process_task(driver, task, parent_window):
 
     try:
         time.sleep(0.5)
-        wait_clickable_or_error(
+        click_with_fallback(
             driver,
-            (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'),
-            parent_window,
-            'el botón para abrir la tarea'
-        ).click()
+            [
+                (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-step-forward'),
+                (By.XPATH, "//button[.//span[contains(@class,'glyphicon-step-forward')]]"),
+            ],
+            'el botón para abrir la tarea',
+            parent_window=parent_window,
+        )
     except Exception:
         # Se lanza la excepción con el mensaje exacto, sin mostrarla inmediatamente
         raise Exception(f"No se encontraron las tareas en la plataforma Telcos.\nTarea: {task_number}")
@@ -188,20 +192,39 @@ def process_task(driver, task, parent_window):
         driver, (By.ID, 'txtObservacionTarea'), parent_window, 'el campo de comentario')
     comment_input.send_keys('SE RECIBE LA MERCADERIA')
     time.sleep(1)
-    wait_clickable_or_error(
-        driver, (By.ID, 'btnGrabarEjecucionTarea'), parent_window, 'el botón Grabar Ejecución').click()
+    click_with_fallback(
+        driver,
+        [
+            (By.ID, 'btnGrabarEjecucionTarea'),
+            (By.XPATH, "//*[@id='btnGrabarEjecucionTarea']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='Aceptar']"),
+        ],
+        'el botón Grabar Ejecución',
+        parent_window=parent_window,
+    )
     time.sleep(2)
-    wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación inicial').click()
+    click_with_fallback(
+        driver,
+        [
+            (By.ID, 'btnSmsCustomOk'),
+            (By.XPATH, "//*[@id='btnSmsCustomOk']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='OK']"),
+        ],
+        'la confirmación inicial',
+        parent_window=parent_window,
+    )
     time.sleep(2)
 
     for detail in task["details"]:
-        tracking_button = wait_clickable_or_error(
+        click_with_fallback(
             driver,
-            (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']"),
-            parent_window,
-            'el botón de seguimiento'
+            [
+                (By.CSS_SELECTOR, "button[onclick*='mostrarIngresoSeguimiento']"),
+                (By.XPATH, "//button[contains(@onclick,'mostrarIngresoSeguimiento')]//span"),
+            ],
+            'el botón de seguimiento',
+            parent_window=parent_window,
         )
-        tracking_button.click()
         time.sleep(2)
         tracking_input = wait_clickable_or_error(
             driver,
@@ -213,17 +236,37 @@ def process_task(driver, task, parent_window):
         tracking_input.clear()
         tracking_input.send_keys(tracking_message)
         time.sleep(2)
-        wait_clickable_or_error(driver, (By.ID, 'btnIngresoSeguimiento'), parent_window, 'el botón Ingreso Seguimiento').click()
+        click_with_fallback(
+            driver,
+            [
+                (By.ID, 'btnIngresoSeguimiento'),
+                (By.XPATH, "//*[@id='btnIngresoSeguimiento']//span"),
+            ],
+            'el botón Ingreso Seguimiento',
+            parent_window=parent_window,
+        )
         time.sleep(2)
-        wait_clickable_or_error(driver, (By.ID, 'btnSmsCustomOk'), parent_window, 'la confirmación de seguimiento').click()
+        click_with_fallback(
+            driver,
+            [
+                (By.ID, 'btnSmsCustomOk'),
+                (By.XPATH, "//*[@id='btnSmsCustomOk']//span"),
+                (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='OK']"),
+            ],
+            'la confirmación de seguimiento',
+            parent_window=parent_window,
+        )
         time.sleep(2)
 
-    wait_clickable_or_error(
+    click_with_fallback(
         driver,
-        (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
-        parent_window,
-        'el botón de reasignar'
-    ).click()
+        [
+            (By.CSS_SELECTOR, 'span.glyphicon.glyphicon-dashboard'),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-dashboard')]]"),
+        ],
+        'el botón de reasignar',
+        parent_window=parent_window,
+    )
     time.sleep(2)
     department_input = wait_clickable_or_error(
         driver,
@@ -272,11 +315,33 @@ def process_task(driver, task, parent_window):
     )
     from selenium.webdriver.common.action_chains import ActionChains
     ActionChains(driver).move_to_element(boton).perform()
-    boton.click()
+    try:
+        click_robust(driver, boton)
+    except Exception:
+        click_with_fallback(
+            driver,
+            [
+                (By.ID, "btnGrabarReasignaTarea"),
+                (By.XPATH, "//*[@id='btnGrabarReasignaTarea']//span"),
+            ],
+            'el botón Guardar',
+            parent_window=parent_window,
+        )
     final_confirm_button = WebDriverWait(driver, 20).until(
         EC.element_to_be_clickable((By.ID, 'btnMensajeFinTarea'))
     )
-    final_confirm_button.click()
+    try:
+        click_robust(driver, final_confirm_button)
+    except Exception:
+        click_with_fallback(
+            driver,
+            [
+                (By.ID, 'btnMensajeFinTarea'),
+                (By.XPATH, "//*[@id='btnMensajeFinTarea']//span"),
+            ],
+            'la confirmación final',
+            parent_window=parent_window,
+        )
     time.sleep(2)
 
 

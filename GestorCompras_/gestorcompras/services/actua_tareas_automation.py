@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from gestorcompras.services.telcos_automation import wait_clickable_or_error
+from gestorcompras.services.selenium_utils import click_with_fallback
+
+# Alias interno para compatibilidad con código previo dentro del módulo.
+_click_with_fallback = click_with_fallback
 
 MOTIVOS_PAUSA_CATALOGO = [
     ("1641", "SE SOLICITA COTIZACION AL PROVEEDOR"),
@@ -141,7 +145,14 @@ def seleccionar_tarea(driver, numero: str, **_params):
 def reanudar_tarea(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-step-forward"), None, "Reanudar").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-step-forward"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-step-forward')]]"),
+        ],
+        "Reanudar",
+    )
 
 
 def ingresar_observacion(driver, texto: str, **_params):
@@ -152,28 +163,10 @@ def ingresar_observacion(driver, texto: str, **_params):
     campo.send_keys(texto)
 
 
-def _click_with_fallback(driver, locators, descripcion: str, timeout: int = 15):
-    """Intenta hacer clic probando varios locators. Si el clic normal falla
-    (por overlays u otros elementos que lo intercepten) recurre a un clic vía
-    JavaScript. Útil para los botones "Aceptar"/"OK" que a veces son <span>."""
-    last_error: Exception | None = None
-    for locator in locators:
-        try:
-            elem = wait_clickable_or_error(driver, locator, None, descripcion, timeout=timeout, retries=1)
-            try:
-                elem.click()
-            except Exception:
-                driver.execute_script("arguments[0].click();", elem)
-            return
-        except Exception as exc:
-            last_error = exc
-    raise Exception(f"No se pudo hacer clic en {descripcion}") from last_error
-
-
 def aceptar_observacion(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    _click_with_fallback(
+    click_with_fallback(
         driver,
         [
             (By.ID, "btnGrabarEjecucionTarea"),
@@ -188,7 +181,7 @@ def aceptar_observacion(driver, **_params):
 def cerrar_mensaje_ok(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    _click_with_fallback(
+    click_with_fallback(
         driver,
         [
             (By.ID, "btnSmsCustomOk"),
@@ -204,7 +197,14 @@ def cerrar_mensaje_ok(driver, **_params):
 def abrir_seguimiento(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-list-alt"), None, "Seguimiento").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-list-alt"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-list-alt')]]"),
+        ],
+        "Seguimiento",
+    )
 
 
 def guardar_seguimiento(driver, **_params):
@@ -216,7 +216,14 @@ def guardar_seguimiento(driver, **_params):
 def abrir_subida_archivo(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-open-file"), None, "Subir archivo").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-open-file"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-open-file')]]"),
+        ],
+        "Subir archivo",
+    )
 
 
 def seleccionar_archivo(driver, ruta: str, **_params):
@@ -240,7 +247,14 @@ def cerrar_mensaje_fin_tarea(driver, **_params):
 def abrir_reasignar(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-dashboard"), None, "Reasignar").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-dashboard"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-dashboard')]]"),
+        ],
+        "Reasignar",
+    )
 
 
 def ingresar_departamento(driver, nombre: str, **_params):
@@ -280,7 +294,14 @@ def guardar_reasignacion(driver, **_params):
 def pausar_tarea(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-pause"), None, "Pausar tarea").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-pause"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-pause')]]"),
+        ],
+        "Pausar tarea",
+    )
 
 
 def motivo_pausa(driver, valor_o_label: str, **_params):
@@ -315,7 +336,7 @@ def motivo_pausa(driver, valor_o_label: str, **_params):
 def aceptar_pausa(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    _click_with_fallback(
+    click_with_fallback(
         driver,
         [
             (By.ID, "btnGrabarPausaTarea"),
