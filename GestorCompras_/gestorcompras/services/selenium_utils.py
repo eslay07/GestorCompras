@@ -56,4 +56,40 @@ def click_robust(driver, element):
     return element
 
 
-__all__ = ["click_with_fallback", "click_robust"]
+def retry_task(
+    fn,
+    args: tuple = (),
+    kwargs: dict | None = None,
+    max_attempts: int = 2,
+    log=None,
+    on_retry=None,
+):
+    """Ejecuta ``fn(*args, **kwargs)`` hasta ``max_attempts`` veces.
+
+    Entre reintentos espera 2 segundos y llama a ``on_retry(attempt)`` si se
+    proporcionó (útil para reabrir un panel o restablecer el estado del driver).
+    Si todos los intentos fallan re-lanza la última excepción. Acepta un
+    callable ``log(msg)`` para reportar cada fallo no definitivo.
+    """
+    import time
+
+    kwargs = kwargs or {}
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < max_attempts:
+                if log:
+                    log(f"Intento {attempt}/{max_attempts} fallido: {exc}. Reintentando en 2 s…")
+                if on_retry:
+                    try:
+                        on_retry(attempt)
+                    except Exception:
+                        pass
+                time.sleep(2)
+    raise last_exc  # type: ignore[misc]
+
+
+__all__ = ["click_with_fallback", "click_robust", "retry_task"]

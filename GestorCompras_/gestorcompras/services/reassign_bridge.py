@@ -107,10 +107,18 @@ def _run_selenium_batch(
         driver = _create_driver(headless)
         login_telcos(driver, address.split("@")[0], password)
 
+        from gestorcompras.services.selenium_utils import retry_task
+
         for payload in payloads:
             message_id = payload.get("message_id")
             try:
-                process_task_servicios(driver, payload, None)
+                retry_task(
+                    process_task_servicios,
+                    args=(driver, payload, None),
+                    max_attempts=2,
+                    log=lambda msg, tid=message_id: logger.warning("tarea %s: %s", tid, msg),
+                    on_retry=lambda _: _reanudar_panel(driver),
+                )
                 _reanudar_panel(driver)
                 resultados.append({
                     "status": "ok",

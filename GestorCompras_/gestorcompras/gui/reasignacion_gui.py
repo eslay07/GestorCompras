@@ -30,7 +30,7 @@ from gestorcompras.services.telcos_automation import (
     wait_clickable_or_error,
     process_task_servicios,
 )
-from gestorcompras.services.selenium_utils import click_with_fallback, click_robust
+from gestorcompras.services.selenium_utils import click_with_fallback, click_robust, retry_task
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -503,12 +503,24 @@ def open_reasignacion(master, email_session):
         telcos_password = email_session["password"]
         login_telcos(driver, telcos_username, telcos_password)
 
+        def _reabrir_panel():
+            element = wait_clickable_or_error(
+                driver, (By.ID, "spanTareasPersonales"), window, "menú de tareas", timeout=10, retries=1
+            )
+            driver.execute_script("arguments[0].click();", element)
+
         try:
             for t_id, (var, _) in task_vars.items():
                 if var.get():
                     task = tasks_dict[t_id]
                     try:
-                        process_task(driver, task, window)
+                        retry_task(
+                            process_task,
+                            args=(driver, task, window),
+                            max_attempts=2,
+                            log=lambda msg: logger.info(msg),
+                            on_retry=lambda _: _reabrir_panel(),
+                        )
                         db.delete_task_temp(t_id)
                         procesadas_ok.append(task)
                     except Exception as e:

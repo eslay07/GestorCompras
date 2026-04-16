@@ -1,5 +1,5 @@
-PyPDF2
-selenium
-requests
-requests-mock
-python-dotenv
+PyPDF2~=3.0
+selenium~=4.43
+requests~=2.33
+requests-mock~=1.12
+python-dotenv~=1.2
