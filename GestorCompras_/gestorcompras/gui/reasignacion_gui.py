@@ -555,8 +555,8 @@ def open_reasignacion(master, email_session):
                     }
                 )
             if tareas_panel and messagebox.askyesno(
-                "Actua. Tareas",
-                "¿Desea ejecutar un flujo de Actua. Tareas sobre las tareas reasignadas?",
+                "Actualizar Tareas",
+                "¿Desea ejecutar un flujo de Actualizar Tareas sobre las tareas reasignadas?",
                 parent=window,
             ):
                 abrir_panel_tareas(

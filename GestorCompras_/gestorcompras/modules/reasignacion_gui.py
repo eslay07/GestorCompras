@@ -626,8 +626,8 @@ class ServiciosReasignacion(tk.Toplevel):
                     }
                 )
             if tareas_ok and messagebox.askyesno(
-                "Actua. Tareas",
-                "¿Desea abrir el panel de Actua. Tareas para estas tareas reasignadas?",
+                "Actualizar Tareas",
+                "¿Desea abrir el panel de Actualizar Tareas para estas tareas reasignadas?",
                 parent=self,
             ):
                 abrir_panel_tareas(

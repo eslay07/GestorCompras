@@ -1,4 +1,4 @@
-"""Envío de reporte por correo al finalizar un flujo de Actua. Tareas."""
+"""Envío de reporte por correo al finalizar un flujo de Actualizar Tareas."""
 from __future__ import annotations
 
 import logging
@@ -50,7 +50,7 @@ def _build_html(
     modo = "Oculto (headless)" if headless else "Visible"
     html = f"""\
 <html><body style="font-family:Segoe UI,Arial,sans-serif;font-size:13px">
-<h2 style="color:#1565c0">Reporte Actua. Tareas</h2>
+<h2 style="color:#1565c0">Reporte Actualizar Tareas</h2>
 <p><b>Flujo:</b> {flujo_nombre}<br>
 <b>Fecha:</b> {ahora}<br>
 <b>Modo:</b> {modo}<br>
@@ -64,7 +64,7 @@ def _build_html(
 </tr>
 {rows}
 </table>
-<p style="color:#888;font-size:11px;margin-top:16px">Generado por GestorCompras - Actua. Tareas</p>
+<p style="color:#888;font-size:11px;margin-top:16px">Generado por GestorCompras - Actualizar Tareas</p>
 </body></html>"""
     return html
 
@@ -80,7 +80,7 @@ def _build_plain(
     modo = "Oculto" if headless else "Visible"
 
     lines = [
-        f"Reporte Actua. Tareas",
+        f"Reporte Actualizar Tareas",
         f"Flujo: {flujo_nombre}",
         f"Fecha: {ahora}",
         f"Modo: {modo}",
@@ -110,7 +110,7 @@ def send_actua_report(
 
     dest = _ensure_email(address)
     n_ok = sum(1 for r in resultados if r.get("status") == "ok")
-    subject = f"Reporte Actua. Tareas - {flujo_nombre} ({n_ok}/{len(resultados)} OK)"
+    subject = f"Reporte Actualizar Tareas - {flujo_nombre} ({n_ok}/{len(resultados)} OK)"
 
     msg = EmailMessage()
     msg["Subject"] = subject
@@ -130,7 +130,7 @@ def send_actua_report(
         logger.info("Reporte enviado a %s: %s", dest, subject)
         return True
     except Exception:
-        logger.exception("Error al enviar reporte Actua. Tareas a %s", dest)
+        logger.exception("Error al enviar reporte Actualizar Tareas a %s", dest)
         return False
 
 

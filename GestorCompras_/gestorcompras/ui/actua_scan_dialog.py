@@ -20,7 +20,7 @@ class ScanEmailDialog(tk.Toplevel):
 
     def __init__(self, master: tk.Misc, email_session: dict[str, str]):
         super().__init__(master)
-        self.title("Escanear correos - Actua. Tareas")
+        self.title("Escanear correos - Actualizar Tareas")
         self.geometry("900x560")
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()

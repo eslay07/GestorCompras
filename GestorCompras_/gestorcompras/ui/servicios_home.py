@@ -55,7 +55,7 @@ class ServiciosHome(ttk.Frame):
         self._add_button(
             container,
             row=5,
-            text="Actua. Tareas",
+            text="Actualizar Tareas",
             command=lambda: router.open_actua_tareas(origin="servicios"),
         )
         self._add_button(

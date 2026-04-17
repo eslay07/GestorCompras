@@ -69,7 +69,7 @@ class ConfigGUI(tk.Toplevel):
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
-        self.geometry("1100x760")
+        self.geometry("1200x800")
         self.email_session = email_session
         self.descargas_cfg = DescargasConfig()
         self._oc_entries: dict[str, tk.Widget] = {}
@@ -87,12 +87,12 @@ class ConfigGUI(tk.Toplevel):
         self.notebook = ttk.Notebook(self, style="MyNotebook.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.oc_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
+        self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.oc_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
 
         self.notebook.add(self.suppliers_frame, text="Proveedores")
         self.notebook.add(self.assign_frame, text="Asignación")
@@ -356,11 +356,14 @@ class ConfigGUI(tk.Toplevel):
     def create_tracking_tab(self):
         frame = self.tracking_frame
 
-        ttk.Label(frame, text="Configuración Seguimientos",
-                  style="MyLabel.TLabel").pack(pady=10)
+        ttk.Label(frame, text="Configuracion de Seguimientos",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 12))
 
         ttk.Label(frame, text="Credenciales Google (JSON):",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Archivo JSON de cuenta de servicio de Google Cloud.",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.google_creds_var = tk.StringVar()
         self.google_creds_var.set(db.get_config("GOOGLE_CREDS", ""))
@@ -374,6 +377,8 @@ class ConfigGUI(tk.Toplevel):
 
         ttk.Label(frame, text="ID de Spreadsheet:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Se encuentra en la URL de la hoja de calculo de Google.",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.sheet_id_var = tk.StringVar()
         self.sheet_id_var.set(db.get_config("GOOGLE_SHEET_ID", ""))
@@ -390,8 +395,10 @@ class ConfigGUI(tk.Toplevel):
         ttk.Entry(frame, textvariable=self.sheet_name_var,
                   style="MyEntry.TEntry", width=50).pack(pady=5)
 
-        ttk.Label(frame, text="Correos CC Seguimiento (hasta 9, separados por ';'):",
+        ttk.Label(frame, text="Correos CC Seguimiento:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Hasta 9 direcciones separadas por punto y coma (;).",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.cc_tracking_var = tk.StringVar()
         self.cc_tracking_var.set(db.get_config("EMAIL_CC_SEGUIMIENTO", ""))
@@ -406,8 +413,9 @@ class ConfigGUI(tk.Toplevel):
     def create_dispatch_tab(self):
         frame = self.dispatch_frame
 
-        ttk.Label(frame, text="Configuración Despacho",
-                  style="MyLabel.TLabel").pack(pady=10)
+        ttk.Label(frame, text="Configuracion de Despacho",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 12))
 
         ttk.Label(frame, text="Ruta de la carpeta para PDFs:",
                   style="MyLabel.TLabel").pack(pady=5)
@@ -423,8 +431,10 @@ class ConfigGUI(tk.Toplevel):
                    style="MyButton.TButton",
                    command=self.select_pdf_folder).pack(pady=5)
 
-        ttk.Label(frame, text="Correos CC Despachos (hasta 9, separados por ';'):",
+        ttk.Label(frame, text="Correos CC Despachos:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Hasta 9 direcciones separadas por punto y coma (;).",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.cc_dispatch_var = tk.StringVar()
         self.cc_dispatch_var.set(db.get_config("EMAIL_CC_DESPACHO", ""))

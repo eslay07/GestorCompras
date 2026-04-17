@@ -155,8 +155,8 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                 if tasks:
                     def _abrir_panel(_tasks=tasks):
                         if messagebox.askyesno(
-                            "Actua. Tareas",
-                            "¿Desea abrir el panel de Actua. Tareas con las OC procesadas?",
+                            "Actualizar Tareas",
+                            "¿Desea abrir el panel de Actualizar Tareas con las OC procesadas?",
                         ):
                             abrir_panel_tareas(
                                 text_widget.winfo_toplevel(),
@@ -170,7 +170,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 
                     text_widget.after(0, _abrir_panel)
         except Exception as exc:
-            append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
+            append(f"[Hook Actualizar Tareas] Error no bloqueante: {exc}")
         if ordenes:
             no_aprobadas = [
                 e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")
@@ -214,18 +214,18 @@ def main():
     root = tk.Tk()
     root.title("Descargas OC")
     root.tk_setPalette(
-        background="#1e1e1e",
-        foreground="#f0f0f0",
-        activeBackground="#333333",
-        activeForeground="#f0f0f0",
-        highlightColor="#555555",
+        background="#F3F4F6",
+        foreground="#374151",
+        activeBackground="#1D4ED8",
+        activeForeground="#FFFFFF",
+        highlightColor="#D1D5DB",
     )
-    root.configure(bg="#1e1e1e")
+    root.configure(bg="#F3F4F6")
 
     frame = tk.Frame(root)
     frame.pack(padx=10, pady=10)
 
-    text = tk.Text(frame, width=80, height=20, bg="#000000", fg="#f0f0f0", insertbackground="#f0f0f0")
+    text = tk.Text(frame, width=80, height=20, bg="#FFFFFF", fg="#374151", insertbackground="#374151")
     text.pack(pady=5)
 
     handler = TextHandler(text)
@@ -382,7 +382,7 @@ def main():
         text="Compra Bienes",
         variable=var_bienes,
         command=actualizar_bienes,
-        selectcolor="#00aa00",
+        selectcolor="#059669",
     )
     chk_bienes.pack(side=tk.LEFT, padx=5)
 
@@ -398,7 +398,7 @@ def main():
         text="Descarga visible",
         variable=var_visible,
         command=actualizar_visible,
-        selectcolor="#00aa00",
+        selectcolor="#059669",
     )
     chk_visible.pack(side=tk.LEFT, padx=5)
 

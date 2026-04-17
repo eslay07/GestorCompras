@@ -19,12 +19,12 @@ def center_window(win: tk.Tk | tk.Toplevel):
 def open_despacho(master, email_session):
     window = tk.Toplevel(master)
     window.title("Correos Masivos")
-    window.geometry("600x450")
+    window.geometry("650x500")
     window.transient(master)
     window.grab_set()
     center_window(window)
 
-    main_frame = ttk.Frame(window, style="MyFrame.TFrame", padding=10)
+    main_frame = ttk.Frame(window, style="MyFrame.TFrame", padding=20)
     main_frame.pack(fill="both", expand=True)
     main_frame.rowconfigure(1, weight=1)
     main_frame.rowconfigure(3, weight=1)
@@ -41,8 +41,8 @@ def open_despacho(master, email_session):
     log_box.grid(row=3, column=0, sticky="nsew", padx=5, pady=5)
 
     ttk.Label(main_frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
-    formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
-    formato_var = tk.StringVar(value="FORMATO")
+    formatos = ["-- Seleccione formato --"] + [tpl[1] for tpl in db.get_email_templates()]
+    formato_var = tk.StringVar(value="-- Seleccione formato --")
     ttk.Combobox(
         main_frame,
         textvariable=formato_var,
@@ -70,7 +70,7 @@ def open_despacho(master, email_session):
             messagebox.showwarning("Advertencia", "Ingrese al menos un número de OC.")
             return
 
-        if formato_var.get() == "FORMATO":
+        if formato_var.get() == "-- Seleccione formato --":
             messagebox.showwarning("Advertencia", "Debe seleccionar un formato de correo.")
             return
 
@@ -156,8 +156,8 @@ def open_despacho(master, email_session):
                 if tareas:
                     def _abrir_panel():
                         if messagebox.askyesno(
-                            "Actua. Tareas",
-                            "¿Desea abrir el panel de Actua. Tareas con las OC procesadas?",
+                            "Actualizar Tareas",
+                            "¿Desea abrir el panel de Actualizar Tareas con las OC procesadas?",
                             parent=window,
                         ):
                             abrir_panel_tareas(
@@ -169,7 +169,7 @@ def open_despacho(master, email_session):
 
                     window.after(0, _abrir_panel)
             except Exception as exc:
-                log_func(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
+                log_func(f"[Hook Actualizar Tareas] Error no bloqueante: {exc}")
 
         threading.Thread(target=process_all_orders).start()
 

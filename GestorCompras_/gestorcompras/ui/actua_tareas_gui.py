@@ -144,7 +144,7 @@ class ActuaTareasScreen(ttk.Frame):
 
         head = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
         head.grid(row=0, column=0, columnspan=2, sticky="ew")
-        ttk.Label(head, text="Actua. Tareas", style="Banner.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(head, text="Actualizar Tareas", style="Banner.TLabel").grid(row=0, column=0, sticky="w")
 
         self.flujo_combo = ttk.Combobox(head, textvariable=self.flujo_var, state="readonly", width=35)
         self.flujo_combo.grid(row=0, column=1, padx=8)
@@ -328,7 +328,7 @@ class ActuaTareasScreen(ttk.Frame):
         ]
         if not editable_params:
             messagebox.showinfo(
-                "Actua. Tareas",
+                "Actualizar Tareas",
                 "Esta acción es un botón y no contiene texto.",
                 parent=self,
             )
@@ -388,7 +388,7 @@ class ActuaTareasScreen(ttk.Frame):
         actua_tareas_repo.save_flujo(nombre, mode, self.pasos)
         actua_tareas_repo.set_carpeta_base(self.carpeta_base_var.get().strip())
         self._refresh_flujos(selected_name=nombre)
-        messagebox.showinfo("Actua. Tareas", "Flujo guardado correctamente.", parent=self)
+        messagebox.showinfo("Actualizar Tareas", "Flujo guardado correctamente.", parent=self)
 
     def _eliminar_flujo(self):
         flujo = next((f for f in self.flujos if f["nombre"] == self.flujo_var.get()), None)
@@ -512,7 +512,7 @@ class ActuaTareasScreen(ttk.Frame):
 
     def _run_flow(self):
         if not self.pasos:
-            messagebox.showwarning("Actua. Tareas", "Debe agregar al menos un paso.", parent=self)
+            messagebox.showwarning("Actualizar Tareas", "Debe agregar al menos un paso.", parent=self)
             return
         self.status_var.set("Ejecutando...")
 
@@ -558,7 +558,7 @@ class ActuaTareasScreen(ttk.Frame):
                 task_inbox.mark_consumed(consumidas_ok)
                 self.after(0, lambda: self.status_var.set("Ejecución completada"))
             except Exception as exc:
-                self.after(0, lambda e=exc: messagebox.showerror("Actua. Tareas", str(e), parent=self))
+                self.after(0, lambda e=exc: messagebox.showerror("Actualizar Tareas", str(e), parent=self))
                 self.after(0, lambda: self.status_var.set("Error durante la ejecución"))
             finally:
                 if driver is not None:
@@ -601,7 +601,7 @@ class ActuaExecutionPanel(tk.Toplevel):
         mode: str | None = None,
     ):
         super().__init__(master)
-        self.title("Actua. Tareas - Ejecutar flujo")
+        self.title("Actualizar Tareas - Ejecutar flujo")
         self.geometry("1060x680")
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()
@@ -860,7 +860,7 @@ class ActuaExecutionPanel(tk.Toplevel):
     def _delete_tasks(self) -> None:
         indices = self._selected_indices()
         if not indices:
-            messagebox.showinfo("Actua. Tareas", "Seleccione tareas para eliminar.", parent=self)
+            messagebox.showinfo("Actualizar Tareas", "Seleccione tareas para eliminar.", parent=self)
             return
         if not messagebox.askyesno("Confirmar", f"¿Eliminar {len(indices)} tarea(s)?", parent=self):
             return
@@ -877,7 +877,7 @@ class ActuaExecutionPanel(tk.Toplevel):
             self.flujo_var.set(nombres[0])
             self._on_flujo_changed()
         else:
-            self.validation_var.set("No hay flujos guardados. Cree uno desde 'Actua. Tareas'.")
+            self.validation_var.set("No hay flujos guardados. Cree uno desde 'Actualizar Tareas'.")
             self.btn_ejecutar.configure(state="disabled")
             self.btn_validar.configure(state="disabled")
 
@@ -941,11 +941,11 @@ class ActuaExecutionPanel(tk.Toplevel):
         if self._running:
             return
         if not self.tareas:
-            messagebox.showwarning("Actua. Tareas", "No hay tareas para ejecutar.", parent=self)
+            messagebox.showwarning("Actualizar Tareas", "No hay tareas para ejecutar.", parent=self)
             return
         flujo = self._current_flujo()
         if not flujo:
-            messagebox.showwarning("Actua. Tareas", "Seleccione un flujo.", parent=self)
+            messagebox.showwarning("Actualizar Tareas", "Seleccione un flujo.", parent=self)
             return
         if not self._validar(silent=True):
             n_missing = sum(1 for t in self.tareas
@@ -1075,7 +1075,7 @@ class ActuaExecutionPanel(tk.Toplevel):
 
     def _on_close(self) -> None:
         if self._running:
-            if not messagebox.askyesno("Actua. Tareas", "Hay ejecucion en curso. ¿Cerrar?", parent=self):
+            if not messagebox.askyesno("Actualizar Tareas", "Hay ejecucion en curso. ¿Cerrar?", parent=self):
                 return
         try:
             self.grab_release()
@@ -1121,17 +1121,17 @@ def run_flow_from_inbox(
     el selector interactivo."""
     flujo = actua_tareas_repo.load_flujo(flujo_id)
     if not flujo:
-        messagebox.showerror("Actua. Tareas", "Flujo no encontrado", parent=master)
+        messagebox.showerror("Actualizar Tareas", "Flujo no encontrado", parent=master)
         return
     pend = task_inbox.list_pending(origen)
     if not pend:
         messagebox.showinfo(
-            "Actua. Tareas", "No hay tareas pendientes en bandeja.", parent=master
+            "Actualizar Tareas", "No hay tareas pendientes en bandeja.", parent=master
         )
         return
 
     modal = tk.Toplevel(master)
-    modal.title(f"Ejecutando flujo Actua. Tareas ({flujo.get('nombre', flujo_id)})")
+    modal.title(f"Ejecutando flujo Actualizar Tareas ({flujo.get('nombre', flujo_id)})")
     txt = ScrolledText(modal, width=90, height=18, state="disabled")
     txt.pack(fill="both", expand=True, padx=8, pady=8)
     progress = ttk.Progressbar(modal, mode="determinate", maximum=len(pend))

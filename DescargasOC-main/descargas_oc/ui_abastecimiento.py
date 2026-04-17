@@ -48,13 +48,13 @@ def main():
     root = tk.Tk()
     root.title("Descarga Abastecimiento")
     root.tk_setPalette(
-        background="#1e1e1e",
-        foreground="#f0f0f0",
-        activeBackground="#333333",
-        activeForeground="#f0f0f0",
-        highlightColor="#555555",
+        background="#F3F4F6",
+        foreground="#374151",
+        activeBackground="#1D4ED8",
+        activeForeground="#FFFFFF",
+        highlightColor="#D1D5DB",
     )
-    root.configure(bg="#1e1e1e")
+    root.configure(bg="#F3F4F6")
 
     tk.Label(root, text="Fecha inicio (dd/mm/aa):").grid(row=0, column=0, sticky="e")
     entry_fd = tk.Entry(root)
@@ -100,7 +100,7 @@ def main():
         text="Descarga visible",
         variable=var_visible,
         command=actualizar_visible,
-        selectcolor="#00aa00",
+        selectcolor="#059669",
     )
     chk_visible.grid(row=4, column=1, sticky="w", padx=5, pady=2)
 

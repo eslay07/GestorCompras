@@ -22,7 +22,7 @@ def _button_specs():
         ("Correos Masivos", "open_correos_masivos"),
         ("Seguimientos", "open_seguimientos"),
         ("Descargas OC", "open_descargas_oc"),
-        ("Actua. Tareas", "open_actua_tareas"),
+        ("Actualizar Tareas", "open_actua_tareas"),
         ("Configuración", "open_config"),
         ("◀ Regresar al menú inicial", "open_home"),
         ("Salir", "quit"),

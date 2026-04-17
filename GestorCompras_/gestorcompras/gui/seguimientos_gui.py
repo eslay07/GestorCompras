@@ -20,12 +20,12 @@ def center_window(win: tk.Tk | tk.Toplevel):
 def open_seguimientos(master, email_session):
     window = tk.Toplevel(master)
     window.title("Seguimientos desde Sheet")
-    window.geometry("700x500")
+    window.geometry("750x550")
     window.transient(master)
     window.grab_set()
     center_window(window)
 
-    frame = ttk.Frame(window, padding=10, style="MyFrame.TFrame")
+    frame = ttk.Frame(window, padding=20, style="MyFrame.TFrame")
     frame.pack(fill="both", expand=True)
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(3, weight=1)
@@ -65,8 +65,8 @@ def open_seguimientos(master, email_session):
     log_box.grid(row=6, column=0, sticky="nsew", pady=5)
 
     ttk.Label(frame, text="Formato de correo:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w")
-    formatos = ["FORMATO"] + [tpl[1] for tpl in db.get_email_templates()]
-    formato_var = tk.StringVar(value="FORMATO")
+    formatos = ["-- Seleccione formato --"] + [tpl[1] for tpl in db.get_email_templates()]
+    formato_var = tk.StringVar(value="-- Seleccione formato --")
     ttk.Combobox(frame, textvariable=formato_var, values=formatos, state="readonly").grid(row=4, column=0, sticky="e", padx=(150,0))
 
     attach_var = tk.BooleanVar(value=True)
@@ -115,7 +115,7 @@ def open_seguimientos(master, email_session):
         if not selected:
             messagebox.showwarning("Advertencia", "No hay órdenes seleccionadas")
             return
-        if formato_var.get() == "FORMATO":
+        if formato_var.get() == "-- Seleccione formato --":
             messagebox.showwarning("Advertencia", "Debe seleccionar un formato de correo.")
             return
 
