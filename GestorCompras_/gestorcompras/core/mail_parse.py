@@ -15,6 +15,11 @@ RX_OT_LINE = re.compile(
     re.I | re.M,
 )
 RX_USERMAIL = re.compile(r'[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}', re.I)
+RX_FACTURA = re.compile(r'FAC(?:TURA)?\.?\s*[:#]?\s*(\S+)', re.I)
+RX_OC = re.compile(r'\bOC\s*[:#]?\s*(\d+)', re.I)
+RX_INGRESO = re.compile(r'INGR(?:ESO)?\.?\s*[:#]?\s*(\S+)', re.I)
+RX_RUC = re.compile(r'\bRUC\s*[:#]?\s*(\d{10,13})', re.I)
+RX_FECHA_ORDEN = re.compile(r'FECHA\s*(?:DE\s*)?ORDEN\s*[:#]?\s*([\d/\-]+)', re.I)
 
 _MOJI = {
     "Ã¡": "á",
@@ -79,12 +84,42 @@ def parse_body(body_text: str | None, correo_usuario: str) -> dict[str, object]:
     else:
         correo_usuario_encontrado = bool(RX_USERMAIL.search(body))
 
+    factura = ""
+    m = RX_FACTURA.search(body)
+    if m:
+        factura = m.group(1).strip()
+
+    oc = ""
+    m = RX_OC.search(body)
+    if m:
+        oc = m.group(1).strip()
+
+    ingreso = ""
+    m = RX_INGRESO.search(body)
+    if m:
+        ingreso = m.group(1).strip()
+
+    ruc = ""
+    m = RX_RUC.search(body)
+    if m:
+        ruc = m.group(1).strip()
+
+    fecha_orden = ""
+    m = RX_FECHA_ORDEN.search(body)
+    if m:
+        fecha_orden = m.group(1).strip()
+
     return {
         "proveedor": proveedor or "N/D",
         "mecanico_nombre": mecanico_nombre or "N/D",
         "mecanico_telefono": mecanico_telefono or "N/D",
         "inf_vehiculo": inf_vehiculo or "N/D",
         "correo_usuario_encontrado": correo_usuario_encontrado,
+        "factura": factura,
+        "oc": oc,
+        "ingreso": ingreso,
+        "ruc": ruc,
+        "fecha_orden": fecha_orden,
     }
 
 
@@ -96,4 +131,9 @@ __all__ = [
     "RX_MECANICO",
     "RX_OT_LINE",
     "RX_USERMAIL",
+    "RX_FACTURA",
+    "RX_OC",
+    "RX_INGRESO",
+    "RX_RUC",
+    "RX_FECHA_ORDEN",
 ]

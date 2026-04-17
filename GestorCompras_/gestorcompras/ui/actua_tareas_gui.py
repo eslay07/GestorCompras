@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import threading
 import tkinter as tk
@@ -11,6 +12,8 @@ from gestorcompras.services import actua_tareas_repo, db, task_inbox
 from gestorcompras.services.reassign_bridge import _create_driver
 from gestorcompras.services.telcos_automation import login_telcos
 from gestorcompras.ui.common import add_hover_effect
+
+logger = logging.getLogger(__name__)
 
 _ORIGEN_MAP = {
     "Manual": None,
@@ -586,10 +589,8 @@ class ActuaTareasScreen(ttk.Frame):
 
 
 class ActuaExecutionPanel(tk.Toplevel):
-    """Panel reutilizable que muestra las tareas detectadas por el módulo origen,
-    permite elegir un flujo guardado, valida que cada tarea contenga la
-    información requerida por el flujo y lanza la ejecución en segundo plano
-    (visible u oculto a voluntad del usuario)."""
+    """Panel que muestra tareas, permite escaneo de correos, edición inline,
+    eliminación, validación reactiva por flujo y ejecución con reporte."""
 
     def __init__(
         self,
@@ -601,184 +602,273 @@ class ActuaExecutionPanel(tk.Toplevel):
     ):
         super().__init__(master)
         self.title("Actua. Tareas - Ejecutar flujo")
-        self.geometry("960x620")
+        self.geometry("1060x680")
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()
         self.email_session = email_session or {}
         self.origen = origen
         self.mode = mode
-        self.tareas = [dict(t) for t in (tareas or [])]
+        self.tareas: list[dict] = [dict(t) for t in (tareas or [])]
         self.flujos = actua_tareas_repo.list_flujos(mode=mode)
         self.flujo_var = tk.StringVar()
         self.headless_var = tk.BooleanVar(
             value=db.get_config("ACTUA_HEADLESS", "1") != "0"
         )
+        self.report_var = tk.BooleanVar(
+            value=db.get_config("ACTUA_REPORT_EMAIL", "1") != "0"
+        )
         self.status_var = tk.StringVar(value="Listo")
+        self.validation_var = tk.StringVar(value="Seleccione un flujo para validar los datos.")
         self._running = False
         self._driver = None
+        self._required: set[str] = set()
+        self._columnas: list[tuple[str, str]] = []
 
         self._build()
+        self._rebuild_columns()
         self._populate_tareas()
         self._populate_flujos()
 
-    # ------------------------------------------------------------------ UI
     def _build(self) -> None:
         wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
         wrapper.pack(fill="both", expand=True)
         wrapper.columnconfigure(0, weight=1)
-        wrapper.rowconfigure(1, weight=1)
-        wrapper.rowconfigure(4, weight=1)
+        wrapper.rowconfigure(2, weight=1)
+        wrapper.rowconfigure(5, weight=1)
 
         header = ttk.Frame(wrapper, style="MyFrame.TFrame")
         header.grid(row=0, column=0, sticky="ew")
         header.columnconfigure(1, weight=1)
-        ttk.Label(
-            header,
-            text="Tareas detectadas por el módulo",
-            style="MyLabel.TLabel",
-        ).grid(row=0, column=0, sticky="w")
-        ttk.Label(
-            header,
-            text=f"Origen: {self.origen}",
-            style="MyLabel.TLabel",
-        ).grid(row=0, column=1, sticky="e")
+        ttk.Label(header, text="Tareas detectadas", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text=f"Origen: {self.origen}", style="MyLabel.TLabel").grid(row=0, column=1, sticky="e")
 
-        columnas = _ORIGEN_COLUMNS.get(self.origen) or [("task_number", "N° Tarea")]
-        columnas = list(columnas) + [("estado", "Estado")]
-        self._columnas = columnas
+        toolbar = ttk.Frame(wrapper, style="MyFrame.TFrame")
+        toolbar.grid(row=1, column=0, sticky="ew", pady=(4, 2))
+        for txt, cmd in (
+            ("Escanear correos", self._scan_emails),
+            ("Agregar manual", self._add_manual),
+            ("Editar", self._edit_task),
+            ("Eliminar", self._delete_tasks),
+            ("Seleccionar todo", self._select_all),
+            ("Ninguno", self._select_none),
+        ):
+            b = ttk.Button(toolbar, text=txt, style="MyButton.TButton", command=cmd)
+            b.pack(side="left", padx=3)
+            add_hover_effect(b)
 
-        tabla_frame = ttk.LabelFrame(
-            wrapper, text="Detalle de tareas", style="MyLabelFrame.TLabelframe", padding=8
-        )
-        tabla_frame.grid(row=1, column=0, sticky="nsew", pady=(6, 6))
-        tabla_frame.columnconfigure(0, weight=1)
+        tabla_frame = ttk.LabelFrame(wrapper, text="Detalle de tareas", style="MyLabelFrame.TLabelframe", padding=8)
+        tabla_frame.grid(row=2, column=0, sticky="nsew", pady=(4, 4))
+        tabla_frame.columnconfigure(0, weight=3)
+        tabla_frame.columnconfigure(1, weight=1)
         tabla_frame.rowconfigure(0, weight=1)
 
-        cols = [c[0] for c in columnas]
-        self.tree = ttk.Treeview(
-            tabla_frame, columns=cols, show="headings", style="MyTreeview.Treeview"
-        )
-        for key, label in columnas:
-            self.tree.heading(key, text=label)
-            self.tree.column(key, width=150 if key != "estado" else 120, anchor="w")
+        self._tree_container = tabla_frame
+        self.tree = ttk.Treeview(tabla_frame, columns=("sel",), show="headings")
         self.tree.grid(row=0, column=0, sticky="nsew")
+        tree_scroll = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
+        tree_scroll.grid(row=0, column=0, sticky="nse")
+        self.tree.configure(yscrollcommand=tree_scroll.set)
+        self.tree.bind("<Button-1>", self._on_tree_click)
+        self.tree.bind("<Double-1>", lambda _e: self._edit_task())
+        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
+        self.tree.tag_configure("missing", foreground="red")
 
-        scroll = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
-        scroll.grid(row=0, column=1, sticky="ns")
-        self.tree.configure(yscrollcommand=scroll.set)
+        self.preview = tk.Text(tabla_frame, width=30, height=8, wrap="word", state="disabled")
+        self.preview.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        flow_frame = ttk.LabelFrame(
-            wrapper,
-            text="Flujo guardado a ejecutar",
-            style="MyLabelFrame.TLabelframe",
-            padding=8,
-        )
-        flow_frame.grid(row=2, column=0, sticky="ew")
+        flow_frame = ttk.LabelFrame(wrapper, text="Flujo guardado", style="MyLabelFrame.TLabelframe", padding=8)
+        flow_frame.grid(row=3, column=0, sticky="ew")
         flow_frame.columnconfigure(1, weight=1)
         ttk.Label(flow_frame, text="Flujo:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        self.flujo_combo = ttk.Combobox(
-            flow_frame,
-            textvariable=self.flujo_var,
-            state="readonly",
-            width=50,
-        )
+        self.flujo_combo = ttk.Combobox(flow_frame, textvariable=self.flujo_var, state="readonly", width=50)
         self.flujo_combo.grid(row=0, column=1, sticky="ew", padx=6)
         self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_flujo_changed())
 
-        ttk.Checkbutton(
-            flow_frame,
-            text="Mostrar navegador al ejecutar (desmarque para modo oculto)",
-            variable=self.headless_var,
-            onvalue=False,
-            offvalue=True,
-            style="MyCheckbutton.TCheckbutton",
-        ).grid(row=0, column=2, padx=(10, 0))
+        opts = ttk.Frame(flow_frame, style="MyFrame.TFrame")
+        opts.grid(row=0, column=2, padx=(10, 0))
+        ttk.Checkbutton(opts, text="Mostrar navegador", variable=self.headless_var, onvalue=False, offvalue=True).pack(side="left")
+        ttk.Checkbutton(opts, text="Enviarme reporte", variable=self.report_var).pack(side="left", padx=(8, 0))
 
-        self.validation_var = tk.StringVar(value="Seleccione un flujo para validar los datos.")
-        ttk.Label(
-            flow_frame,
-            textvariable=self.validation_var,
-            style="MyLabel.TLabel",
-            wraplength=800,
-            justify="left",
-        ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
-
-        log_frame = ttk.LabelFrame(
-            wrapper, text="Bitácora de ejecución", style="MyLabelFrame.TLabelframe", padding=6
-        )
-        log_frame.grid(row=4, column=0, sticky="nsew", pady=(6, 6))
-        log_frame.columnconfigure(0, weight=1)
-        log_frame.rowconfigure(0, weight=1)
-        self.log = ScrolledText(log_frame, height=8, state="disabled")
-        self.log.grid(row=0, column=0, sticky="nsew")
+        ttk.Label(flow_frame, textvariable=self.validation_var, style="MyLabel.TLabel", wraplength=900, justify="left").grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
         self.progress = ttk.Progressbar(wrapper, mode="determinate")
-        self.progress.grid(row=3, column=0, sticky="ew")
+        self.progress.grid(row=4, column=0, sticky="ew")
+
+        log_frame = ttk.LabelFrame(wrapper, text="Bitácora", style="MyLabelFrame.TLabelframe", padding=6)
+        log_frame.grid(row=5, column=0, sticky="nsew", pady=(4, 4))
+        log_frame.columnconfigure(0, weight=1)
+        log_frame.rowconfigure(0, weight=1)
+        self.log = ScrolledText(log_frame, height=7, state="disabled")
+        self.log.grid(row=0, column=0, sticky="nsew")
 
         buttons = ttk.Frame(wrapper, style="MyFrame.TFrame")
-        buttons.grid(row=5, column=0, sticky="ew", pady=(6, 0))
+        buttons.grid(row=6, column=0, sticky="ew", pady=(4, 0))
         buttons.columnconfigure(0, weight=1)
-
-        ttk.Label(buttons, textvariable=self.status_var, style="MyLabel.TLabel").grid(
-            row=0, column=0, sticky="w"
-        )
-        self.btn_validar = ttk.Button(
-            buttons, text="Validar", style="MyButton.TButton", command=self._validar
-        )
+        ttk.Label(buttons, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
+        self.btn_validar = ttk.Button(buttons, text="Validar", style="MyButton.TButton", command=self._validar)
         self.btn_validar.grid(row=0, column=1, padx=4)
         add_hover_effect(self.btn_validar)
-        self.btn_ejecutar = ttk.Button(
-            buttons,
-            text="Ejecutar flujo en segundo plano",
-            style="MyButton.TButton",
-            command=self._ejecutar,
-        )
+        self.btn_ejecutar = ttk.Button(buttons, text="Ejecutar flujo", style="MyButton.TButton", command=self._ejecutar)
         self.btn_ejecutar.grid(row=0, column=2, padx=4)
         add_hover_effect(self.btn_ejecutar)
-        self.btn_cerrar = ttk.Button(
-            buttons, text="Cerrar", style="MyButton.TButton", command=self._on_close
-        )
+        self.btn_cerrar = ttk.Button(buttons, text="Cerrar", style="MyButton.TButton", command=self._on_close)
         self.btn_cerrar.grid(row=0, column=3, padx=4)
         add_hover_effect(self.btn_cerrar)
-
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ---------------------------------------------------------- helpers UI
-    def _log(self, msg: str) -> None:
-        def _append():
-            self.log.configure(state="normal")
-            self.log.insert(tk.END, msg + "\n")
-            self.log.see(tk.END)
-            self.log.configure(state="disabled")
+    def _rebuild_columns(self) -> None:
+        base = [("sel", "✓", 30), ("task_number", "N° Tarea", 100)]
+        extra_from_flow = [(k, k.replace("_", " ").title(), 110) for k in sorted(self._required) if k != "task_number"]
+        origin_cols = _ORIGEN_COLUMNS.get(self.origen) or []
+        seen = {"sel", "task_number"} | {k for k, _, _ in extra_from_flow}
+        for key, label in origin_cols:
+            if key not in seen:
+                extra_from_flow.append((key, label, 110))
+                seen.add(key)
+        all_cols = base + extra_from_flow + [("estado", "Estado", 90)]
+        self._columnas = [(k, lbl) for k, lbl, _ in all_cols]
+        col_ids = [k for k, _, _ in all_cols]
 
-        try:
-            self.after(0, _append)
-        except tk.TclError:
-            pass
+        self.tree.configure(columns=col_ids)
+        for key, lbl, w in all_cols:
+            self.tree.heading(key, text=lbl)
+            self.tree.column(key, width=w, anchor="center" if key in ("sel", "estado") else "w")
 
     def _populate_tareas(self) -> None:
         self.tree.delete(*self.tree.get_children())
         for idx, task in enumerate(self.tareas):
-            valores = [
-                _task_value(task, key) for key, _ in self._columnas if key != "estado"
-            ]
-            valores.append("Pendiente")
-            self.tree.insert("", "end", iid=str(idx), values=valores)
+            vals = self._task_row_values(task, "Pendiente")
+            tags = self._missing_tag(task)
+            self.tree.insert("", "end", iid=str(idx), values=vals, tags=tags)
+
+    def _task_row_values(self, task: dict, estado: str) -> list[str]:
+        return ["☐"] + [_task_value(task, k) for k, _ in self._columnas if k not in ("sel", "estado")] + [estado]
+
+    def _missing_tag(self, task: dict) -> tuple[str, ...]:
+        if not self._required:
+            return ()
+        for k in self._required:
+            if not _task_value(task, k).strip():
+                return ("missing",)
+        return ()
 
     def _set_estado(self, idx: int, estado: str) -> None:
         iid = str(idx)
-
         def _apply():
             if not self.tree.exists(iid):
                 return
             vals = list(self.tree.item(iid, "values"))
             vals[-1] = estado
             self.tree.item(iid, values=vals)
-
         try:
             self.after(0, _apply)
         except tk.TclError:
             pass
+
+    def _log_msg(self, msg: str) -> None:
+        def _append():
+            self.log.configure(state="normal")
+            self.log.insert(tk.END, msg + "\n")
+            self.log.see(tk.END)
+            self.log.configure(state="disabled")
+        try:
+            self.after(0, _append)
+        except tk.TclError:
+            pass
+
+    def _on_tree_click(self, event) -> None:
+        item = self.tree.identify_row(event.y)
+        col = self.tree.identify_column(event.x)
+        if not item or col != "#1":
+            return
+        vals = list(self.tree.item(item, "values"))
+        vals[0] = "☑" if vals[0] == "☐" else "☐"
+        self.tree.item(item, values=vals)
+
+    def _on_tree_select(self, _event=None) -> None:
+        sel = self.tree.selection()
+        if not sel:
+            return
+        idx = int(sel[0])
+        if 0 <= idx < len(self.tareas):
+            task = self.tareas[idx]
+            body = task.get("_email_body") or task.get("body", "")
+            if not body:
+                body = "\n".join(f"{k}: {v}" for k, v in task.items()
+                                 if k not in ("_email_body", "body", "_db_id", "_created_at"))
+            self.preview.configure(state="normal")
+            self.preview.delete("1.0", tk.END)
+            self.preview.insert("1.0", body[:3000])
+            self.preview.configure(state="disabled")
+
+    def _select_all(self) -> None:
+        for iid in self.tree.get_children():
+            vals = list(self.tree.item(iid, "values"))
+            vals[0] = "☑"
+            self.tree.item(iid, values=vals)
+
+    def _select_none(self) -> None:
+        for iid in self.tree.get_children():
+            vals = list(self.tree.item(iid, "values"))
+            vals[0] = "☐"
+            self.tree.item(iid, values=vals)
+
+    def _selected_indices(self) -> list[int]:
+        return [int(iid) for iid in self.tree.get_children()
+                if self.tree.item(iid, "values")[0] == "☑"]
+
+    def _scan_emails(self) -> None:
+        from gestorcompras.ui.actua_scan_dialog import ScanEmailDialog
+        dialog = ScanEmailDialog(self, self.email_session)
+        self.wait_window(dialog)
+        if dialog.result:
+            for item in dialog.result:
+                task = dict(item)
+                task["_email_body"] = item.get("body", "")
+                self.tareas.append(task)
+            self._rebuild_columns()
+            self._populate_tareas()
+            self._validar(silent=True)
+
+    def _add_manual(self) -> None:
+        from gestorcompras.ui.actua_task_editor import TaskEditDialog
+        task: dict = {}
+        dialog = TaskEditDialog(self, task, required_keys=self._required)
+        self.wait_window(dialog)
+        if dialog.saved and task.get("task_number"):
+            self.tareas.append(task)
+            self._rebuild_columns()
+            self._populate_tareas()
+            self._validar(silent=True)
+
+    def _edit_task(self) -> None:
+        sel = self.tree.selection()
+        if not sel:
+            return
+        idx = int(sel[0])
+        if idx >= len(self.tareas):
+            return
+        from gestorcompras.ui.actua_task_editor import TaskEditDialog
+        task = self.tareas[idx]
+        dialog = TaskEditDialog(self, task, required_keys=self._required)
+        self.wait_window(dialog)
+        if dialog.saved:
+            self._rebuild_columns()
+            self._populate_tareas()
+            self._validar(silent=True)
+
+    def _delete_tasks(self) -> None:
+        indices = self._selected_indices()
+        if not indices:
+            messagebox.showinfo("Actua. Tareas", "Seleccione tareas para eliminar.", parent=self)
+            return
+        if not messagebox.askyesno("Confirmar", f"¿Eliminar {len(indices)} tarea(s)?", parent=self):
+            return
+        for idx in sorted(indices, reverse=True):
+            if idx < len(self.tareas):
+                self.tareas.pop(idx)
+        self._populate_tareas()
+        self._validar(silent=True)
 
     def _populate_flujos(self) -> None:
         nombres = [f"{f['nombre']} (#{f['id']})" for f in self.flujos]
@@ -787,9 +877,7 @@ class ActuaExecutionPanel(tk.Toplevel):
             self.flujo_var.set(nombres[0])
             self._on_flujo_changed()
         else:
-            self.validation_var.set(
-                "No hay flujos guardados para este módulo. Cree uno desde 'Actua. Tareas'."
-            )
+            self.validation_var.set("No hay flujos guardados. Cree uno desde 'Actua. Tareas'.")
             self.btn_ejecutar.configure(state="disabled")
             self.btn_validar.configure(state="disabled")
 
@@ -804,9 +892,16 @@ class ActuaExecutionPanel(tk.Toplevel):
         return self.flujos[idx]
 
     def _on_flujo_changed(self) -> None:
+        flujo = self._current_flujo()
+        if flujo:
+            pasos = flujo.get("pasos") or []
+            self._required = _required_keys_for_flow(pasos)
+        else:
+            self._required = set()
+        self._rebuild_columns()
+        self._populate_tareas()
         self._validar(silent=True)
 
-    # -------------------------------------------------------- Validación
     def _validar(self, silent: bool = False) -> bool:
         flujo = self._current_flujo()
         if not flujo:
@@ -815,15 +910,15 @@ class ActuaExecutionPanel(tk.Toplevel):
         pasos = flujo.get("pasos") or []
         required = _required_keys_for_flow(pasos)
         if not required:
-            self.validation_var.set(
-                f"Flujo '{flujo['nombre']}' no requiere datos adicionales. Listo para ejecutar."
-            )
+            self.validation_var.set(f"Flujo '{flujo['nombre']}' listo. No requiere datos adicionales.")
             return True
 
+        n_missing = 0
         faltantes_por_tarea: list[str] = []
         for task in self.tareas:
             missing = [k for k in required if not _task_value(task, k).strip()]
             if missing:
+                n_missing += 1
                 task_num = task.get("task_number") or "?"
                 faltantes_por_tarea.append(f"Tarea {task_num}: faltan {', '.join(missing)}")
 
@@ -833,22 +928,15 @@ class ActuaExecutionPanel(tk.Toplevel):
                 + "\n".join(faltantes_por_tarea[:6])
             )
             if len(faltantes_por_tarea) > 6:
-                resumen += f"\n…y {len(faltantes_por_tarea) - 6} tareas más."
+                resumen += f"\n...y {len(faltantes_por_tarea) - 6} tareas mas."
             self.validation_var.set(resumen)
             if not silent:
-                messagebox.showwarning(
-                    "Validación",
-                    "Algunas tareas no contienen toda la información requerida por el flujo.",
-                    parent=self,
-                )
+                messagebox.showwarning("Validacion", f"{n_missing} tarea(s) con campos faltantes.", parent=self)
             return False
 
-        self.validation_var.set(
-            f"Flujo '{flujo['nombre']}' validado. Requiere: {', '.join(sorted(required))}."
-        )
+        self.validation_var.set(f"Flujo '{flujo['nombre']}' validado. Requiere: {', '.join(sorted(required))}.")
         return True
 
-    # ---------------------------------------------------------- Ejecución
     def _ejecutar(self) -> None:
         if self._running:
             return
@@ -860,39 +948,54 @@ class ActuaExecutionPanel(tk.Toplevel):
             messagebox.showwarning("Actua. Tareas", "Seleccione un flujo.", parent=self)
             return
         if not self._validar(silent=True):
+            n_missing = sum(1 for t in self.tareas
+                           if any(not _task_value(t, k).strip() for k in self._required))
             if not messagebox.askyesno(
-                "Validación",
-                "Algunas tareas no cuentan con toda la información requerida. ¿Desea continuar de todos modos?",
+                "Validacion",
+                f"Hay {n_missing} tarea(s) con campos faltantes. ¿Continuar?",
                 parent=self,
             ):
                 return
 
         db.set_config("ACTUA_HEADLESS", "1" if self.headless_var.get() else "0")
+        db.set_config("ACTUA_REPORT_EMAIL", "1" if self.report_var.get() else "0")
 
         self._running = True
         self.btn_ejecutar.configure(state="disabled")
         self.btn_validar.configure(state="disabled")
         self.flujo_combo.configure(state="disabled")
-        self.status_var.set("Ejecutando…")
+        self.status_var.set("Ejecutando...")
         self.progress.configure(maximum=len(self.tareas), value=0)
 
         pasos = flujo.get("pasos") or []
+        flujo_nombre = flujo.get("nombre", "?")
         headless = bool(self.headless_var.get())
+        send_report = self.report_var.get()
         tareas_snapshot = [dict(t) for t in self.tareas]
 
         thread = threading.Thread(
-            target=self._worker, args=(pasos, tareas_snapshot, headless), daemon=True
+            target=self._worker,
+            args=(pasos, tareas_snapshot, headless, flujo_nombre, send_report),
+            daemon=True,
         )
         thread.start()
 
-    def _worker(self, pasos: list[dict], tareas: list[dict], headless: bool) -> None:
+    def _worker(
+        self,
+        pasos: list[dict],
+        tareas: list[dict],
+        headless: bool,
+        flujo_nombre: str,
+        send_report: bool,
+    ) -> None:
         exitos = 0
         fallos = 0
+        resultados: list[dict] = []
         try:
             try:
                 self._driver = _create_driver(headless=headless)
             except Exception as exc:
-                self._log(f"No se pudo iniciar el navegador: {exc}")
+                self._log_msg(f"No se pudo iniciar el navegador: {exc}")
                 self.after(0, lambda: self.status_var.set("Error iniciando navegador"))
                 return
 
@@ -900,27 +1003,26 @@ class ActuaExecutionPanel(tk.Toplevel):
                 username = (self.email_session.get("address") or "").split("@")[0]
                 password = self.email_session.get("password") or ""
                 if not username or not password:
-                    raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
-                self._log(f"Iniciando sesión en Telcos como {username}…")
+                    raise ValueError("Credenciales de Telcos no disponibles.")
+                self._log_msg(f"Iniciando sesion en Telcos como {username}...")
                 login_telcos(self._driver, username, password)
             except Exception as exc:
-                self._log(f"Fallo en el inicio de sesión: {exc}")
-                self.after(0, lambda: self.status_var.set("Error autenticando en Telcos"))
+                self._log_msg(f"Fallo inicio de sesion: {exc}")
+                self.after(0, lambda: self.status_var.set("Error autenticando"))
                 return
 
             for idx, task in enumerate(tareas):
                 task_number = str(task.get("task_number") or "")
-                self._set_estado(idx, "En ejecución")
-                self._log(f"→ Tarea {task_number or '(sin número)'} ({idx + 1}/{len(tareas)})")
+                self._set_estado(idx, "En ejecucion")
+                self._log_msg(f"-> Tarea {task_number or '(sin numero)'} ({idx + 1}/{len(tareas)})")
                 ctx = {
                     "task_number": task_number,
                     "numero_tarea": task_number,
                     "carpeta_base": actua_tareas_repo.get_carpeta_base(""),
                     "file_aliases": {},
                 }
-                # Propaga datos del módulo (proveedor, ruc, oc, etc.) como ctx
                 for k, v in task.items():
-                    if k == "task_number":
+                    if k in ("task_number", "_email_body", "body", "_db_id", "_created_at"):
                         continue
                     if isinstance(v, (list, tuple)):
                         ctx[k] = ", ".join(str(x) for x in v if x)
@@ -928,23 +1030,37 @@ class ActuaExecutionPanel(tk.Toplevel):
                         ctx[k] = v
 
                 def on_step(n, action_id, params, _t=task_number):
-                    self._log(f"   [{_t}] Paso {n}: {action_id} {params}")
+                    self._log_msg(f"   [{_t}] Paso {n}: {action_id} {params}")
 
                 ctx["on_step"] = on_step
                 try:
                     auto.ejecutar_flujo(self._driver, pasos, ctx)
                     exitos += 1
                     self._set_estado(idx, "OK")
-                    self._log(f"✓ Tarea {task_number} completada")
+                    self._log_msg(f"OK Tarea {task_number} completada")
+                    resultados.append({"task_number": task_number, "status": "ok", "mensaje": "Completada", "campos": {k: v for k, v in ctx.items() if k not in ("on_step", "file_aliases", "carpeta_base")}})
                 except Exception as exc:
                     fallos += 1
                     self._set_estado(idx, f"Error: {exc}")
-                    self._log(f"✗ Tarea {task_number}: {exc}")
+                    self._log_msg(f"ERROR Tarea {task_number}: {exc}")
+                    resultados.append({"task_number": task_number, "status": "error", "mensaje": str(exc), "campos": {}})
                 self.after(0, lambda v=idx + 1: self.progress.configure(value=v))
 
             resumen = f"Finalizado. {exitos} exitosas / {fallos} con error."
             self.after(0, lambda: self.status_var.set(resumen))
-            self._log(resumen)
+            self._log_msg(resumen)
+
+            if send_report and self.email_session:
+                try:
+                    from gestorcompras.services.actua_reporter import send_actua_report
+                    sent = send_actua_report(self.email_session, flujo_nombre, resultados, headless)
+                    if sent:
+                        self._log_msg("Reporte enviado por correo.")
+                    else:
+                        self._log_msg("No se pudo enviar el reporte por correo.")
+                except Exception as exc:
+                    logger.exception("Error enviando reporte")
+                    self._log_msg(f"Error al enviar reporte: {exc}")
         finally:
             if self._driver is not None:
                 try:
@@ -959,11 +1075,7 @@ class ActuaExecutionPanel(tk.Toplevel):
 
     def _on_close(self) -> None:
         if self._running:
-            if not messagebox.askyesno(
-                "Actua. Tareas",
-                "Hay una ejecución en curso. ¿Desea cerrar de todos modos?",
-                parent=self,
-            ):
+            if not messagebox.askyesno("Actua. Tareas", "Hay ejecucion en curso. ¿Cerrar?", parent=self):
                 return
         try:
             self.grab_release()
@@ -979,17 +1091,9 @@ def abrir_panel_tareas(
     tareas: list[dict],
     mode: str | None = None,
 ) -> ActuaExecutionPanel | None:
-    """Abre el panel unificado de Actua. Tareas para las tareas recolectadas
-    por el módulo origen. Muestra la tabla con la información relevante y deja
-    que el usuario escoja el flujo a ejecutar."""
-    if not tareas:
-        messagebox.showinfo(
-            "Actua. Tareas",
-            "El módulo no detectó tareas para procesar en Actua. Tareas.",
-            parent=master,
-        )
-        return None
-    panel = ActuaExecutionPanel(master, email_session, origen, tareas, mode=mode)
+    """Abre el panel unificado de Actua. Tareas. Si ``tareas`` viene vacío el
+    usuario puede escanear correos o agregar manualmente desde el panel."""
+    panel = ActuaExecutionPanel(master, email_session, origen, tareas or [], mode=mode)
     return panel
 
 

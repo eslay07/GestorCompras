@@ -155,6 +155,25 @@ def init_db():
                 signature_path TEXT
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS actua_correos_escaneados (
+                id INTEGER PRIMARY KEY,
+                message_id TEXT UNIQUE,
+                raw_hash TEXT,
+                fecha TEXT,
+                task_number TEXT,
+                asunto TEXT,
+                remitente TEXT,
+                payload_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_actua_correos_task "
+            "ON actua_correos_escaneados(task_number)"
+        )
+
         conn.commit()
     finally:
         conn.close()

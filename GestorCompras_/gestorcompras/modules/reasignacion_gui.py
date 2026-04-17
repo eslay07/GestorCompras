@@ -254,79 +254,28 @@ class ServiciosReasignacion(tk.Toplevel):
 
     @staticmethod
     def _decode_header_value(raw: str) -> str:
-        try:
-            return str(make_header(decode_header(raw)))
-        except Exception:  # pragma: no cover - caso defensivo
-            partes: list[str] = []
-            for value, encoding in decode_header(raw):
-                if isinstance(value, bytes):
-                    codec = encoding or "utf-8"
-                    try:
-                        partes.append(value.decode(codec, errors="ignore"))
-                    except Exception:
-                        partes.append(value.decode("utf-8", errors="ignore"))
-                else:
-                    partes.append(value)
-            return "".join(partes)
+        from gestorcompras.services.email_task_scanner import decode_header_value
+        return decode_header_value(raw)
 
     @classmethod
     def _decode_subject(cls, msg: Message) -> str:
-        return cls._decode_header_value(msg.get("Subject", ""))
+        from gestorcompras.services.email_task_scanner import decode_subject
+        return decode_subject(msg)
 
     @staticmethod
     def _clean_html(text: str) -> str:
-        cleaned = re.sub(r"(?is)<(script|style).*?>.*?</\\1>", " ", text)
-        cleaned = re.sub(r"(?is)<br\\s*/?>", "\n", cleaned)
-        cleaned = re.sub(r"(?is)</p>", "\n", cleaned)
-        cleaned = re.sub(r"(?is)<[^>]+>", " ", cleaned)
-        cleaned = html.unescape(cleaned)
-        return re.sub(r"\s+", " ", cleaned).strip()
+        from gestorcompras.services.email_task_scanner import clean_html
+        return clean_html(text)
 
     @classmethod
     def _extract_text(cls, msg: Message) -> str:
-        partes: list[str] = []
-        if msg.is_multipart():
-            for part in msg.walk():
-                if part.get_content_disposition() == "attachment":
-                    continue
-                payload = part.get_payload(decode=True)
-                if payload is None:
-                    continue
-                charset = part.get_content_charset() or "utf-8"
-                try:
-                    texto = payload.decode(charset, errors="ignore")
-                except Exception:
-                    texto = payload.decode("utf-8", errors="ignore")
-                if part.get_content_type() == "text/html":
-                    texto = cls._clean_html(texto)
-                partes.append(texto)
-        else:
-            payload = msg.get_payload(decode=True)
-            if payload:
-                charset = msg.get_content_charset() or "utf-8"
-                try:
-                    texto = payload.decode(charset, errors="ignore")
-                except Exception:
-                    texto = payload.decode("utf-8", errors="ignore")
-                if msg.get_content_type() == "text/html":
-                    texto = cls._clean_html(texto)
-                partes.append(texto)
-        return "\n".join(filter(None, partes)).strip()
+        from gestorcompras.services.email_task_scanner import extract_text
+        return extract_text(msg)
 
     @staticmethod
     def _parse_header_date(msg: Message, tz: ZoneInfo) -> datetime | None:
-        header = msg.get("Date")
-        if not header:
-            return None
-        try:
-            dt = parsedate_to_datetime(header)
-        except (TypeError, ValueError):
-            return None
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-        return dt.astimezone(tz)
+        from gestorcompras.services.email_task_scanner import parse_header_date
+        return parse_header_date(msg, tz)
 
     def _buscar_correos(
         self,
@@ -414,12 +363,8 @@ class ServiciosReasignacion(tk.Toplevel):
 
     @staticmethod
     def _normalize_for_search(value: str | None) -> str:
-        """Normaliza una cadena removiendo acentos para búsquedas flexibles."""
-        if not value:
-            return ""
-        normalized = unicodedata.normalize("NFD", value)
-        sin_acentos = "".join(ch for ch in normalized if not unicodedata.combining(ch))
-        return sin_acentos.upper()
+        from gestorcompras.services.email_task_scanner import normalize_for_search
+        return normalize_for_search(value)
 
     def _buscar(self) -> None:
         cfg = core_config.get_servicios_config()
