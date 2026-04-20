@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from gestorcompras import theme
 from gestorcompras.core import config as core_config
 from gestorcompras.core.mail_parse import parse_body, parse_subject
 from gestorcompras.data import reasignaciones_repo
@@ -50,7 +51,7 @@ class ServiciosReasignacion(tk.Toplevel):
     def __init__(self, master: tk.Misc | None, email_session: dict[str, str]):
         super().__init__(master)
         self.title("Reasignación de tareas - Servicios")
-        self.geometry("1080x640")
+        self.geometry("1100x720")
         self.transient(master)
         self.grab_set()
         self.email_session = email_session
@@ -75,10 +76,30 @@ class ServiciosReasignacion(tk.Toplevel):
         main.pack(fill="both", expand=True)
         main.columnconfigure(0, weight=3)
         main.columnconfigure(1, weight=2)
-        main.rowconfigure(2, weight=1)
+        main.rowconfigure(3, weight=1)
 
-        filtros = ttk.LabelFrame(main, text="Filtros", style="MyLabelFrame.TLabelframe", padding=10)
-        filtros.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        # -- Row 0: Professional header --
+        header_frame = ttk.Frame(main, style="MyFrame.TFrame")
+        header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 5))
+        ttk.Label(
+            header_frame,
+            text="Reasignacion de Tareas",
+            font=("Segoe UI", 16, "bold"),
+            foreground=theme.color_titulos,
+            style="MyLabel.TLabel",
+        ).pack(anchor="w")
+        ttk.Label(
+            header_frame,
+            text="Busque correos de servicio y reasigne tareas a otro usuario.",
+            font=("Segoe UI", 10),
+            foreground="#6B7280",
+            style="MyLabel.TLabel",
+        ).pack(anchor="w")
+        ttk.Separator(header_frame, orient="horizontal").pack(fill="x", pady=(5, 0))
+
+        # -- Row 1: Filtros --
+        filtros = ttk.LabelFrame(main, text="Busqueda de correos", style="MyLabelFrame.TLabelframe", padding=10)
+        filtros.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         for col in (1, 3):
             filtros.columnconfigure(col, weight=1)
         filtros.columnconfigure(4, weight=0)
@@ -96,16 +117,9 @@ class ServiciosReasignacion(tk.Toplevel):
         ttk.Label(filtros, text="Hasta (YYYY-MM-DD HH:MM):", style="MyLabel.TLabel").grid(row=0, column=2, sticky="w")
         ttk.Entry(filtros, textvariable=self.hasta_var, style="MyEntry.TEntry", width=22).grid(row=0, column=3, padx=5, sticky="ew")
 
-        buscar_btn = ttk.Button(filtros, text="Buscar", style="MyButton.TButton", command=self._buscar)
-        buscar_btn.grid(row=0, column=4, padx=10, rowspan=2, sticky="n")
+        buscar_btn = ttk.Button(filtros, text="Buscar correos", style="MyButton.TButton", command=self._buscar)
+        buscar_btn.grid(row=0, column=4, padx=10, rowspan=3, sticky="n")
         add_hover_effect(buscar_btn)
-
-        ttk.Button(
-            filtros,
-            text="Cerrar",
-            style="MyButton.TButton",
-            command=self.destroy,
-        ).grid(row=0, column=5, rowspan=2, sticky="ne")
 
         ttk.Label(filtros, text="Remitente:", style="MyLabel.TLabel").grid(row=1, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(
@@ -114,13 +128,22 @@ class ServiciosReasignacion(tk.Toplevel):
             style="MyEntry.TEntry",
         ).grid(row=1, column=1, columnspan=3, padx=5, sticky="ew", pady=(8, 0))
 
+        ttk.Label(
+            filtros,
+            text="Formato: AAAA-MM-DD HH:MM",
+            font=("Segoe UI", 9),
+            foreground="#6B7280",
+            style="MyLabel.TLabel",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
+
+        # -- Row 2: Asignacion --
         asignacion = ttk.LabelFrame(
             main,
-            text="Datos de reasignación",
+            text="Datos de reasignacion",
             style="MyLabelFrame.TLabelframe",
             padding=10,
         )
-        asignacion.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        asignacion.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 10))
         asignacion.columnconfigure(1, weight=1)
         asignacion.columnconfigure(3, weight=1)
 
@@ -140,18 +163,29 @@ class ServiciosReasignacion(tk.Toplevel):
 
         ttk.Checkbutton(
             asignacion,
-            text="Ejecutar navegador en modo oculto (headless)",
+            text="Mostrar navegador durante la ejecucion",
             style="MyCheckbutton.TCheckbutton",
             variable=self.headless_var,
+            onvalue=False,
+            offvalue=True,
         ).grid(row=1, column=0, columnspan=4, sticky="w", pady=(8, 0))
 
-        tabla_frame = ttk.Frame(main, style="MyFrame.TFrame")
-        tabla_frame.grid(row=2, column=0, sticky="nsew")
-        tabla_frame.rowconfigure(0, weight=1)
-        tabla_frame.columnconfigure(0, weight=1)
+        ttk.Label(
+            asignacion,
+            text="Si esta activado, podra ver el navegador mientras se ejecuta la reasignacion.",
+            font=("Segoe UI", 9),
+            foreground="#6B7280",
+            style="MyLabel.TLabel",
+        ).grid(row=2, column=0, columnspan=4, sticky="w", pady=(2, 0))
+
+        # -- Row 3: Table wrapped in LabelFrame --
+        tabla_lf = ttk.LabelFrame(main, text="Correos encontrados", style="MyLabelFrame.TLabelframe", padding=5)
+        tabla_lf.grid(row=3, column=0, sticky="nsew")
+        tabla_lf.rowconfigure(0, weight=1)
+        tabla_lf.columnconfigure(0, weight=1)
 
         self.tree = ttk.Treeview(
-            tabla_frame,
+            tabla_lf,
             columns=self.columns,
             show="headings",
             style="MyTreeview.Treeview",
@@ -160,7 +194,7 @@ class ServiciosReasignacion(tk.Toplevel):
         headings = {
             "seleccion": "",
             "fecha": "Fecha",
-            "numero_tarea": "Número de tarea",
+            "numero_tarea": "Numero de tarea",
             "taller": "Taller",
             "asunto": "Asunto",
         }
@@ -175,17 +209,18 @@ class ServiciosReasignacion(tk.Toplevel):
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Button-1>", self._on_tree_click, add=True)
 
-        scrollbar = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(tabla_lf, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
 
+        # -- Row 4: Actions --
         acciones = ttk.Frame(main, style="MyFrame.TFrame", padding=5)
-        acciones.grid(row=3, column=0, sticky="ew", pady=5)
+        acciones.grid(row=4, column=0, sticky="ew", pady=5)
 
         self.select_all_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             acciones,
-            text="Marcar todos",
+            text="Seleccionar todos",
             style="MyCheckbutton.TCheckbutton",
             variable=self.select_all_var,
             command=self._toggle_all,
@@ -194,17 +229,32 @@ class ServiciosReasignacion(tk.Toplevel):
         self.estado_label = ttk.Label(acciones, text="", style="MyLabel.TLabel")
         self.estado_label.pack(side="left", padx=(10, 0))
 
-        reasignar_btn = ttk.Button(acciones, text="Reasignar", style="MyButton.TButton", command=self._reasignar)
+        self.progress = ttk.Progressbar(acciones, mode="indeterminate", length=120)
+        self.progress.pack(side="right", padx=(5, 0))
+        self.progress.grid_remove() if self.progress.winfo_manager() == "grid" else self.progress.pack_forget()
+
+        reasignar_btn = ttk.Button(acciones, text="Reasignar tareas", style="MyButton.TButton", command=self._reasignar)
         reasignar_btn.pack(side="right", padx=5)
         add_hover_effect(reasignar_btn)
 
-        preview_frame = ttk.LabelFrame(main, text="Vista previa", style="MyLabelFrame.TLabelframe", padding=10)
-        preview_frame.grid(row=2, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
+        # -- Preview (column 1, spanning table + actions rows) --
+        preview_frame = ttk.LabelFrame(main, text="Vista previa del correo", style="MyLabelFrame.TLabelframe", padding=10)
+        preview_frame.grid(row=3, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
         preview_frame.rowconfigure(0, weight=1)
         preview_frame.columnconfigure(0, weight=1)
 
         self.preview = tk.Text(preview_frame, wrap="word", state="disabled")
         self.preview.grid(row=0, column=0, sticky="nsew")
+
+        # -- Row 5: Status bar --
+        self.status_var = tk.StringVar(value="Listo para buscar.")
+        ttk.Label(
+            main,
+            textvariable=self.status_var,
+            style="MyLabel.TLabel",
+            font=("Segoe UI", 9),
+            foreground="#6B7280",
+        ).grid(row=5, column=0, columnspan=2, sticky="w", pady=(5, 0))
 
     @staticmethod
     def _checkbox_symbol(checked: bool) -> str:
@@ -638,7 +688,7 @@ class ServiciosReasignacion(tk.Toplevel):
                     mode="servicios",
                 )
         except Exception:
-            logger.exception("Hook Actua. Tareas (reasignación) falló sin afectar el flujo principal.")
+            logger.exception("Hook Actualizar Tareas (reasignación) falló sin afectar el flujo principal.")
 
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:

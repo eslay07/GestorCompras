@@ -137,56 +137,44 @@ class ActuaTareasScreen(ttk.Frame):
 
     def _build(self):
         self.columnconfigure(1, weight=1)
-        # La fila de "Flujo/Acciones" debe conservar altura visible;
-        # de lo contrario el bloque de ejecución puede colapsarla.
-        self.rowconfigure(2, weight=1, minsize=230)
-        self.rowconfigure(3, weight=0)
+        self.rowconfigure(3, weight=1, minsize=230)
+        self.rowconfigure(4, weight=0)
 
-        head = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
+        head = ttk.Frame(self, style="MyFrame.TFrame", padding=(10, 10, 10, 4))
         head.grid(row=0, column=0, columnspan=2, sticky="ew")
-        ttk.Label(head, text="Actualizar Tareas", style="Banner.TLabel").grid(row=0, column=0, sticky="w")
+        head.columnconfigure(1, weight=1)
 
-        self.flujo_combo = ttk.Combobox(head, textvariable=self.flujo_var, state="readonly", width=35)
-        self.flujo_combo.grid(row=0, column=1, padx=8)
+        ttk.Label(head, text="Actualizar Tareas",
+                  font=("Segoe UI", 16, "bold"), foreground="#111827").grid(row=0, column=0, sticky="w")
+        ttk.Label(head, text="Cree y ejecute flujos de automatizacion sobre tareas en Telcos.",
+                  font=("Segoe UI", 10), foreground="#6B7280").grid(row=0, column=1, sticky="w", padx=(16, 0))
+
+        ttk.Separator(self, orient="horizontal").grid(row=1, column=0, columnspan=2, sticky="ew", padx=10)
+
+        flujo_frame = ttk.LabelFrame(self, text="Flujo guardado", style="MyLabelFrame.TLabelframe", padding=10)
+        flujo_frame.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 6))
+        flujo_frame.columnconfigure(1, weight=1)
+
+        ttk.Label(flujo_frame, text="Flujo:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
+        self.flujo_combo = ttk.Combobox(flujo_frame, textvariable=self.flujo_var, state="readonly", width=35)
+        self.flujo_combo.grid(row=0, column=1, padx=8, sticky="w")
         self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._load_selected_flujo())
 
         for i, (txt, cmd) in enumerate([
             ("Nuevo flujo", self._nuevo_flujo),
-            ("Guardar", self._guardar_flujo),
-            ("Eliminar", self._eliminar_flujo),
+            ("Guardar flujo", self._guardar_flujo),
+            ("Eliminar flujo", self._eliminar_flujo),
         ]):
-            b = ttk.Button(head, text=txt, style="MyButton.TButton", command=cmd)
+            b = ttk.Button(flujo_frame, text=txt, style="MyButton.TButton", command=cmd)
             b.grid(row=0, column=2 + i, padx=4)
             add_hover_effect(b)
 
-        source_frame = ttk.LabelFrame(self, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=8)
-        source_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 8))
-        ttk.Combobox(
-            source_frame,
-            textvariable=self.origen_var,
-            values=list(_ORIGEN_MAP.keys()),
-            state="readonly",
-            width=28,
-        ).grid(row=0, column=0, sticky="w")
-        source_frame.bind("<<ComboboxSelected>>", lambda _e: self._refresh_inbox())
-        self.origen_var.trace_add("write", lambda *_: self._refresh_inbox())
+        ttk.Label(flujo_frame, text="Seleccione un flujo existente o cree uno nuevo con las acciones disponibles.",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=1, column=0, columnspan=5, sticky="w", pady=(4, 0))
 
-        btn_all = ttk.Button(source_frame, text="Seleccionar todo", command=self._inbox_select_all)
-        btn_none = ttk.Button(source_frame, text="Ninguno", command=self._inbox_select_none)
-        btn_clear = ttk.Button(source_frame, text="Limpiar bandeja", command=self._inbox_clear)
-        btn_all.grid(row=0, column=1, padx=5)
-        btn_none.grid(row=0, column=2, padx=5)
-        btn_clear.grid(row=0, column=3, padx=5)
-
-        self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"), show="headings", height=4)
-        for col, txt, w in (("sel", "✓", 35), ("origen", "Origen", 130), ("task", "Tarea", 130)):
-            self.inbox_tree.heading(col, text=txt)
-            self.inbox_tree.column(col, width=w, anchor="center")
-        self.inbox_tree.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(8, 0))
-        self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
-
-        left = ttk.LabelFrame(self, text="Acciones", style="MyLabelFrame.TLabelframe", padding=8)
-        left.grid(row=2, column=0, sticky="nsew", padx=(10, 5), pady=(0, 10))
+        left = ttk.LabelFrame(self, text="Acciones disponibles", style="MyLabelFrame.TLabelframe", padding=8)
+        left.grid(row=3, column=0, sticky="nsew", padx=(10, 5), pady=(0, 8))
         left.columnconfigure(0, weight=1)
         left.rowconfigure(0, weight=1)
 
@@ -207,8 +195,7 @@ class ActuaTareasScreen(ttk.Frame):
 
         for i, accion in enumerate(auto.ACCIONES):
             btn = ttk.Button(
-                act_container,
-                text=accion["label"],
+                act_container, text=accion["label"],
                 style="MyButton.TButton",
                 command=lambda a=accion: self._agregar_paso(a),
             )
@@ -218,23 +205,19 @@ class ActuaTareasScreen(ttk.Frame):
             ActionTooltip(btn, descripcion)
             btn.bind("<Enter>", lambda _e, d=descripcion: self.action_help_var.set(d), add="+")
 
-        ttk.Label(
-            left,
-            textvariable=self.action_help_var,
-            style="MyLabel.TLabel",
-            wraplength=360,
-            justify="left",
-        ).pack(fill="x", padx=4, pady=(4, 0))
+        ttk.Label(left, textvariable=self.action_help_var, style="MyLabel.TLabel",
+                  wraplength=360, justify="left").pack(fill="x", padx=4, pady=(4, 0))
 
-        right = ttk.LabelFrame(self, text="Flujo", style="MyLabelFrame.TLabelframe", padding=8)
-        right.grid(row=2, column=1, sticky="nsew", padx=(5, 10), pady=(0, 10))
+        right = ttk.LabelFrame(self, text="Pasos del flujo", style="MyLabelFrame.TLabelframe", padding=8)
+        right.grid(row=3, column=1, sticky="nsew", padx=(5, 10), pady=(0, 8))
         right.rowconfigure(0, weight=1)
         right.columnconfigure(0, weight=1)
 
-        self.tree = ttk.Treeview(right, columns=("n", "accion", "params"), show="headings", height=8)
+        self.tree = ttk.Treeview(right, columns=("n", "accion", "params"),
+                                 show="headings", style="MyTreeview.Treeview", height=8)
         self.tree.heading("n", text="#")
-        self.tree.heading("accion", text="Acción")
-        self.tree.heading("params", text="Parámetros")
+        self.tree.heading("accion", text="Accion")
+        self.tree.heading("params", text="Parametros")
         self.tree.column("n", width=40, anchor="center")
         self.tree.column("accion", width=260)
         self.tree.column("params", width=320)
@@ -242,44 +225,89 @@ class ActuaTareasScreen(ttk.Frame):
 
         actions_row = ttk.Frame(right, style="MyFrame.TFrame")
         actions_row.grid(row=1, column=0, sticky="ew", pady=(8, 0))
-        for txt, cmd in (("↑", self._move_up), ("↓", self._move_down), ("✎", self._edit_step), ("✖", self._del_step)):
-            b = ttk.Button(actions_row, text=txt, command=cmd, width=4)
+        for txt, cmd in (("Subir", self._move_up), ("Bajar", self._move_down),
+                         ("Editar", self._edit_step), ("Quitar", self._del_step)):
+            b = ttk.Button(actions_row, text=txt, style="MyButton.TButton", command=cmd, width=7)
             b.pack(side="left", padx=3)
 
-        bottom = ttk.LabelFrame(self, text="Ejecución", style="MyLabelFrame.TLabelframe", padding=8)
-        bottom.grid(row=3, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
+        bottom = ttk.LabelFrame(self, text="Ejecucion", style="MyLabelFrame.TLabelframe", padding=10)
+        bottom.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
+        bottom.columnconfigure(3, weight=1)
+
         ttk.Label(bottom, text="N° tarea manual:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Entry(bottom, textvariable=self.task_default_var, width=20).grid(row=0, column=1, padx=4)
-        ttk.Label(bottom, text="Carpeta base:", style="MyLabel.TLabel").grid(row=0, column=2, padx=(10, 0), sticky="w")
-        ttk.Entry(bottom, textvariable=self.carpeta_base_var, width=40).grid(row=0, column=3, padx=4)
-        ttk.Button(bottom, text="Examinar…", command=self._pick_folder).grid(row=0, column=4)
-        ttk.Label(bottom, text="Tareas manuales (1 por línea):", style="MyLabel.TLabel").grid(
-            row=1, column=0, sticky="w", pady=(4, 0)
-        )
-        self.manual_tasks_text = tk.Text(bottom, height=3, width=36)
-        self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Entry(bottom, textvariable=self.task_default_var, style="MyEntry.TEntry",
+                  width=20).grid(row=0, column=1, padx=4)
+        ttk.Label(bottom, text="Carpeta base:", style="MyLabel.TLabel").grid(
+            row=0, column=2, padx=(10, 0), sticky="w")
+        ttk.Entry(bottom, textvariable=self.carpeta_base_var, style="MyEntry.TEntry",
+                  width=40).grid(row=0, column=3, padx=4, sticky="ew")
+        ttk.Button(bottom, text="Examinar...", style="MyButton.TButton",
+                   command=self._pick_folder).grid(row=0, column=4)
 
-        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar", variable=self.mostrar_nav_var).grid(row=2, column=0, columnspan=2, sticky="w", pady=6)
-        ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=2, column=2, columnspan=3, sticky="w")
+        ttk.Label(bottom, text="Tareas manuales (1 por linea):", style="MyLabel.TLabel").grid(
+            row=1, column=0, sticky="w", pady=(6, 0))
+        self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
+                                          borderwidth=1, font=("Segoe UI", 10))
+        self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(6, 0))
 
-        self.log = ScrolledText(bottom, height=5, state="disabled")
-        self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=4)
+        source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
+        source_frame.grid(row=1, column=3, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
+        ttk.Combobox(source_frame, textvariable=self.origen_var,
+                     values=list(_ORIGEN_MAP.keys()), state="readonly", width=24).grid(
+            row=0, column=0, sticky="w")
+        self.origen_var.trace_add("write", lambda *_: self._refresh_inbox())
 
-        run_btn = ttk.Button(bottom, text="Ejecutar flujo", style="MyButton.TButton", command=self._run_flow)
-        run_btn.grid(row=4, column=3, sticky="e", pady=5)
-        add_hover_effect(run_btn)
-        back_btn = ttk.Button(bottom, text="◀ Regresar", style="MyButton.TButton", command=self._go_back)
-        back_btn.grid(row=4, column=4, sticky="e", padx=6)
-        add_hover_effect(back_btn)
+        btn_all = ttk.Button(source_frame, text="Todos", command=self._inbox_select_all)
+        btn_none = ttk.Button(source_frame, text="Ninguno", command=self._inbox_select_none)
+        btn_clear = ttk.Button(source_frame, text="Limpiar", command=self._inbox_clear)
+        btn_all.grid(row=0, column=1, padx=3)
+        btn_none.grid(row=0, column=2, padx=3)
+        btn_clear.grid(row=0, column=3, padx=3)
 
-        alias_frame = ttk.LabelFrame(bottom, text="Alias de archivos", style="MyLabelFrame.TLabelframe", padding=6)
-        alias_frame.grid(row=5, column=0, columnspan=5, sticky="ew", pady=(6, 0))
+        self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"),
+                                       show="headings", style="MyTreeview.Treeview", height=3)
+        for col, txt, w in (("sel", "✓", 30), ("origen", "Origen", 110), ("task", "Tarea", 110)):
+            self.inbox_tree.heading(col, text=txt)
+            self.inbox_tree.column(col, width=w, anchor="center")
+        self.inbox_tree.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
+
+        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar",
+                        style="MyCheckbutton.TCheckbutton",
+                        variable=self.mostrar_nav_var).grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=2, column=2, columnspan=3, sticky="w", pady=(8, 0))
+
+        self.log = ScrolledText(bottom, height=5, state="disabled", font=("Segoe UI", 9))
+        self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(6, 4))
+
+        btn_row = ttk.Frame(bottom, style="MyFrame.TFrame")
+        btn_row.grid(row=4, column=0, columnspan=5, sticky="ew")
+        btn_row.columnconfigure(0, weight=1)
+
+        alias_frame = ttk.LabelFrame(btn_row, text="Alias de archivos",
+                                     style="MyLabelFrame.TLabelframe", padding=6)
+        alias_frame.grid(row=0, column=0, sticky="w")
         self.alias_name = tk.StringVar()
         self.alias_path = tk.StringVar()
-        ttk.Entry(alias_frame, textvariable=self.alias_name, width=20).grid(row=0, column=0, padx=4)
-        ttk.Entry(alias_frame, textvariable=self.alias_path, width=50).grid(row=0, column=1, padx=4)
+        ttk.Entry(alias_frame, textvariable=self.alias_name, style="MyEntry.TEntry",
+                  width=16).grid(row=0, column=0, padx=4)
+        ttk.Entry(alias_frame, textvariable=self.alias_path, style="MyEntry.TEntry",
+                  width=36).grid(row=0, column=1, padx=4)
         ttk.Button(alias_frame, text="...", command=self._pick_alias_folder).grid(row=0, column=2)
-        ttk.Button(alias_frame, text="Guardar alias", command=self._save_alias).grid(row=0, column=3, padx=4)
+        ttk.Button(alias_frame, text="Guardar alias", style="MyButton.TButton",
+                   command=self._save_alias).grid(row=0, column=3, padx=4)
+
+        run_btn = ttk.Button(btn_row, text="Ejecutar flujo", style="MyButton.TButton",
+                             command=self._run_flow)
+        run_btn.grid(row=0, column=1, padx=4, sticky="e")
+        add_hover_effect(run_btn)
+        back_btn = ttk.Button(btn_row, text="Regresar", style="MyButton.TButton",
+                              command=self._go_back)
+        back_btn.grid(row=0, column=2, padx=(0, 4), sticky="e")
+        add_hover_effect(back_btn)
 
     def _log(self, txt: str):
         self.log.configure(state="normal")
@@ -630,20 +658,23 @@ class ActuaExecutionPanel(tk.Toplevel):
         self._populate_flujos()
 
     def _build(self) -> None:
-        wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=10)
+        wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=12)
         wrapper.pack(fill="both", expand=True)
         wrapper.columnconfigure(0, weight=1)
-        wrapper.rowconfigure(2, weight=1)
-        wrapper.rowconfigure(5, weight=1)
+        wrapper.rowconfigure(3, weight=1)
+        wrapper.rowconfigure(6, weight=1)
 
         header = ttk.Frame(wrapper, style="MyFrame.TFrame")
         header.grid(row=0, column=0, sticky="ew")
-        header.columnconfigure(1, weight=1)
-        ttk.Label(header, text="Tareas detectadas", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(header, text=f"Origen: {self.origen}", style="MyLabel.TLabel").grid(row=0, column=1, sticky="e")
+        header.columnconfigure(0, weight=1)
+        ttk.Label(header, text="Actualizar Tareas - Ejecutar flujo",
+                  font=("Segoe UI", 14, "bold"), foreground="#111827").grid(row=0, column=0, sticky="w")
+        ttk.Label(header, text=f"Origen: {self.origen}",
+                  font=("Segoe UI", 10), foreground="#6B7280").grid(row=0, column=1, sticky="e")
+        ttk.Separator(wrapper, orient="horizontal").grid(row=1, column=0, sticky="ew", pady=(4, 6))
 
         toolbar = ttk.Frame(wrapper, style="MyFrame.TFrame")
-        toolbar.grid(row=1, column=0, sticky="ew", pady=(4, 2))
+        toolbar.grid(row=2, column=0, sticky="ew", pady=(0, 4))
         for txt, cmd in (
             ("Escanear correos", self._scan_emails),
             ("Agregar manual", self._add_manual),
@@ -656,14 +687,16 @@ class ActuaExecutionPanel(tk.Toplevel):
             b.pack(side="left", padx=3)
             add_hover_effect(b)
 
-        tabla_frame = ttk.LabelFrame(wrapper, text="Detalle de tareas", style="MyLabelFrame.TLabelframe", padding=8)
-        tabla_frame.grid(row=2, column=0, sticky="nsew", pady=(4, 4))
+        tabla_frame = ttk.LabelFrame(wrapper, text="Detalle de tareas",
+                                     style="MyLabelFrame.TLabelframe", padding=8)
+        tabla_frame.grid(row=3, column=0, sticky="nsew", pady=(0, 6))
         tabla_frame.columnconfigure(0, weight=3)
         tabla_frame.columnconfigure(1, weight=1)
         tabla_frame.rowconfigure(0, weight=1)
 
         self._tree_container = tabla_frame
-        self.tree = ttk.Treeview(tabla_frame, columns=("sel",), show="headings")
+        self.tree = ttk.Treeview(tabla_frame, columns=("sel",), show="headings",
+                                 style="MyTreeview.Treeview")
         self.tree.grid(row=0, column=0, sticky="nsew")
         tree_scroll = ttk.Scrollbar(tabla_frame, orient="vertical", command=self.tree.yview)
         tree_scroll.grid(row=0, column=0, sticky="nse")
@@ -671,47 +704,61 @@ class ActuaExecutionPanel(tk.Toplevel):
         self.tree.bind("<Button-1>", self._on_tree_click)
         self.tree.bind("<Double-1>", lambda _e: self._edit_task())
         self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
-        self.tree.tag_configure("missing", foreground="red")
+        self.tree.tag_configure("missing", foreground="#DC2626")
 
-        self.preview = tk.Text(tabla_frame, width=30, height=8, wrap="word", state="disabled")
+        self.preview = tk.Text(tabla_frame, width=30, height=8, wrap="word",
+                               state="disabled", font=("Segoe UI", 9))
         self.preview.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        flow_frame = ttk.LabelFrame(wrapper, text="Flujo guardado", style="MyLabelFrame.TLabelframe", padding=8)
-        flow_frame.grid(row=3, column=0, sticky="ew")
+        flow_frame = ttk.LabelFrame(wrapper, text="Flujo y opciones",
+                                    style="MyLabelFrame.TLabelframe", padding=10)
+        flow_frame.grid(row=4, column=0, sticky="ew", pady=(0, 6))
         flow_frame.columnconfigure(1, weight=1)
         ttk.Label(flow_frame, text="Flujo:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        self.flujo_combo = ttk.Combobox(flow_frame, textvariable=self.flujo_var, state="readonly", width=50)
-        self.flujo_combo.grid(row=0, column=1, sticky="ew", padx=6)
+        self.flujo_combo = ttk.Combobox(flow_frame, textvariable=self.flujo_var,
+                                        state="readonly", width=50)
+        self.flujo_combo.grid(row=0, column=1, sticky="ew", padx=8)
         self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_flujo_changed())
 
         opts = ttk.Frame(flow_frame, style="MyFrame.TFrame")
         opts.grid(row=0, column=2, padx=(10, 0))
-        ttk.Checkbutton(opts, text="Mostrar navegador", variable=self.headless_var, onvalue=False, offvalue=True).pack(side="left")
-        ttk.Checkbutton(opts, text="Enviarme reporte", variable=self.report_var).pack(side="left", padx=(8, 0))
+        ttk.Checkbutton(opts, text="Mostrar navegador",
+                        style="MyCheckbutton.TCheckbutton",
+                        variable=self.headless_var, onvalue=False, offvalue=True).pack(side="left")
+        ttk.Checkbutton(opts, text="Enviarme reporte",
+                        style="MyCheckbutton.TCheckbutton",
+                        variable=self.report_var).pack(side="left", padx=(8, 0))
 
-        ttk.Label(flow_frame, textvariable=self.validation_var, style="MyLabel.TLabel", wraplength=900, justify="left").grid(row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        ttk.Label(flow_frame, textvariable=self.validation_var, style="MyLabel.TLabel",
+                  wraplength=900, justify="left", foreground="#6B7280").grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
         self.progress = ttk.Progressbar(wrapper, mode="determinate")
-        self.progress.grid(row=4, column=0, sticky="ew")
+        self.progress.grid(row=5, column=0, sticky="ew")
 
-        log_frame = ttk.LabelFrame(wrapper, text="Bitácora", style="MyLabelFrame.TLabelframe", padding=6)
-        log_frame.grid(row=5, column=0, sticky="nsew", pady=(4, 4))
+        log_frame = ttk.LabelFrame(wrapper, text="Progreso",
+                                   style="MyLabelFrame.TLabelframe", padding=6)
+        log_frame.grid(row=6, column=0, sticky="nsew", pady=(4, 6))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log = ScrolledText(log_frame, height=7, state="disabled")
+        self.log = ScrolledText(log_frame, height=7, state="disabled", font=("Segoe UI", 9))
         self.log.grid(row=0, column=0, sticky="nsew")
 
         buttons = ttk.Frame(wrapper, style="MyFrame.TFrame")
-        buttons.grid(row=6, column=0, sticky="ew", pady=(4, 0))
+        buttons.grid(row=7, column=0, sticky="ew")
         buttons.columnconfigure(0, weight=1)
-        ttk.Label(buttons, textvariable=self.status_var, style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        self.btn_validar = ttk.Button(buttons, text="Validar", style="MyButton.TButton", command=self._validar)
+        ttk.Label(buttons, textvariable=self.status_var, style="MyLabel.TLabel",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(row=0, column=0, sticky="w")
+        self.btn_validar = ttk.Button(buttons, text="Validar datos", style="MyButton.TButton",
+                                      command=self._validar)
         self.btn_validar.grid(row=0, column=1, padx=4)
         add_hover_effect(self.btn_validar)
-        self.btn_ejecutar = ttk.Button(buttons, text="Ejecutar flujo", style="MyButton.TButton", command=self._ejecutar)
+        self.btn_ejecutar = ttk.Button(buttons, text="Ejecutar flujo", style="MyButton.TButton",
+                                       command=self._ejecutar)
         self.btn_ejecutar.grid(row=0, column=2, padx=4)
         add_hover_effect(self.btn_ejecutar)
-        self.btn_cerrar = ttk.Button(buttons, text="Cerrar", style="MyButton.TButton", command=self._on_close)
+        self.btn_cerrar = ttk.Button(buttons, text="Cerrar", style="MyButton.TButton",
+                                     command=self._on_close)
         self.btn_cerrar.grid(row=0, column=3, padx=4)
         add_hover_effect(self.btn_cerrar)
         self.protocol("WM_DELETE_WINDOW", self._on_close)

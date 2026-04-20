@@ -4,6 +4,9 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from gestorcompras import theme
+from gestorcompras.ui.common import add_hover_effect
+
 ALL_KNOWN_FIELDS = [
     ("task_number", "N° Tarea"),
     ("proveedor", "Proveedor"),
@@ -40,21 +43,29 @@ class TaskEditDialog(tk.Toplevel):
         self._build()
 
     def _build(self) -> None:
-        wrapper = ttk.Frame(self, padding=12)
+        wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=16)
         wrapper.pack(fill="both", expand=True)
+
+        ttk.Label(wrapper, text="Editar Tarea", font=("Segoe UI", 13, "bold"),
+                  foreground=theme.color_titulos).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Separator(wrapper, orient="horizontal").grid(
+            row=1, column=0, columnspan=2, sticky="ew", pady=(4, 2))
+        ttk.Label(wrapper, text="Los campos marcados con * son requeridos por el flujo seleccionado.",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=2, column=0, columnspan=2, sticky="w", pady=(0, 8))
 
         visible_keys = {"task_number"} | self.required_keys | set(self.task.keys())
         visible_keys -= {"_email_body", "body", "_db_id", "_created_at",
                          "message_id", "raw_hash", "correo_usuario_encontrado"}
 
-        row = 0
+        row = 3
         for key, label in ALL_KNOWN_FIELDS:
             if key not in visible_keys:
                 continue
             is_required = key in self.required_keys
             lbl_text = f"* {label}" if is_required else label
-            lbl = ttk.Label(wrapper, text=lbl_text)
-            lbl.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=3)
+            lbl = ttk.Label(wrapper, text=lbl_text, style="MyLabel.TLabel")
+            lbl.grid(row=row, column=0, sticky="w", padx=(0, 10), pady=5)
 
             current = self.task.get(key, "")
             if isinstance(current, (list, tuple)):
@@ -62,11 +73,11 @@ class TaskEditDialog(tk.Toplevel):
             var = tk.StringVar(value=str(current or ""))
             self._vars[key] = var
 
-            entry = ttk.Entry(wrapper, textvariable=var, width=50)
-            entry.grid(row=row, column=1, sticky="ew", pady=3)
+            entry = ttk.Entry(wrapper, textvariable=var, style="MyEntry.TEntry", width=50)
+            entry.grid(row=row, column=1, sticky="ew", pady=5)
 
             if is_required and not str(current or "").strip():
-                lbl.configure(foreground="red")
+                lbl.configure(foreground=theme.color_danger)
             self._labels[key] = lbl
 
             var.trace_add("write", lambda *_a, k=key: self._on_change(k))
@@ -74,10 +85,13 @@ class TaskEditDialog(tk.Toplevel):
 
         wrapper.columnconfigure(1, weight=1)
 
-        btn_frame = ttk.Frame(wrapper)
-        btn_frame.grid(row=row, column=0, columnspan=2, sticky="e", pady=(10, 0))
-        ttk.Button(btn_frame, text="Guardar", command=self._save).pack(side="right", padx=4)
-        ttk.Button(btn_frame, text="Cancelar", command=self.destroy).pack(side="right")
+        btn_frame = ttk.Frame(wrapper, style="MyFrame.TFrame")
+        btn_frame.grid(row=row, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        save_btn = ttk.Button(btn_frame, text="Guardar", style="MyButton.TButton", command=self._save)
+        save_btn.pack(side="right", padx=6)
+        add_hover_effect(save_btn)
+        ttk.Button(btn_frame, text="Cancelar", style="MyButton.TButton",
+                   command=self.destroy).pack(side="right")
 
     def _on_change(self, key: str) -> None:
         if key not in self.required_keys:
@@ -86,7 +100,7 @@ class TaskEditDialog(tk.Toplevel):
         if not lbl:
             return
         val = self._vars[key].get().strip()
-        lbl.configure(foreground="red" if not val else "")
+        lbl.configure(foreground=theme.color_danger if not val else theme.color_texto)
 
     def _save(self) -> None:
         for key, var in self._vars.items():

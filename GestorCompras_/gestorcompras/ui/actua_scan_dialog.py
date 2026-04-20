@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from tkinter import messagebox, ttk
 from zoneinfo import ZoneInfo
 
+from gestorcompras import theme
 from gestorcompras.services import db
 from gestorcompras.services.email_task_scanner import scan_inbox
 from gestorcompras.ui.common import add_hover_effect
@@ -21,7 +22,7 @@ class ScanEmailDialog(tk.Toplevel):
     def __init__(self, master: tk.Misc, email_session: dict[str, str]):
         super().__init__(master)
         self.title("Escanear correos - Actualizar Tareas")
-        self.geometry("900x560")
+        self.geometry("960x620")
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()
         self.email_session = email_session
@@ -40,38 +41,62 @@ class ScanEmailDialog(tk.Toplevel):
         self._build()
 
     def _build(self) -> None:
-        wrapper = ttk.Frame(self, padding=10)
+        wrapper = ttk.Frame(self, style="MyFrame.TFrame", padding=12)
         wrapper.pack(fill="both", expand=True)
-        wrapper.columnconfigure(1, weight=1)
-        wrapper.rowconfigure(4, weight=1)
+        wrapper.columnconfigure(0, weight=1)
+        wrapper.rowconfigure(1, weight=1)
 
-        ttk.Label(wrapper, text="Desde:").grid(row=0, column=0, sticky="w", pady=2)
-        ttk.Entry(wrapper, textvariable=self.desde_var, width=22).grid(row=0, column=1, sticky="w", padx=4)
-        ttk.Label(wrapper, text="Hasta:").grid(row=0, column=2, sticky="w", padx=(12, 0))
-        ttk.Entry(wrapper, textvariable=self.hasta_var, width=22).grid(row=0, column=3, sticky="w", padx=4)
+        filtros = ttk.LabelFrame(wrapper, text="Filtros de busqueda",
+                                 style="MyLabelFrame.TLabelframe", padding=12)
+        filtros.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        filtros.columnconfigure(1, weight=1)
+        filtros.columnconfigure(3, weight=1)
 
-        ttk.Label(wrapper, text="Remitente:").grid(row=1, column=0, sticky="w", pady=2)
-        ttk.Entry(wrapper, textvariable=self.remitente_var, width=40).grid(row=1, column=1, columnspan=2, sticky="ew", padx=4)
+        ttk.Label(filtros, text="Desde:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Entry(filtros, textvariable=self.desde_var, style="MyEntry.TEntry", width=22).grid(
+            row=0, column=1, sticky="w", padx=4)
+        ttk.Label(filtros, text="Hasta:", style="MyLabel.TLabel").grid(row=0, column=2, sticky="w", padx=(12, 0))
+        ttk.Entry(filtros, textvariable=self.hasta_var, style="MyEntry.TEntry", width=22).grid(
+            row=0, column=3, sticky="w", padx=4)
 
-        ttk.Label(wrapper, text="Asunto contiene:").grid(row=2, column=0, sticky="w", pady=2)
-        ttk.Entry(wrapper, textvariable=self.asunto_var, width=40).grid(row=2, column=1, columnspan=2, sticky="ew", padx=4)
-
-        ttk.Label(wrapper, text="N° tareas (1 por línea, vacío=todos):").grid(row=3, column=0, sticky="nw", pady=2)
-        self.tasks_text = tk.Text(wrapper, height=3, width=30)
-        self.tasks_text.grid(row=3, column=1, columnspan=2, sticky="ew", padx=4, pady=2)
-
-        btn_buscar = ttk.Button(wrapper, text="Buscar", command=self._buscar)
-        btn_buscar.grid(row=0, column=4, rowspan=2, padx=8, sticky="ns")
+        btn_buscar = ttk.Button(filtros, text="Buscar correos", style="MyButton.TButton", command=self._buscar)
+        btn_buscar.grid(row=0, column=4, rowspan=2, padx=(12, 0), sticky="n")
         add_hover_effect(btn_buscar)
 
-        results_frame = ttk.LabelFrame(wrapper, text="Resultados", padding=6)
-        results_frame.grid(row=4, column=0, columnspan=5, sticky="nsew", pady=(6, 0))
+        ttk.Label(filtros, text="Formato: AAAA-MM-DD HH:MM",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=1, column=0, columnspan=4, sticky="w", pady=(2, 4))
+
+        ttk.Label(filtros, text="Remitente:", style="MyLabel.TLabel").grid(row=2, column=0, sticky="w", pady=2)
+        ttk.Entry(filtros, textvariable=self.remitente_var, style="MyEntry.TEntry", width=40).grid(
+            row=2, column=1, columnspan=3, sticky="ew", padx=4)
+        ttk.Label(filtros, text="Direccion de correo del remitente a filtrar.",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=3, column=1, columnspan=3, sticky="w", padx=4)
+
+        ttk.Label(filtros, text="Asunto contiene:", style="MyLabel.TLabel").grid(row=4, column=0, sticky="w", pady=2)
+        ttk.Entry(filtros, textvariable=self.asunto_var, style="MyEntry.TEntry", width=40).grid(
+            row=4, column=1, columnspan=3, sticky="ew", padx=4)
+
+        ttk.Label(filtros, text="N° tareas (1 por linea):", style="MyLabel.TLabel").grid(
+            row=5, column=0, sticky="nw", pady=2)
+        self.tasks_text = tk.Text(filtros, height=3, width=30, relief="solid", borderwidth=1,
+                                  font=("Segoe UI", 10))
+        self.tasks_text.grid(row=5, column=1, columnspan=3, sticky="ew", padx=4, pady=2)
+        ttk.Label(filtros, text="Deje vacio para buscar todos los correos.",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=6, column=1, columnspan=3, sticky="w", padx=4)
+
+        results_frame = ttk.LabelFrame(wrapper, text="Resultados",
+                                       style="MyLabelFrame.TLabelframe", padding=8)
+        results_frame.grid(row=1, column=0, sticky="nsew", pady=(0, 6))
         results_frame.columnconfigure(0, weight=3)
         results_frame.columnconfigure(1, weight=1)
         results_frame.rowconfigure(0, weight=1)
 
         cols = ("sel", "fecha", "task_number", "proveedor", "factura", "oc", "asunto")
-        self.tree = ttk.Treeview(results_frame, columns=cols, show="headings", height=10)
+        self.tree = ttk.Treeview(results_frame, columns=cols, show="headings",
+                                 style="MyTreeview.Treeview", height=10)
         for c, txt, w in (
             ("sel", "✓", 30), ("fecha", "Fecha", 110), ("task_number", "Tarea", 90),
             ("proveedor", "Proveedor", 130), ("factura", "Factura", 100),
@@ -86,22 +111,28 @@ class ScanEmailDialog(tk.Toplevel):
         self.tree.bind("<Button-1>", self._on_click)
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
-        self.preview = tk.Text(results_frame, width=30, height=10, wrap="word", state="disabled")
+        self.preview = tk.Text(results_frame, width=30, height=10, wrap="word",
+                               state="disabled", font=("Segoe UI", 9))
         self.preview.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
-        bottom = ttk.Frame(wrapper)
-        bottom.grid(row=5, column=0, columnspan=5, sticky="ew", pady=(6, 0))
+        bottom = ttk.Frame(wrapper, style="MyFrame.TFrame")
+        bottom.grid(row=2, column=0, sticky="ew", pady=(0, 0))
         bottom.columnconfigure(0, weight=1)
-        ttk.Label(bottom, textvariable=self.status_var).grid(row=0, column=0, sticky="w")
+        ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(row=0, column=0, sticky="w")
 
-        btn_all = ttk.Button(bottom, text="Seleccionar todo", command=self._select_all)
+        btn_all = ttk.Button(bottom, text="Seleccionar todo", style="MyButton.TButton",
+                             command=self._select_all)
         btn_all.grid(row=0, column=1, padx=4)
-        btn_none = ttk.Button(bottom, text="Ninguno", command=self._select_none)
+        btn_none = ttk.Button(bottom, text="Ninguno", style="MyButton.TButton",
+                              command=self._select_none)
         btn_none.grid(row=0, column=2, padx=4)
-        btn_import = ttk.Button(bottom, text="Importar seleccionadas", command=self._importar)
+        btn_import = ttk.Button(bottom, text="Importar seleccion", style="MyButton.TButton",
+                                command=self._importar)
         btn_import.grid(row=0, column=3, padx=4)
         add_hover_effect(btn_import)
-        btn_cancel = ttk.Button(bottom, text="Cancelar", command=self.destroy)
+        btn_cancel = ttk.Button(bottom, text="Cancelar", style="MyButton.TButton",
+                                command=self.destroy)
         btn_cancel.grid(row=0, column=4, padx=4)
 
     def _buscar(self) -> None:

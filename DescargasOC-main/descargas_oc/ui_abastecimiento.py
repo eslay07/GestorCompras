@@ -46,7 +46,8 @@ def ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn):
 
 def main():
     root = tk.Tk()
-    root.title("Descarga Abastecimiento")
+    root.title("Descarga de Abastecimiento")
+    root.geometry("580x460")
     root.tk_setPalette(
         background="#F3F4F6",
         foreground="#374151",
@@ -56,37 +57,59 @@ def main():
     )
     root.configure(bg="#F3F4F6")
 
-    tk.Label(root, text="Fecha inicio (dd/mm/aa):").grid(row=0, column=0, sticky="e")
-    entry_fd = tk.Entry(root)
-    entry_fd.grid(row=0, column=1, padx=5, pady=2)
+    main_frame = tk.Frame(root, bg="#F3F4F6", padx=16, pady=12)
+    main_frame.pack(fill="both", expand=True)
 
-    tk.Label(root, text="Fecha final (dd/mm/aa):").grid(row=1, column=0, sticky="e")
-    entry_fh = tk.Entry(root)
-    entry_fh.grid(row=1, column=1, padx=5, pady=2)
+    tk.Label(main_frame, text="Descarga de Abastecimiento",
+             font=("Segoe UI", 15, "bold"), fg="#111827", bg="#F3F4F6").pack(anchor="w")
+    tk.Label(main_frame, text="Descargue ordenes de compra de abastecimiento por rango de fechas.",
+             font=("Segoe UI", 10), fg="#6B7280", bg="#F3F4F6").pack(anchor="w", pady=(0, 8))
+    ttk.Separator(main_frame, orient="horizontal").pack(fill="x", pady=(0, 10))
+
+    fechas_lf = tk.LabelFrame(main_frame, text="Rango de fechas", padx=12, pady=10,
+                               font=("Segoe UI", 10), fg="#374151", bg="#FFFFFF")
+    fechas_lf.pack(fill="x", pady=(0, 8))
+    fechas_lf.columnconfigure(1, weight=1)
+
+    tk.Label(fechas_lf, text="Fecha inicio:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", pady=4)
+    entry_fd = tk.Entry(fechas_lf, width=20)
+    entry_fd.grid(row=0, column=1, sticky="w", padx=8, pady=4)
+    tk.Label(fechas_lf, text="Formato: dd/mm/aa", font=("Segoe UI", 9),
+             fg="#6B7280", bg="#FFFFFF").grid(row=0, column=2, sticky="w")
+
+    tk.Label(fechas_lf, text="Fecha final:", bg="#FFFFFF").grid(row=1, column=0, sticky="w", pady=4)
+    entry_fh = tk.Entry(fechas_lf, width=20)
+    entry_fh.grid(row=1, column=1, sticky="w", padx=8, pady=4)
+    tk.Label(fechas_lf, text="Formato: dd/mm/aa", font=("Segoe UI", 9),
+             fg="#6B7280", bg="#FFFFFF").grid(row=1, column=2, sticky="w")
 
     cfg = Config()
-    tk.Label(root, text="Solicitante:").grid(row=2, column=0, sticky="e")
+    params_lf = tk.LabelFrame(main_frame, text="Parametros de busqueda", padx=12, pady=10,
+                               font=("Segoe UI", 10), fg="#374151", bg="#FFFFFF")
+    params_lf.pack(fill="x", pady=(0, 8))
+    params_lf.columnconfigure(1, weight=1)
+
+    tk.Label(params_lf, text="Solicitante:", bg="#FFFFFF").grid(row=0, column=0, sticky="w", pady=4)
     solicitantes = cfg.abastecimiento_solicitantes or []
     if DEFAULT_SOLICITANTE not in solicitantes:
         solicitantes.insert(0, DEFAULT_SOLICITANTE)
     sol_var = tk.StringVar(value=DEFAULT_SOLICITANTE)
-    entry_sol = ttk.Combobox(
-        root,
-        textvariable=sol_var,
-        values=solicitantes,
-        width=40,
-    )
-    entry_sol.grid(row=2, column=1, padx=5, pady=2)
+    entry_sol = ttk.Combobox(params_lf, textvariable=sol_var, values=solicitantes, width=42)
+    entry_sol.grid(row=0, column=1, sticky="ew", padx=8, pady=4)
 
-    tk.Label(root, text="Autoriza:").grid(row=3, column=0, sticky="e")
+    tk.Label(params_lf, text="Autoriza:", bg="#FFFFFF").grid(row=1, column=0, sticky="w", pady=4)
     aut_var = tk.StringVar()
-    entry_aut = ttk.Combobox(
-        root,
-        textvariable=aut_var,
-        values=cfg.abastecimiento_autorizadores or [],
-        width=40,
-    )
-    entry_aut.grid(row=3, column=1, padx=5, pady=2)
+    entry_aut = ttk.Combobox(params_lf, textvariable=aut_var,
+                              values=cfg.abastecimiento_autorizadores or [], width=42)
+    entry_aut.grid(row=1, column=1, sticky="ew", padx=8, pady=4)
+
+    tk.Label(params_lf, text="Seleccione los parametros configurados en la seccion de Configuracion.",
+             font=("Segoe UI", 9), fg="#6B7280", bg="#FFFFFF").grid(
+        row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
+
+    opciones_lf = tk.LabelFrame(main_frame, text="Opciones", padx=12, pady=10,
+                                 font=("Segoe UI", 10), fg="#374151", bg="#FFFFFF")
+    opciones_lf.pack(fill="x", pady=(0, 8))
 
     var_visible = tk.BooleanVar(value=not bool(cfg.headless))
 
@@ -96,20 +119,21 @@ def main():
         cfg.save()
 
     chk_visible = tk.Checkbutton(
-        root,
-        text="Descarga visible",
-        variable=var_visible,
-        command=actualizar_visible,
-        selectcolor="#059669",
+        opciones_lf, text="Mostrar navegador durante la descarga",
+        variable=var_visible, command=actualizar_visible,
+        bg="#FFFFFF", selectcolor="#059669", anchor="w",
     )
-    chk_visible.grid(row=4, column=1, sticky="w", padx=5, pady=2)
+    chk_visible.pack(anchor="w")
+
+    btn_frame = tk.Frame(main_frame, bg="#F3F4F6")
+    btn_frame.pack(fill="x", pady=(4, 4))
 
     btn_ejecutar = tk.Button(
-        root,
-        text="Descargar",
+        btn_frame, text="Descargar",
         command=lambda: ejecutar(entry_fd, entry_fh, entry_sol, entry_aut, btn_ejecutar),
+        padx=16, pady=4,
     )
-    btn_ejecutar.grid(row=5, column=0, columnspan=2, pady=10)
+    btn_ejecutar.pack(side="left", padx=(0, 8))
 
     def abrir_config():
         configurar_abastecimiento()
@@ -123,8 +147,12 @@ def main():
         if entry_aut.winfo_exists():
             entry_aut['values'] = nuevo.abastecimiento_autorizadores or []
 
-    btn_cfg = tk.Button(root, text="Configurar", command=abrir_config)
-    btn_cfg.grid(row=6, column=0, columnspan=2, pady=(0, 10))
+    btn_cfg = tk.Button(btn_frame, text="Configurar", command=abrir_config, padx=16, pady=4)
+    btn_cfg.pack(side="left")
+
+    status_lbl = tk.Label(main_frame, text="Listo para descargar.",
+                          font=("Segoe UI", 9), fg="#6B7280", bg="#F3F4F6")
+    status_lbl.pack(anchor="w", pady=(4, 0))
 
     def center_window(win):
         win.update_idletasks()
