@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import Any
 
 from gestorcompras.services.telcos_automation import wait_clickable_or_error
+from gestorcompras.services.selenium_utils import click_with_fallback
+
+# Alias interno para compatibilidad con código previo dentro del módulo.
+_click_with_fallback = click_with_fallback
 
 MOTIVOS_PAUSA_CATALOGO = [
     ("1641", "SE SOLICITA COTIZACION AL PROVEEDOR"),
@@ -141,7 +145,14 @@ def seleccionar_tarea(driver, numero: str, **_params):
 def reanudar_tarea(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-step-forward"), None, "Reanudar").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-step-forward"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-step-forward')]]"),
+        ],
+        "Reanudar",
+    )
 
 
 def ingresar_observacion(driver, texto: str, **_params):
@@ -155,22 +166,45 @@ def ingresar_observacion(driver, texto: str, **_params):
 def aceptar_observacion(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"), None, "Aceptar").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnGrabarEjecucionTarea"),
+            (By.XPATH, "//*[@id='btnGrabarEjecucionTarea']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='Aceptar']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"),
+        ],
+        "Aceptar observación",
+    )
 
 
 def cerrar_mensaje_ok(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    try:
-        wait_clickable_or_error(driver, (By.ID, "btnSmsCustomOk"), None, "OK", timeout=8).click()
-    except Exception:
-        wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'OK')]"), None, "OK fallback", timeout=8).click()
+    click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnSmsCustomOk"),
+            (By.XPATH, "//*[@id='btnSmsCustomOk']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='OK']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'OK')]"),
+        ],
+        "OK",
+        timeout=8,
+    )
 
 
 def abrir_seguimiento(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-list-alt"), None, "Seguimiento").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-list-alt"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-list-alt')]]"),
+        ],
+        "Seguimiento",
+    )
 
 
 def guardar_seguimiento(driver, **_params):
@@ -182,7 +216,14 @@ def guardar_seguimiento(driver, **_params):
 def abrir_subida_archivo(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-open-file"), None, "Subir archivo").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-open-file"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-open-file')]]"),
+        ],
+        "Subir archivo",
+    )
 
 
 def seleccionar_archivo(driver, ruta: str, **_params):
@@ -206,7 +247,14 @@ def cerrar_mensaje_fin_tarea(driver, **_params):
 def abrir_reasignar(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-dashboard"), None, "Reasignar").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-dashboard"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-dashboard')]]"),
+        ],
+        "Reasignar",
+    )
 
 
 def ingresar_departamento(driver, nombre: str, **_params):
@@ -246,7 +294,14 @@ def guardar_reasignacion(driver, **_params):
 def pausar_tarea(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.CSS_SELECTOR, "span.glyphicon.glyphicon-pause"), None, "Pausar tarea").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.CSS_SELECTOR, "span.glyphicon.glyphicon-pause"),
+            (By.XPATH, "//button[.//span[contains(@class,'glyphicon-pause')]]"),
+        ],
+        "Pausar tarea",
+    )
 
 
 def motivo_pausa(driver, valor_o_label: str, **_params):
@@ -281,7 +336,16 @@ def motivo_pausa(driver, valor_o_label: str, **_params):
 def aceptar_pausa(driver, **_params):
     from selenium.webdriver.common.by import By
 
-    wait_clickable_or_error(driver, (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"), None, "Aceptar pausa").click()
+    click_with_fallback(
+        driver,
+        [
+            (By.ID, "btnGrabarPausaTarea"),
+            (By.XPATH, "//*[@id='btnGrabarPausaTarea']//span"),
+            (By.XPATH, "//span[contains(@class,'text-btn') and normalize-space(.)='Aceptar']"),
+            (By.XPATH, "//button[contains(@class,'text-btn') and contains(.,'Aceptar')]"),
+        ],
+        "Aceptar pausa",
+    )
 
 
 ACCIONES = [

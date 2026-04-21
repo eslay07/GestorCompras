@@ -7,13 +7,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from gestorcompras.core import config as core_config
-from gestorcompras.gui.status_bar import ResourceStatusBar
 from gestorcompras.services import db
 from gestorcompras import theme
 from gestorcompras.ui import router
 from gestorcompras.ui.common import center_window, add_hover_effect
 
-# Palette (imported from theme for a cohesive modern look)
+# Palette (imported from theme)
 bg_base = theme.bg_base
 bg_frame = theme.bg_frame
 color_primario = theme.color_primario
@@ -22,6 +21,7 @@ color_acento = theme.color_acento
 color_texto = theme.color_texto
 color_titulos = theme.color_titulos
 color_borde = theme.color_borde
+bg_input = theme.bg_input
 
 # Fonts
 fuente_normal = ("Segoe UI", 11)
@@ -46,7 +46,7 @@ def init_styles() -> None:
     style = ttk.Style()
     style.theme_use("clam")
 
-    style.configure("MyFrame.TFrame", background=bg_frame, relief="groove", borderwidth=1)
+    style.configure("MyFrame.TFrame", background=bg_frame, relief="flat", borderwidth=0)
     style.configure("MyLabel.TLabel", background=bg_frame, foreground=color_texto, font=fuente_normal)
     style.map(
         "MyLabel.TLabel",
@@ -56,162 +56,134 @@ def init_styles() -> None:
     style.configure(
         "MyButton.TButton",
         font=fuente_bold,
-        foreground=color_titulos,
+        foreground="#FFFFFF",
         background=color_primario,
-        padding=10,
-        relief="raised",
-        borderwidth=1,
+        padding=12,
+        relief="flat",
+        borderwidth=0,
     )
     style.configure(
         "MyButtonHover.TButton",
         font=fuente_bold,
-        foreground=color_titulos,
+        foreground="#FFFFFF",
         background=color_hover,
-        padding=10,
-        relief="raised",
-        borderwidth=1,
+        padding=12,
+        relief="flat",
+        borderwidth=0,
     )
     style.map(
         "MyButton.TButton",
-        background=[("active", color_acento), ("disabled", color_borde)],
-        foreground=[("active", bg_frame)],
+        background=[("active", color_hover), ("disabled", color_borde)],
+        foreground=[("active", "#FFFFFF"), ("disabled", "#9CA3AF")],
     )
     style.map(
         "MyButtonHover.TButton",
-        background=[("active", color_acento)],
-        foreground=[("active", color_titulos)],
+        background=[("active", color_hover)],
+        foreground=[("active", "#FFFFFF")],
     )
     style.configure("MyCheckbutton.TCheckbutton", background=bg_frame, foreground=color_texto, font=fuente_normal)
     style.configure(
         "MyEntry.TEntry",
         font=fuente_entry,
-        padding=5,
+        padding=6,
         relief="solid",
         borderwidth=1,
         foreground=color_texto,
-        fieldbackground=bg_base,
-        background=bg_base,
+        fieldbackground=bg_input,
+        background=bg_input,
         insertcolor=color_texto,
     )
     style.configure(
         "TCombobox",
         foreground=color_texto,
-        fieldbackground=bg_base,
-        background=bg_base,
+        fieldbackground=bg_input,
+        background=bg_input,
         arrowcolor=color_texto,
     )
     style.configure("MyNotebook.TNotebook", background=bg_base, borderwidth=0)
-    style.configure("MyNotebook.TNotebook.Tab", padding=[12, 8], font=fuente_bold)
+    style.configure("MyNotebook.TNotebook.Tab", padding=[14, 8], font=fuente_bold)
     style.map(
         "MyNotebook.TNotebook.Tab",
         background=[("selected", color_primario), ("active", color_hover)],
-        foreground=[("selected", color_texto), ("active", color_texto)],
+        foreground=[("selected", "#FFFFFF"), ("active", "#FFFFFF")],
     )
     style.configure(
         "MyTreeview.Treeview",
-        background=bg_frame,
+        background="#FFFFFF",
         foreground=color_texto,
-        rowheight=28,
-        fieldbackground=bg_frame,
+        rowheight=30,
+        fieldbackground="#FFFFFF",
         font=fuente_normal,
     )
-    style.configure("MyTreeview.Treeview.Heading", background=color_primario, foreground=color_titulos, font=fuente_bold)
-    style.map("MyTreeview.Treeview.Heading", background=[("active", color_hover)])
+    style.configure(
+        "MyTreeview.Treeview.Heading",
+        background="#E5E7EB",
+        foreground=color_titulos,
+        font=fuente_bold,
+        relief="flat",
+    )
+    style.map("MyTreeview.Treeview.Heading", background=[("active", "#D1D5DB")])
     style.configure(
         "MyVertical.TScrollbar",
         gripcount=0,
-        background=color_primario,
-        troughcolor=bg_frame,
-        bordercolor=bg_frame,
+        background="#D1D5DB",
+        troughcolor=bg_base,
+        bordercolor=bg_base,
         arrowcolor=color_texto,
     )
-    style.map("MyVertical.TScrollbar", background=[("active", color_hover)], arrowcolor=[("active", color_texto)])
-    style.configure("MyLabelFrame.TLabelframe", background=bg_frame, relief="groove")
+    style.map("MyVertical.TScrollbar", background=[("active", "#9CA3AF")], arrowcolor=[("active", color_texto)])
+    style.configure("MyLabelFrame.TLabelframe", background=bg_frame, relief="groove", bordercolor=color_borde)
     style.configure("MyLabelFrame.TLabelframe.Label", background=bg_frame, foreground=color_texto, font=fuente_bold)
     style.configure("Banner.TLabel", background=bg_frame, foreground=color_titulos, font=fuente_banner)
+    style.configure("WizardStep.TLabel", background=bg_frame, foreground=color_texto, font=fuente_bold)
 
 
 class LoginScreen(tk.Frame):
     def __init__(self, master: tk.Misc, on_success):
-        super().__init__(master)
+        super().__init__(master, bg=bg_base)
         self.on_success = on_success
-        self._banner_text = "COMPRAS TELCONET S.A"
-        self._banner_index = 0
-        self._banner_colors = [color_primario, color_acento]
-        self._color_index = 0
-        self._animating = True
-        self._after_id = None
         self.create_widgets()
-        self.animate_banner()
 
     def create_widgets(self) -> None:
         container = ttk.Frame(self, style="MyFrame.TFrame")
         container.pack(fill="both", expand=True)
 
-        self.banner = ttk.Label(container, text="", style="Banner.TLabel")
-        self.banner.pack(pady=(20, 10))
+        banner = ttk.Label(container, text="COMPRAS TELCONET S.A.", style="Banner.TLabel")
+        banner.pack(pady=(40, 20))
 
-        login_frame = ttk.Frame(container, style="MyFrame.TFrame", padding=20)
-        login_frame.place(relx=0.5, rely=0.5, anchor="center")
+        card = ttk.Frame(container, style="MyFrame.TFrame", padding=30)
+        card.place(relx=0.5, rely=0.5, anchor="center")
 
-        lbl_title = ttk.Label(login_frame, text="Inicio de Sesión", style="MyLabel.TLabel")
+        lbl_title = ttk.Label(card, text="Inicio de Sesion", style="MyLabel.TLabel")
         lbl_title.configure(font=fuente_bold, foreground=color_titulos)
-        lbl_title.grid(row=0, column=0, pady=15)
+        lbl_title.grid(row=0, column=0, pady=(0, 20))
 
-        ttk.Label(login_frame, text="Usuario Telcos:", style="MyLabel.TLabel").grid(row=1, column=0, sticky="w", pady=(5, 0))
-        self.user_entry = ttk.Entry(login_frame, style="MyEntry.TEntry")
-        self.user_entry.grid(row=2, column=0, pady=5)
+        ttk.Label(card, text="Usuario Telcos:", style="MyLabel.TLabel").grid(row=1, column=0, sticky="w", pady=(5, 0))
+        self.user_entry = ttk.Entry(card, style="MyEntry.TEntry", width=30)
+        self.user_entry.grid(row=2, column=0, pady=5, sticky="ew")
         self.user_entry.config(font=fuente_entry)
 
-        ttk.Label(login_frame, text="Contraseña:", style="MyLabel.TLabel").grid(row=3, column=0, sticky="w", pady=(5, 0))
-        self.pass_entry = ttk.Entry(login_frame, show="*", style="MyEntry.TEntry")
-        self.pass_entry.grid(row=4, column=0, pady=5)
+        ttk.Label(card, text="Contrasena:", style="MyLabel.TLabel").grid(row=3, column=0, sticky="w", pady=(10, 0))
+        self.pass_entry = ttk.Entry(card, show="*", style="MyEntry.TEntry", width=30)
+        self.pass_entry.grid(row=4, column=0, pady=5, sticky="ew")
         self.pass_entry.config(font=fuente_entry)
         self.pass_entry.bind("<Return>", lambda event: self.attempt_login())
 
-        self.btn_login = ttk.Button(login_frame, text="Iniciar Sesión", style="MyButton.TButton", command=self.attempt_login)
-        self.btn_login.grid(row=5, column=0, pady=15)
+        self.btn_login = ttk.Button(card, text="Iniciar Sesion", style="MyButton.TButton", command=self.attempt_login)
+        self.btn_login.grid(row=5, column=0, pady=(20, 10), sticky="ew")
         add_hover_effect(self.btn_login)
 
-        self.lbl_status = ttk.Label(login_frame, text="", style="MyLabel.TLabel")
+        self.lbl_status = ttk.Label(card, text="", style="MyLabel.TLabel")
         self.lbl_status.grid(row=6, column=0, pady=(0, 5))
-
-    def animate_banner(self) -> None:
-        if not self._animating:
-            return
-        text = self._banner_text[: self._banner_index]
-        color = self._banner_colors[self._color_index]
-        try:
-            self.banner.config(text=text, foreground=color)
-        except tk.TclError:
-            # El widget fue destruido; detener la animación
-            self._animating = False
-            return
-        self._banner_index += 1
-        if self._banner_index > len(self._banner_text):
-            self._banner_index = 0
-            self._color_index = (self._color_index + 1) % len(self._banner_colors)
-        self._after_id = self.after(150, self.animate_banner)
-
-    def _stop_animation(self) -> None:
-        """Detiene la animación del banner de forma segura."""
-        self._animating = False
-        if self._after_id is not None:
-            try:
-                self.after_cancel(self._after_id)
-            except Exception:
-                pass
-            self._after_id = None
 
     def attempt_login(self) -> None:
         username = self.user_entry.get().strip()
         password = self.pass_entry.get().strip()
         if not username or not password:
-            messagebox.showerror("Error", "Debe ingresar usuario y contraseña.", parent=self)
+            messagebox.showerror("Error", "Debe ingresar usuario y contrasena.", parent=self)
             return
         email_address = f"{username}@telconet.ec"
 
-        # Deshabilitar controles mientras se conecta para evitar dobles clics
         self.btn_login.config(state="disabled")
         self.user_entry.config(state="disabled")
         self.pass_entry.config(state="disabled")
@@ -219,13 +191,11 @@ class LoginScreen(tk.Frame):
 
         def _do_login():
             success = test_email_connection(email_address, password)
-            # Volver al hilo principal para actualizar la UI
             self.after(0, lambda: self._on_login_result(success, email_address, password))
 
         threading.Thread(target=_do_login, daemon=True).start()
 
     def _on_login_result(self, success: bool, email_address: str, password: str) -> None:
-        """Maneja el resultado del login en el hilo principal de Tkinter."""
         try:
             self.btn_login.config(state="normal")
             self.user_entry.config(state="normal")
@@ -238,23 +208,21 @@ class LoginScreen(tk.Frame):
             email_session["address"] = email_address
             email_session["password"] = password
             core_config.set_user_email(email_address)
-            self._stop_animation()
-            messagebox.showinfo("Éxito", "Inicio de sesión correcto.", parent=self)
+            messagebox.showinfo("Bienvenido", "Inicio de sesion correcto.", parent=self)
             self.on_success()
         else:
-            messagebox.showerror("Error", "Usuario o contraseña incorrectos.", parent=self)
+            messagebox.showerror("Error", "Usuario o contrasena incorrectos.", parent=self)
 
 
 def main() -> None:
-    # db.init_db() ya se ejecuta automáticamente al importar el módulo db
     root = tk.Tk()
-    root.title("Sistema de Automatización")
-    root.geometry("800x600")
+    root.title("Gestor Compras - Telconet")
+    root.geometry("1100x700")
     root.tk_setPalette(
         background=bg_base,
         foreground=color_texto,
         activeBackground=color_hover,
-        activeForeground=color_texto,
+        activeForeground="#FFFFFF",
         highlightColor=color_borde,
     )
     center_window(root)
@@ -266,7 +234,7 @@ def main() -> None:
             if isinstance(w, tk.Toplevel):
                 messagebox.showwarning(
                     "Aviso",
-                    "No puede cerrar la ventana principal mientras existan ventanas abiertas.",
+                    "Cierre las ventanas abiertas antes de cerrar la aplicacion.",
                     parent=root,
                 )
                 return
@@ -274,16 +242,27 @@ def main() -> None:
 
     root.protocol("WM_DELETE_WINDOW", on_main_close)
 
-    container = ttk.Frame(root, style="MyFrame.TFrame")
-    container.pack(fill="both", expand=True)
+    login_container = ttk.Frame(root, style="MyFrame.TFrame")
+    login_container.pack(fill="both", expand=True)
 
-    status_bar = ResourceStatusBar(root)
-    status_bar.pack(side="bottom", fill="x")
+    def show_main_layout() -> None:
+        login_container.destroy()
 
-    def show_home() -> None:
-        router.configure(container, email_session)
+        from gestorcompras.ui.sidebar import Sidebar
 
-    LoginScreen(container, on_success=show_home).pack(fill="both", expand=True)
+        sidebar = Sidebar(root, email_session, on_navigate=_on_sidebar_navigate)
+        sidebar.pack(side="left", fill="y")
+
+        content = ttk.Frame(root, style="MyFrame.TFrame")
+        content.pack(side="left", fill="both", expand=True)
+
+        router.configure(content, email_session, sidebar=sidebar)
+        router.show_welcome()
+
+    def _on_sidebar_navigate(module_id: str) -> None:
+        router.open_module(module_id)
+
+    LoginScreen(login_container, on_success=show_main_layout).pack(fill="both", expand=True)
 
     root.mainloop()
 

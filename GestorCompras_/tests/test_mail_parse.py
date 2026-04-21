@@ -74,6 +74,11 @@ def test_parse_body_valores_por_defecto():
     assert parsed["mecanico_nombre"] == "N/D"
     assert parsed["mecanico_telefono"] == "N/D"
     assert parsed["inf_vehiculo"] == "N/D"
+    assert parsed["factura"] == ""
+    assert parsed["oc"] == ""
+    assert parsed["ingreso"] == ""
+    assert parsed["ruc"] == ""
+    assert parsed["fecha_orden"] == ""
 
 
 def test_parse_body_formato_servicios():
@@ -91,3 +96,51 @@ def test_parse_body_formato_servicios():
     assert parsed["mecanico_telefono"] == "0935587896"
     assert "OT" in parsed["inf_vehiculo"]
     assert parsed["correo_usuario_encontrado"] is True
+
+
+@pytest.mark.parametrize(
+    "body,field,expected",
+    [
+        ("Se adjunta FACTURA: 001-002-003456", "factura", "001-002-003456"),
+        ("FAC. 789-XYZ resto del texto", "factura", "789-XYZ"),
+        ("Fac# ABC123", "factura", "ABC123"),
+        ("Factura  999", "factura", "999"),
+        ("OC: 54321 aprobada", "oc", "54321"),
+        ("Se genera OC 12345 del proveedor", "oc", "12345"),
+        ("OC:99999", "oc", "99999"),
+        ("INGRESO: ING-0042", "ingreso", "ING-0042"),
+        ("Ingr. 7890 registrado", "ingreso", "7890"),
+        ("Ingreso# A001", "ingreso", "A001"),
+        ("RUC: 1790001234001 del proveedor", "ruc", "1790001234001"),
+        ("RUC 0992345678001", "ruc", "0992345678001"),
+        ("ruc:1234567890", "ruc", "1234567890"),
+        ("Fecha de Orden: 15/03/2025", "fecha_orden", "15/03/2025"),
+        ("FECHA ORDEN: 2025-01-10", "fecha_orden", "2025-01-10"),
+        ("Fecha Orden 01/12/2024", "fecha_orden", "01/12/2024"),
+    ],
+)
+def test_parse_body_campos_extendidos(body, field, expected):
+    parsed = parse_body(body, "user@telconet.ec")
+    assert parsed[field] == expected
+
+
+def test_parse_body_multiples_campos_en_mismo_correo():
+    cuerpo = (
+        "Estimados \"MAVESA QUITO\"\n"
+        "Se recibe FACTURA: 001-045-000789 OC: 33210\n"
+        "INGRESO: ING-2025-042\n"
+        "RUC: 1790016919001\n"
+        "FECHA DE ORDEN: 10/02/2025\n"
+        "coordinando el mantenimiento con \"Pedro Alvarado (0998765432)\"\n"
+        "[GTI-1566] OT MG-4400 MANT GREAT WALL\n"
+    )
+    parsed = parse_body(cuerpo, "user@telconet.ec")
+    assert parsed["proveedor"] == "MAVESA QUITO"
+    assert parsed["factura"] == "001-045-000789"
+    assert parsed["oc"] == "33210"
+    assert parsed["ingreso"] == "ING-2025-042"
+    assert parsed["ruc"] == "1790016919001"
+    assert parsed["fecha_orden"] == "10/02/2025"
+    assert parsed["mecanico_nombre"] == "Pedro Alvarado"
+    assert parsed["mecanico_telefono"] == "0998765432"
+    assert "OT" in parsed["inf_vehiculo"]

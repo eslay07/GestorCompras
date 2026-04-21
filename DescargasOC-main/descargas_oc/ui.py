@@ -28,9 +28,12 @@ try:
     _ROOT = Path(__file__).resolve().parents[2]
     if str(_ROOT) not in sys.path:
         sys.path.append(str(_ROOT))
-    from gestorcompras.ui.actua_tareas_gui import ejecutar_flujo_desde_modulo  # type: ignore
+    _GESTOR = (_ROOT / "GestorCompras_").resolve()
+    if _GESTOR.exists() and str(_GESTOR) not in sys.path:
+        sys.path.append(str(_GESTOR))
+    from gestorcompras.ui.actua_tareas_gui import abrir_panel_tareas  # type: ignore
 except Exception:  # pragma: no cover
-    ejecutar_flujo_desde_modulo = None
+    abrir_panel_tareas = None
 
 
 def center_window(win: tk.Tk | tk.Toplevel):
@@ -137,7 +140,7 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
             append("No se encontraron nuevas órdenes\n")
         enviado = enviar_reporte(exitosas, faltantes, ordenes, cfg, errores=errores)
         try:
-            if ejecutar_flujo_desde_modulo and ordenes:
+            if abrir_panel_tareas and ordenes:
                 tasks = []
                 for orden in ordenes:
                     tasks.append(
@@ -150,21 +153,24 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
                     )
                 tasks = [t for t in tasks if t["task_number"]]
                 if tasks:
-                    if messagebox.askyesno(
-                        "Actua. Tareas",
-                        "¿Ejecutar un flujo de Actua. Tareas sobre estas tareas?",
-                    ):
-                        ejecutar_flujo_desde_modulo(
-                            text_widget.winfo_toplevel(),
-                            {
-                                "address": cfg.usuario_oc,
-                                "password": cfg.password_oc,
-                            },
-                            "descargas_oc",
-                            tasks,
-                        )
+                    def _abrir_panel(_tasks=tasks):
+                        if messagebox.askyesno(
+                            "Actualizar Tareas",
+                            "¿Desea abrir el panel de Actualizar Tareas con las OC procesadas?",
+                        ):
+                            abrir_panel_tareas(
+                                text_widget.winfo_toplevel(),
+                                {
+                                    "address": cfg.usuario_oc,
+                                    "password": cfg.password_oc,
+                                },
+                                "descargas_oc",
+                                _tasks,
+                            )
+
+                    text_widget.after(0, _abrir_panel)
         except Exception as exc:
-            append(f"[Hook Actua. Tareas] Error no bloqueante: {exc}")
+            append(f"[Hook Actualizar Tareas] Error no bloqueante: {exc}")
         if ordenes:
             no_aprobadas = [
                 e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")
@@ -207,33 +213,115 @@ def realizar_escaneo(text_widget: tk.Text, lbl_last: tk.Label):
 def main():
     root = tk.Tk()
     root.title("Descargas OC")
+    root.geometry("850x620")
     root.tk_setPalette(
-        background="#1e1e1e",
-        foreground="#f0f0f0",
-        activeBackground="#333333",
-        activeForeground="#f0f0f0",
-        highlightColor="#555555",
+        background="#F3F4F6",
+        foreground="#374151",
+        activeBackground="#1D4ED8",
+        activeForeground="#FFFFFF",
+        highlightColor="#D1D5DB",
     )
-    root.configure(bg="#1e1e1e")
+    root.configure(bg="#F3F4F6")
 
-    frame = tk.Frame(root)
-    frame.pack(padx=10, pady=10)
+    main_frame = tk.Frame(root, bg="#F3F4F6", padx=20, pady=16)
+    main_frame.pack(fill="both", expand=True)
+    main_frame.columnconfigure(0, weight=1)
+    main_frame.rowconfigure(2, weight=1)
 
-    text = tk.Text(frame, width=80, height=20, bg="#000000", fg="#f0f0f0", insertbackground="#f0f0f0")
-    text.pack(pady=5)
+    header = tk.Frame(main_frame, bg="#F3F4F6")
+    header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+    tk.Label(header, text="Descargas de Ordenes de Compra",
+             font=("Segoe UI", 16, "bold"), bg="#F3F4F6", fg="#111827").pack(side="left")
+
+    ctrl_frame = tk.LabelFrame(main_frame, text="Control del escuchador",
+                                bg="#FFFFFF", fg="#111827", font=("Segoe UI", 10, "bold"),
+                                padx=12, pady=8)
+    ctrl_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+
+    cfg = Config()
+    estado = {"activo": False, "contador": 0}
+    manual_mode = {"active": False}
+
+    row_auto = tk.Frame(ctrl_frame, bg="#FFFFFF")
+    row_auto.pack(fill="x", pady=(0, 6))
+
+    btn_toggle = tk.Button(row_auto, text="Activar escuchador", width=18)
+    btn_toggle.pack(side="left", padx=(0, 8))
+
+    btn_escanear = tk.Button(row_auto, text="Escanear ahora", width=14)
+    btn_escanear.pack(side="left", padx=(0, 8))
+
+    lbl_contador = tk.Label(row_auto, text="Escuchador detenido",
+                            bg="#FFFFFF", fg="#374151", font=("Segoe UI", 10))
+    lbl_contador.pack(side="left", padx=(8, 0))
+
+    lbl_last = tk.Label(row_auto, text="Ultimo UIDL: " + (cargar_ultimo_uidl() or '-'),
+                        bg="#FFFFFF", fg="#6B7280", font=("Segoe UI", 9))
+    lbl_last.pack(side="right")
+
+    row_opts = tk.Frame(ctrl_frame, bg="#FFFFFF")
+    row_opts.pack(fill="x", pady=(0, 4))
+
+    var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
+    var_visible = tk.BooleanVar(value=not bool(cfg.headless))
+
+    def actualizar_bienes():
+        cfg.load()
+        cfg.data['compra_bienes'] = var_bienes.get()
+        cfg.save()
+
+    def actualizar_visible():
+        cfg.load()
+        cfg.data['headless'] = not var_visible.get()
+        cfg.save()
+
+    tk.Checkbutton(row_opts, text="Compra Bienes", variable=var_bienes,
+                   command=actualizar_bienes, bg="#FFFFFF", selectcolor="#059669").pack(side="left", padx=(0, 12))
+    tk.Checkbutton(row_opts, text="Mostrar navegador", variable=var_visible,
+                   command=actualizar_visible, bg="#FFFFFF", selectcolor="#059669").pack(side="left", padx=(0, 16))
+
+    tk.Label(row_opts, text="Intervalo (seg):", bg="#FFFFFF").pack(side="left", padx=(8, 4))
+    entry_interval = tk.Entry(row_opts, width=6)
+    entry_interval.insert(0, str(cfg.scan_interval))
+    entry_interval.pack(side="left")
+
+    def actualizar_intervalo():
+        try:
+            val = int(entry_interval.get())
+            if val >= 300:
+                cfg.load()
+                cfg.data['scan_interval'] = val
+                cfg.save()
+                estado['contador'] = val
+                messagebox.showinfo("Guardado", f"Intervalo actualizado a {val} segundos.")
+        except ValueError:
+            messagebox.showwarning("Advertencia", "Ingrese un numero valido (minimo 300).")
+
+    tk.Button(row_opts, text="Guardar intervalo", command=actualizar_intervalo).pack(side="left", padx=(6, 0))
+
+    row_manual = tk.Frame(ctrl_frame, bg="#FFFFFF")
+    row_manual.pack(fill="x")
+
+    btn_manual = tk.Button(row_manual, text="Descarga manual", width=16)
+    btn_manual.pack(side="left", padx=(0, 8))
+    btn_ejecutar = tk.Button(row_manual, text="Ejecutar descarga", width=16, state=tk.DISABLED)
+    btn_ejecutar.pack(side="left")
+    tk.Label(row_manual, text="Ingrese numeros de OC en el area de texto y presione Ejecutar.",
+             bg="#FFFFFF", fg="#6B7280", font=("Segoe UI", 9)).pack(side="left", padx=(12, 0))
+
+    log_frame = tk.LabelFrame(main_frame, text="Registro de actividad",
+                               bg="#FFFFFF", fg="#111827", font=("Segoe UI", 10, "bold"),
+                               padx=10, pady=8)
+    log_frame.grid(row=2, column=0, sticky="nsew", pady=(0, 0))
+
+    text = tk.Text(log_frame, width=80, height=18, bg="#FFFFFF", fg="#374151",
+                   insertbackground="#374151", font=("Segoe UI", 10),
+                   relief="solid", borderwidth=1)
+    text.pack(fill="both", expand=True, pady=(0, 4))
 
     handler = TextHandler(text)
     handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
     logging.getLogger().addHandler(handler)
-
-    estado = {"activo": False, "contador": 0}
-    lbl_contador = tk.Label(frame, text="Escuchador detenido")
-    lbl_contador.pack()
-    lbl_last = tk.Label(frame, text="Último UIDL: " + (cargar_ultimo_uidl() or '-'))
-    lbl_last.pack()
-
-    cfg = Config()
-    manual_mode = {"active": False}
 
     def actualizar_contador():
         if estado["activo"]:
@@ -252,10 +340,7 @@ def main():
             btn_toggle.config(text="Activar escuchador")
         else:
             if not config_completa(cfg):
-                messagebox.showerror(
-                    "Error",
-                    "Configuración incompleta o por favor configurar correctamente",
-                )
+                messagebox.showerror("Error", "Configuracion incompleta. Verifique los parametros en Configuracion.")
                 return
             estado["activo"] = True
             estado["contador"] = cfg.scan_interval
@@ -269,7 +354,7 @@ def main():
     def activar_manual():
         manual_mode["active"] = True
         text.delete("1.0", tk.END)
-        text.insert(tk.END, "Introduzca ordenes que desea descargar 1 por linea:\n")
+        text.insert(tk.END, "Ingrese los numeros de OC a descargar, uno por linea:\n")
         btn_ejecutar.config(state=tk.DISABLED)
         text.focus_set()
 
@@ -290,10 +375,7 @@ def main():
         if not numeros:
             scanning_lock.release()
             return
-        if not messagebox.askyesno(
-            "Confirmación",
-            "Se descargarán las siguientes órdenes:\n" + "\n".join(numeros),
-        ):
+        if not messagebox.askyesno("Confirmar", f"Se descargaran {len(numeros)} orden(es):\n" + "\n".join(numeros)):
             scanning_lock.release()
             return
         text.delete("1.0", tk.END)
@@ -310,30 +392,26 @@ def main():
 
                 append(f"Procesando {len(ordenes)} OC(s)\n")
                 try:
-                    subidos, no_encontrados, errores = descargar_oc(
-                        ordenes, headless=cfg.headless
-                    )
+                    subidos, no_encontrados, errores = descargar_oc(ordenes, headless=cfg.headless)
                 except Exception as exc:
                     errores = [str(exc)]
                     subidos, no_encontrados = [], numeros
                 for num in subidos:
-                    append(f"✔️ OC {num} procesada\n")
+                    append(f"  OC {num} descargada correctamente\n")
                 for num in no_encontrados:
-                    append(f"❌ OC {num} faltante\n")
+                    append(f"  OC {num} no encontrada\n")
                 enviar_reporte(subidos, no_encontrados, ordenes, cfg, errores=errores)
-                no_aprobadas = [
-                    e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")
-                ]
+                no_aprobadas = [e.split(":", 1)[1] for e in errores if e.startswith("OC_NO_APROBADA:")]
                 otros_errores = [e for e in errores if not e.startswith("OC_NO_APROBADA:")]
                 partes: list[str] = []
                 if subidos:
-                    partes.append(f"✔ Descargadas ({len(subidos)}): " + ", ".join(str(n) for n in subidos))
+                    partes.append(f"Descargadas ({len(subidos)}): " + ", ".join(str(n) for n in subidos))
                 if no_encontrados:
-                    partes.append(f"❌ No encontradas ({len(no_encontrados)}): " + ", ".join(str(n) for n in no_encontrados))
+                    partes.append(f"No encontradas ({len(no_encontrados)}): " + ", ".join(str(n) for n in no_encontrados))
                 if no_aprobadas:
-                    partes.append(f"⚠ OC no aprobadas ({len(no_aprobadas)}): " + ", ".join(no_aprobadas))
+                    partes.append(f"No aprobadas ({len(no_aprobadas)}): " + ", ".join(no_aprobadas))
                 if otros_errores:
-                    partes.append("Errores adicionales:\n" + "\n".join(otros_errores))
+                    partes.append("Errores:\n" + "\n".join(otros_errores))
                 summary = "\n\n".join(partes) if partes else "Proceso finalizado"
                 text.after(0, lambda s=summary: messagebox.showinfo("Resultado", s))
             finally:
@@ -342,66 +420,10 @@ def main():
 
         threading.Thread(target=run, daemon=True).start()
 
-    def actualizar_intervalo():
-        try:
-            val = int(entry_interval.get())
-            if val >= 300:
-                cfg.load()
-                cfg.data['scan_interval'] = val
-                cfg.save()
-                estado['contador'] = val
-        except ValueError:
-            pass
-
-    btn_toggle = tk.Button(frame, text="Activar escuchador", command=toggle)
-    btn_toggle.pack(side=tk.LEFT, padx=5)
-
-    btn_escanear = tk.Button(frame, text="Escanear ahora", command=escanear_ahora)
-    btn_escanear.pack(side=tk.LEFT, padx=5)
-
-    btn_manual = tk.Button(frame, text="Descarga manual", command=activar_manual)
-    btn_manual.pack(side=tk.LEFT, padx=5)
-    btn_ejecutar = tk.Button(frame, text="Ejecutar descarga", command=ejecutar_manual, state=tk.DISABLED)
-    btn_ejecutar.pack(side=tk.LEFT, padx=5)
-
-    var_bienes = tk.BooleanVar(value=bool(cfg.compra_bienes))
-
-    def actualizar_bienes():
-        cfg.load()
-        cfg.data['compra_bienes'] = var_bienes.get()
-        cfg.save()
-
-    chk_bienes = tk.Checkbutton(
-        frame,
-        text="Compra Bienes",
-        variable=var_bienes,
-        command=actualizar_bienes,
-        selectcolor="#00aa00",
-    )
-    chk_bienes.pack(side=tk.LEFT, padx=5)
-
-    var_visible = tk.BooleanVar(value=not bool(cfg.headless))
-
-    def actualizar_visible():
-        cfg.load()
-        cfg.data['headless'] = not var_visible.get()
-        cfg.save()
-
-    chk_visible = tk.Checkbutton(
-        frame,
-        text="Descarga visible",
-        variable=var_visible,
-        command=actualizar_visible,
-        selectcolor="#00aa00",
-    )
-    chk_visible.pack(side=tk.LEFT, padx=5)
-
-    tk.Label(frame, text="Intervalo(seg):").pack(side=tk.LEFT, padx=5)
-    entry_interval = tk.Entry(frame, width=5)
-    entry_interval.insert(0, str(cfg.scan_interval))
-    entry_interval.pack(side=tk.LEFT)
-    btn_interval = tk.Button(frame, text="Guardar", command=actualizar_intervalo)
-    btn_interval.pack(side=tk.LEFT, padx=5)
+    btn_toggle.configure(command=toggle)
+    btn_escanear.configure(command=escanear_ahora)
+    btn_manual.configure(command=activar_manual)
+    btn_ejecutar.configure(command=ejecutar_manual)
 
     center_window(root)
     root.mainloop()

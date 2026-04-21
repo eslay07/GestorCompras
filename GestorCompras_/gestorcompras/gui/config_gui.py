@@ -69,7 +69,7 @@ class ConfigGUI(tk.Toplevel):
         # window is launched directly without going through main()
         db.init_db()
         self.title("Configuración")
-        self.geometry("1100x760")
+        self.geometry("1200x800")
         self.email_session = email_session
         self.descargas_cfg = DescargasConfig()
         self._oc_entries: dict[str, tk.Widget] = {}
@@ -87,12 +87,12 @@ class ConfigGUI(tk.Toplevel):
         self.notebook = ttk.Notebook(self, style="MyNotebook.TNotebook")
         self.notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.oc_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
-        self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=10)
+        self.suppliers_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.assign_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.tracking_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.dispatch_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.oc_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
+        self.email_templates_frame = ttk.Frame(self.notebook, style="MyFrame.TFrame", padding=20)
 
         self.notebook.add(self.suppliers_frame, text="Proveedores")
         self.notebook.add(self.assign_frame, text="Asignación")
@@ -109,6 +109,10 @@ class ConfigGUI(tk.Toplevel):
         self.create_email_templates_tab()
     
     def create_suppliers_tab(self):
+        ttk.Label(self.suppliers_frame, text="Proveedores registrados",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(self.suppliers_frame, orient="horizontal").pack(fill="x", pady=(0, 12))
+
         search_frame = ttk.Frame(self.suppliers_frame, style="MyFrame.TFrame")
         search_frame.pack(fill="x", pady=(0,5))
         ttk.Label(search_frame, text="Buscar:", style="MyLabel.TLabel").pack(side="left")
@@ -224,12 +228,20 @@ class ConfigGUI(tk.Toplevel):
         if not selected:
             messagebox.showwarning("Advertencia", "Seleccione un proveedor para eliminar.")
             return
+        nombre = self.suppliers_list.item(selected[0])["values"][1]
+        if not messagebox.askyesno("Confirmar eliminacion",
+                                   f"¿Esta seguro de eliminar al proveedor '{nombre}'?"):
+            return
         supplier_id = self.suppliers_list.item(selected[0])["values"][0]
         db.delete_supplier(supplier_id)
         self.load_suppliers()
-        messagebox.showinfo("Información", "Proveedor eliminado.")
+        messagebox.showinfo("Informacion", "Proveedor eliminado.")
     
     def create_assignment_tab(self):
+        ttk.Label(self.assign_frame, text="Asignaciones y Servicios",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(self.assign_frame, orient="horizontal").pack(fill="x", pady=(0, 12))
+
         self.assign_list = ttk.Treeview(
             self.assign_frame,
             columns=("Subdepto", "Departamento", "Persona"),
@@ -356,11 +368,14 @@ class ConfigGUI(tk.Toplevel):
     def create_tracking_tab(self):
         frame = self.tracking_frame
 
-        ttk.Label(frame, text="Configuración Seguimientos",
-                  style="MyLabel.TLabel").pack(pady=10)
+        ttk.Label(frame, text="Configuracion de Seguimientos",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 12))
 
         ttk.Label(frame, text="Credenciales Google (JSON):",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Archivo JSON de cuenta de servicio de Google Cloud.",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.google_creds_var = tk.StringVar()
         self.google_creds_var.set(db.get_config("GOOGLE_CREDS", ""))
@@ -374,6 +389,8 @@ class ConfigGUI(tk.Toplevel):
 
         ttk.Label(frame, text="ID de Spreadsheet:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Se encuentra en la URL de la hoja de calculo de Google.",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.sheet_id_var = tk.StringVar()
         self.sheet_id_var.set(db.get_config("GOOGLE_SHEET_ID", ""))
@@ -390,8 +407,10 @@ class ConfigGUI(tk.Toplevel):
         ttk.Entry(frame, textvariable=self.sheet_name_var,
                   style="MyEntry.TEntry", width=50).pack(pady=5)
 
-        ttk.Label(frame, text="Correos CC Seguimiento (hasta 9, separados por ';'):",
+        ttk.Label(frame, text="Correos CC Seguimiento:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Hasta 9 direcciones separadas por punto y coma (;).",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.cc_tracking_var = tk.StringVar()
         self.cc_tracking_var.set(db.get_config("EMAIL_CC_SEGUIMIENTO", ""))
@@ -406,8 +425,9 @@ class ConfigGUI(tk.Toplevel):
     def create_dispatch_tab(self):
         frame = self.dispatch_frame
 
-        ttk.Label(frame, text="Configuración Despacho",
-                  style="MyLabel.TLabel").pack(pady=10)
+        ttk.Label(frame, text="Configuracion de Despacho",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 12))
 
         ttk.Label(frame, text="Ruta de la carpeta para PDFs:",
                   style="MyLabel.TLabel").pack(pady=5)
@@ -423,8 +443,10 @@ class ConfigGUI(tk.Toplevel):
                    style="MyButton.TButton",
                    command=self.select_pdf_folder).pack(pady=5)
 
-        ttk.Label(frame, text="Correos CC Despachos (hasta 9, separados por ';'):",
+        ttk.Label(frame, text="Correos CC Despachos:",
                   style="MyLabel.TLabel").pack(pady=5)
+        ttk.Label(frame, text="Hasta 9 direcciones separadas por punto y coma (;).",
+                  font=("Segoe UI", 9), foreground="#6B7280").pack(anchor="w")
 
         self.cc_dispatch_var = tk.StringVar()
         self.cc_dispatch_var.set(db.get_config("EMAIL_CC_DESPACHO", ""))
@@ -753,33 +775,45 @@ class ConfigGUI(tk.Toplevel):
 
     def create_email_templates_tab(self):
         frame = self.email_templates_frame
-        ttk.Label(frame, text="Seleccione el Formato de Correo Actual:",
-                  style="MyLabel.TLabel").pack(pady=10)
+
+        ttk.Label(frame, text="Formatos de Correo",
+                  font=("Segoe UI", 13, "bold"), foreground="#111827").pack(pady=(0, 4), anchor="w")
+        ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=(0, 12))
+
+        active_frame = ttk.LabelFrame(frame, text="Formato activo",
+                                      style="MyLabelFrame.TLabelframe", padding=10)
+        active_frame.pack(fill="x", pady=(0, 10))
+        active_frame.columnconfigure(1, weight=1)
+        ttk.Label(active_frame, text="Formato de correo actual:", style="MyLabel.TLabel").grid(
+            row=0, column=0, sticky="w")
         self.email_template_var = tk.StringVar()
-        self.template_combo = ttk.Combobox(frame, textvariable=self.email_template_var,
-                                           state="readonly")
-        self.template_combo.pack(pady=5)
-        ttk.Button(frame, text="Guardar Formato",
-                   style="MyButton.TButton",
-                   command=self.save_email_template).pack(pady=10)
+        self.template_combo = ttk.Combobox(active_frame, textvariable=self.email_template_var,
+                                           state="readonly", width=40)
+        self.template_combo.grid(row=0, column=1, sticky="w", padx=8)
+        ttk.Button(active_frame, text="Guardar seleccion", style="MyButton.TButton",
+                   command=self.save_email_template).grid(row=0, column=2, padx=(8, 0))
+        ttk.Label(active_frame, text="Este formato se usara por defecto en los envios de correo.",
+                  font=("Segoe UI", 9), foreground="#6B7280").grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
         self.templates_list = ttk.Treeview(frame, style="MyTreeview.Treeview",
                                            columns=("ID", "Nombre"), show="headings",
-                                           height=5)
+                                           height=8)
         self.templates_list.heading("ID", text="ID")
         self.templates_list.heading("Nombre", text="Nombre")
-        self.templates_list.column("ID", width=50)
-        self.templates_list.pack(fill="x", pady=5)
+        self.templates_list.column("ID", width=60)
+        self.templates_list.column("Nombre", width=400)
+        self.templates_list.pack(fill="both", expand=True, pady=(0, 5))
 
         btn_frame = ttk.Frame(frame, style="MyFrame.TFrame", padding=5)
-        btn_frame.pack(pady=5)
-        ttk.Button(btn_frame, text="Agregar",
+        btn_frame.pack(fill="x")
+        ttk.Button(btn_frame, text="Agregar formato",
                    style="MyButton.TButton",
                    command=self.agregar_nuevo_formato).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Editar",
+        ttk.Button(btn_frame, text="Editar formato",
                    style="MyButton.TButton",
                    command=self.editar_formato).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Eliminar",
+        ttk.Button(btn_frame, text="Eliminar formato",
                    style="MyButton.TButton",
                    command=self.eliminar_formato).pack(side="left", padx=5)
 
@@ -800,13 +834,13 @@ class ConfigGUI(tk.Toplevel):
         for tpl in templates:
             self.templates_list.insert("", "end", values=(tpl[0], tpl[1]))
 
-        opciones = ["FORMATO"] + [tpl[1] for tpl in templates]
+        opciones = ["-- Seleccione formato --"] + [tpl[1] for tpl in templates]
         self.template_combo["values"] = opciones
-        current = db.get_config("EMAIL_TEMPLATE", "FORMATO")
+        current = db.get_config("EMAIL_TEMPLATE", "-- Seleccione formato --")
         if current in opciones:
             self.email_template_var.set(current)
         else:
-            self.email_template_var.set("FORMATO")
+            self.email_template_var.set("-- Seleccione formato --")
 
     def agregar_nuevo_formato(self):
         TemplateForm(self, "Nuevo Formato", self.load_email_templates, email_session=self.email_session).wait_window()
@@ -826,7 +860,9 @@ class ConfigGUI(tk.Toplevel):
             messagebox.showwarning("Advertencia", "Seleccione un formato para eliminar.")
             return
         tpl_id = self.templates_list.item(selected[0])["values"][0]
-        if messagebox.askyesno("Confirmar", "¿Eliminar el formato seleccionado?"):
+        tpl_nombre = self.templates_list.item(selected[0])["values"][1]
+        if messagebox.askyesno("Confirmar eliminacion",
+                               f"¿Esta seguro de eliminar el formato '{tpl_nombre}'?"):
             db.delete_email_template(tpl_id)
             self.load_email_templates()
 
