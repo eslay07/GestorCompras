@@ -50,6 +50,15 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+def _resolve_telcos_credentials(session: dict[str, str]) -> tuple[str, str]:
+    username = (session.get("username") or "").strip()
+    if not username:
+        username = (session.get("address") or "").strip().split("@")[0]
+    username = username.split("@")[0].strip()
+    password = (session.get("password") or "").strip()
+    return username, password
+
+
 def _required_keys_for_flow(pasos: list[dict]) -> set[str]:
     """Extrae las claves de contexto ({clave}) requeridas por un flujo."""
     keys: set[str] = set()
@@ -558,8 +567,9 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
-                username = (self.email_session.get("address") or "").split("@")[0]
-                password = self.email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(self.email_session)
+                if not username or not password:
+                    raise ValueError("Credenciales de Telcos no disponibles.")
                 login_telcos(driver, username, password)
 
                 consumidas_ok: list[int] = []
@@ -678,6 +688,7 @@ class ActuaExecutionPanel(tk.Toplevel):
         for txt, cmd in (
             ("Escanear correos", self._scan_emails),
             ("Agregar manual", self._add_manual),
+            ("Ejecutar flujo", self._ejecutar),
             ("Editar", self._edit_task),
             ("Eliminar", self._delete_tasks),
             ("Seleccionar todo", self._select_all),
@@ -1047,8 +1058,7 @@ class ActuaExecutionPanel(tk.Toplevel):
                 return
 
             try:
-                username = (self.email_session.get("address") or "").split("@")[0]
-                password = self.email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(self.email_session)
                 if not username or not password:
                     raise ValueError("Credenciales de Telcos no disponibles.")
                 self._log_msg(f"Iniciando sesion en Telcos como {username}...")
@@ -1208,8 +1218,7 @@ def run_flow_from_inbox(
                 return
 
             try:
-                username = (email_session.get("address") or "").split("@")[0]
-                password = email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(email_session)
                 if not username or not password:
                     raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
                 log(f"Iniciando sesión en Telcos como {username}…")

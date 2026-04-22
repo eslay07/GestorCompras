@@ -182,6 +182,7 @@ class LoginScreen(tk.Frame):
         if not username or not password:
             messagebox.showerror("Error", "Debe ingresar usuario y contrasena.", parent=self)
             return
+        username = username.split("@")[0].strip()
         email_address = f"{username}@telconet.ec"
 
         self.btn_login.config(state="disabled")
@@ -191,11 +192,11 @@ class LoginScreen(tk.Frame):
 
         def _do_login():
             success = test_email_connection(email_address, password)
-            self.after(0, lambda: self._on_login_result(success, email_address, password))
+            self.after(0, lambda: self._on_login_result(success, username, email_address, password))
 
         threading.Thread(target=_do_login, daemon=True).start()
 
-    def _on_login_result(self, success: bool, email_address: str, password: str) -> None:
+    def _on_login_result(self, success: bool, username: str, email_address: str, password: str) -> None:
         try:
             self.btn_login.config(state="normal")
             self.user_entry.config(state="normal")
@@ -205,6 +206,7 @@ class LoginScreen(tk.Frame):
             return
 
         if success:
+            email_session["username"] = username
             email_session["address"] = email_address
             email_session["password"] = password
             core_config.set_user_email(email_address)
