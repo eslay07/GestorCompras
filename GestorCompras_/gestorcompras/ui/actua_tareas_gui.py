@@ -50,12 +50,35 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def _resolve_telcos_credentials(session: dict[str, str]) -> tuple[str, str]:
-    username = (session.get("username") or "").strip()
+def _resolve_telcos_credentials(session: dict[str, str] | None) -> tuple[str, str]:
+    session = session or {}
+    username = (
+        session.get("username")
+        or session.get("user")
+        or session.get("usuario")
+        or ""
+    ).strip()
     if not username:
-        username = (session.get("address") or "").strip().split("@")[0]
-    username = username.split("@")[0].strip()
-    password = (session.get("password") or "").strip()
+        address = (
+            session.get("address")
+            or session.get("email")
+            or session.get("correo")
+            or ""
+        ).strip()
+        username = address.split("@")[0] if address else ""
+    if not username:
+        try:
+            from gestorcompras.core import config as core_config
+            username = (core_config.get_user_email() or "").split("@")[0].strip()
+        except Exception:
+            username = ""
+    username = username.split("@")[0].strip().upper()
+    password = (
+        session.get("password")
+        or session.get("pass")
+        or session.get("contrasena")
+        or ""
+    ).strip()
     return username, password
 
 

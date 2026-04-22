@@ -207,7 +207,9 @@ class LoginScreen(tk.Frame):
 
         if success:
             email_session["username"] = username
+            email_session["user"] = username
             email_session["address"] = email_address
+            email_session["email"] = email_address
             email_session["password"] = password
             core_config.set_user_email(email_address)
             messagebox.showinfo("Bienvenido", "Inicio de sesion correcto.", parent=self)
