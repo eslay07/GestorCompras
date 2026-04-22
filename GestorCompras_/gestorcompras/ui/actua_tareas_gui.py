@@ -258,6 +258,7 @@ class ActuaTareasScreen(ttk.Frame):
         self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
                                           borderwidth=1, font=("Segoe UI", 10))
         self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+        self.manual_tasks_text.bind("<Control-Return>", lambda _e: self._run_flow())
 
         source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
         source_frame.grid(row=1, column=3, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
@@ -269,16 +270,19 @@ class ActuaTareasScreen(ttk.Frame):
         btn_all = ttk.Button(source_frame, text="Todos", command=self._inbox_select_all)
         btn_none = ttk.Button(source_frame, text="Ninguno", command=self._inbox_select_none)
         btn_clear = ttk.Button(source_frame, text="Limpiar", command=self._inbox_clear)
+        btn_manual_run = ttk.Button(source_frame, text="Ejecutar manual", command=self._run_flow)
         btn_all.grid(row=0, column=1, padx=3)
         btn_none.grid(row=0, column=2, padx=3)
         btn_clear.grid(row=0, column=3, padx=3)
+        btn_manual_run.grid(row=0, column=4, padx=3)
+        add_hover_effect(btn_manual_run)
 
         self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"),
                                        show="headings", style="MyTreeview.Treeview", height=3)
         for col, txt, w in (("sel", "✓", 30), ("origen", "Origen", 110), ("task", "Tarea", 110)):
             self.inbox_tree.heading(col, text=txt)
             self.inbox_tree.column(col, width=w, anchor="center")
-        self.inbox_tree.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        self.inbox_tree.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(6, 0))
         self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
 
         ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar",
