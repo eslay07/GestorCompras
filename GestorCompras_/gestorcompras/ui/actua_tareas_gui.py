@@ -50,6 +50,38 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+def _resolve_telcos_credentials(session: dict[str, str] | None) -> tuple[str, str]:
+    session = session or {}
+    username = (
+        session.get("username")
+        or session.get("user")
+        or session.get("usuario")
+        or ""
+    ).strip()
+    if not username:
+        address = (
+            session.get("address")
+            or session.get("email")
+            or session.get("correo")
+            or ""
+        ).strip()
+        username = address.split("@")[0] if address else ""
+    if not username:
+        try:
+            from gestorcompras.core import config as core_config
+            username = (core_config.get_user_email() or "").split("@")[0].strip()
+        except Exception:
+            username = ""
+    username = username.split("@")[0].strip().upper()
+    password = (
+        session.get("password")
+        or session.get("pass")
+        or session.get("contrasena")
+        or ""
+    ).strip()
+    return username, password
+
+
 def _required_keys_for_flow(pasos: list[dict]) -> set[str]:
     """Extrae las claves de contexto ({clave}) requeridas por un flujo."""
     keys: set[str] = set()
@@ -249,6 +281,7 @@ class ActuaTareasScreen(ttk.Frame):
         self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
                                           borderwidth=1, font=("Segoe UI", 10))
         self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+        self.manual_tasks_text.bind("<Control-Return>", lambda _e: self._run_flow())
 
         source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
         source_frame.grid(row=1, column=3, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
@@ -260,16 +293,19 @@ class ActuaTareasScreen(ttk.Frame):
         btn_all = ttk.Button(source_frame, text="Todos", command=self._inbox_select_all)
         btn_none = ttk.Button(source_frame, text="Ninguno", command=self._inbox_select_none)
         btn_clear = ttk.Button(source_frame, text="Limpiar", command=self._inbox_clear)
+        btn_manual_run = ttk.Button(source_frame, text="Ejecutar manual", command=self._run_flow)
         btn_all.grid(row=0, column=1, padx=3)
         btn_none.grid(row=0, column=2, padx=3)
         btn_clear.grid(row=0, column=3, padx=3)
+        btn_manual_run.grid(row=0, column=4, padx=3)
+        add_hover_effect(btn_manual_run)
 
         self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"),
                                        show="headings", style="MyTreeview.Treeview", height=3)
         for col, txt, w in (("sel", "✓", 30), ("origen", "Origen", 110), ("task", "Tarea", 110)):
             self.inbox_tree.heading(col, text=txt)
             self.inbox_tree.column(col, width=w, anchor="center")
-        self.inbox_tree.grid(row=1, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        self.inbox_tree.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(6, 0))
         self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
 
         ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar",
@@ -558,8 +594,9 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
-                username = (self.email_session.get("address") or "").split("@")[0]
-                password = self.email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(self.email_session)
+                if not username or not password:
+                    raise ValueError("Credenciales de Telcos no disponibles.")
                 login_telcos(driver, username, password)
 
                 consumidas_ok: list[int] = []
@@ -678,6 +715,7 @@ class ActuaExecutionPanel(tk.Toplevel):
         for txt, cmd in (
             ("Escanear correos", self._scan_emails),
             ("Agregar manual", self._add_manual),
+            ("Ejecutar flujo", self._ejecutar),
             ("Editar", self._edit_task),
             ("Eliminar", self._delete_tasks),
             ("Seleccionar todo", self._select_all),
@@ -1047,8 +1085,7 @@ class ActuaExecutionPanel(tk.Toplevel):
                 return
 
             try:
-                username = (self.email_session.get("address") or "").split("@")[0]
-                password = self.email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(self.email_session)
                 if not username or not password:
                     raise ValueError("Credenciales de Telcos no disponibles.")
                 self._log_msg(f"Iniciando sesion en Telcos como {username}...")
@@ -1208,8 +1245,7 @@ def run_flow_from_inbox(
                 return
 
             try:
-                username = (email_session.get("address") or "").split("@")[0]
-                password = email_session.get("password") or ""
+                username, password = _resolve_telcos_credentials(email_session)
                 if not username or not password:
                     raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
                 log(f"Iniciando sesión en Telcos como {username}…")
