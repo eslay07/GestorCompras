@@ -60,6 +60,12 @@ _HTML_TEMPLATE = """
 """
 
 
+def _ensure_email(address: str) -> str:
+    if "@" not in address:
+        return f"{address}@telconet.ec"
+    return address
+
+
 def _formatear_filas(filas: Iterable[Dict[str, object]]) -> List[Dict[str, str]]:
     resultado: List[Dict[str, str]] = []
     for fila in filas:
@@ -93,7 +99,8 @@ def enviar_reporte_servicios(
 ) -> bool:
     """Envía un resumen de las tareas reasignadas y las que fallaron."""
 
-    if not email_session or not destinatario:
+    destinatario_normalizado = _ensure_email((destinatario or "").strip()) if destinatario else ""
+    if not email_session or not destinatario_normalizado:
         logger.debug("No se envía reporte: faltan credenciales o destinatario")
         return False
 
@@ -105,7 +112,7 @@ def enviar_reporte_servicios(
         return False
 
     contexto = {
-        "email_to": destinatario,
+        "email_to": destinatario_normalizado,
         "filas_ok": filas_ok,
         "filas_fail": filas_fail,
     }
@@ -118,7 +125,7 @@ def enviar_reporte_servicios(
             contexto,
             cc_key="EMAIL_CC_REASIGNACION",
         )
-        logger.info("Reporte de reasignación enviado a %s", destinatario)
+        logger.info("Reporte de reasignación enviado a %s", destinatario_normalizado)
         return True
     except Exception as exc:  # pragma: no cover - la entrega puede fallar por red
         logger.warning("No se pudo enviar el reporte de reasignación: %s", exc)
