@@ -50,6 +50,8 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
+_OPEN_ACTUA_PANEL = None
+
 
 
 def _required_keys_for_flow(pasos: list[dict]) -> set[str]:
@@ -78,7 +80,9 @@ def _task_value(task: dict, key: str) -> str:
 
 
 def _normalize_task_number(task_number: str | None) -> str:
-    return re.sub(r"\s+", "", str(task_number or "")).upper()
+    texto = str(task_number or "").strip().upper()
+    # Normaliza entradas como "12 34", "12-34" o "TAREA 1234".
+    return re.sub(r"[^A-Z0-9]", "", texto)
 
 
 def _has_duplicate_task_numbers(tasks: list[dict]) -> bool:
@@ -793,6 +797,14 @@ class ActuaExecutionPanel(tk.Toplevel):
                                      command=self._on_close)
         self.btn_cerrar.grid(row=0, column=3, padx=4)
         add_hover_effect(self.btn_cerrar)
+        self.btn_regresar_menu = ttk.Button(
+            buttons,
+            text="Regresar al menú",
+            style="MyButton.TButton",
+            command=self._close_and_return_menu,
+        )
+        self.btn_regresar_menu.grid(row=0, column=4, padx=4)
+        add_hover_effect(self.btn_regresar_menu)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _rebuild_columns(self) -> None:
@@ -1088,7 +1100,19 @@ class ActuaExecutionPanel(tk.Toplevel):
             try:
                 username, password = resolve_telcos_credentials(self.email_session)
                 self._log_msg(f"Iniciando sesion en Telcos como {username}...")
-                login_telcos(self._driver, username, password)
+                ultimo_error = None
+                for intento in range(1, 3):
+                    try:
+                        login_telcos(self._driver, username, password)
+                        ultimo_error = None
+                        break
+                    except Exception as exc:
+                        ultimo_error = exc
+                        self._log_msg(
+                            f"Intento {intento}/2 de inicio de sesion falló: {exc}"
+                        )
+                if ultimo_error is not None:
+                    raise ultimo_error
             except Exception as exc:
                 self._log_msg(f"Fallo inicio de sesion: {exc}")
                 self.after(0, lambda: self.status_var.set("Error autenticando"))
@@ -1136,7 +1160,9 @@ class ActuaExecutionPanel(tk.Toplevel):
             if send_report and self.email_session:
                 try:
                     from gestorcompras.services.actua_reporter import send_actua_report
-                    sent = send_actua_report(self.email_session, flujo_nombre, resultados, headless)
+                    sent = send_actua_report(
+                        self.email_session, flujo_nombre, resultados, headless
+                    )
                     if sent:
                         self._log_msg("Reporte enviado por correo.")
                     else:
@@ -1164,7 +1190,18 @@ class ActuaExecutionPanel(tk.Toplevel):
             self.grab_release()
         except Exception:
             pass
+        global _OPEN_ACTUA_PANEL
+        _OPEN_ACTUA_PANEL = None
         self.destroy()
+
+    def _close_and_return_menu(self) -> None:
+        self._on_close()
+        try:
+            from gestorcompras.ui import router
+
+            router.open_home()
+        except Exception:
+            logger.exception("No se pudo regresar al menú tras cerrar Actualizar Tareas.")
 
 
 def abrir_panel_tareas(
@@ -1176,7 +1213,17 @@ def abrir_panel_tareas(
 ) -> ActuaExecutionPanel | None:
     """Abre el panel unificado de Actua. Tareas. Si ``tareas`` viene vacío el
     usuario puede escanear correos o agregar manualmente desde el panel."""
+    global _OPEN_ACTUA_PANEL
+    if _OPEN_ACTUA_PANEL is not None and _OPEN_ACTUA_PANEL.winfo_exists():
+        try:
+            _OPEN_ACTUA_PANEL.lift()
+            _OPEN_ACTUA_PANEL.focus_force()
+        except Exception:
+            pass
+        return _OPEN_ACTUA_PANEL
+
     panel = ActuaExecutionPanel(master, email_session, origen, tareas or [], mode=mode)
+    _OPEN_ACTUA_PANEL = panel
     return panel
 
 
