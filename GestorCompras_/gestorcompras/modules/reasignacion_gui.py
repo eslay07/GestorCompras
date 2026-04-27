@@ -22,6 +22,7 @@ from gestorcompras.core import config as core_config
 from gestorcompras.core.mail_parse import parse_body, parse_subject
 from gestorcompras.data import reasignaciones_repo
 from gestorcompras.services import reassign_bridge, db
+from gestorcompras.services.credentials import resolve_telcos_credentials
 from gestorcompras.ui.common import add_hover_effect, center_window
 from gestorcompras.gui import reasignacion_gui as legacy_gui
 
@@ -680,6 +681,21 @@ class ServiciosReasignacion(tk.Toplevel):
                 "¿Desea abrir el panel de Actualizar Tareas para estas tareas reasignadas?",
                 parent=self,
             ):
+                try:
+                    resolve_telcos_credentials(self.email_session)
+                except ValueError as exc:
+                    messagebox.showwarning(
+                        "Actualizar Tareas",
+                        (
+                            f"{exc}\n\n"
+                            "Para continuar:\n"
+                            "1) Cierre sesión y vuelva a ingresar con su correo corporativo.\n"
+                            "2) Verifique que la contraseña esté registrada."
+                        ),
+                        parent=self,
+                    )
+                    return
+
                 abrir_panel_tareas(
                     self,
                     self.email_session,

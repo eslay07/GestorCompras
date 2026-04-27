@@ -9,6 +9,7 @@ from tkinter.scrolledtext import ScrolledText
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
+from gestorcompras.services.credentials import resolve_telcos_credentials
 from gestorcompras.services.reassign_bridge import _create_driver
 from gestorcompras.services.telcos_automation import login_telcos
 from gestorcompras.ui.common import add_hover_effect
@@ -49,37 +50,6 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-
-def _resolve_telcos_credentials(session: dict[str, str] | None) -> tuple[str, str]:
-    session = session or {}
-    username = (
-        session.get("username")
-        or session.get("user")
-        or session.get("usuario")
-        or ""
-    ).strip()
-    if not username:
-        address = (
-            session.get("address")
-            or session.get("email")
-            or session.get("correo")
-            or ""
-        ).strip()
-        username = address.split("@")[0] if address else ""
-    if not username:
-        try:
-            from gestorcompras.core import config as core_config
-            username = (core_config.get_user_email() or "").split("@")[0].strip()
-        except Exception:
-            username = ""
-    username = username.split("@")[0].strip().upper()
-    password = (
-        session.get("password")
-        or session.get("pass")
-        or session.get("contrasena")
-        or ""
-    ).strip()
-    return username, password
 
 
 def _required_keys_for_flow(pasos: list[dict]) -> set[str]:
@@ -594,9 +564,7 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
-                username, password = _resolve_telcos_credentials(self.email_session)
-                if not username or not password:
-                    raise ValueError("Credenciales de Telcos no disponibles.")
+                username, password = resolve_telcos_credentials(self.email_session)
                 login_telcos(driver, username, password)
 
                 consumidas_ok: list[int] = []
@@ -1085,9 +1053,7 @@ class ActuaExecutionPanel(tk.Toplevel):
                 return
 
             try:
-                username, password = _resolve_telcos_credentials(self.email_session)
-                if not username or not password:
-                    raise ValueError("Credenciales de Telcos no disponibles.")
+                username, password = resolve_telcos_credentials(self.email_session)
                 self._log_msg(f"Iniciando sesion en Telcos como {username}...")
                 login_telcos(self._driver, username, password)
             except Exception as exc:
@@ -1245,9 +1211,7 @@ def run_flow_from_inbox(
                 return
 
             try:
-                username, password = _resolve_telcos_credentials(email_session)
-                if not username or not password:
-                    raise ValueError("Credenciales de Telcos no disponibles en la sesión.")
+                username, password = resolve_telcos_credentials(email_session)
                 log(f"Iniciando sesión en Telcos como {username}…")
                 login_telcos(driver, username, password)
             except Exception as exc:

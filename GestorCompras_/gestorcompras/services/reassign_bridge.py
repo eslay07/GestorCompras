@@ -5,6 +5,7 @@ import logging
 from typing import Any, Dict, List
 
 from gestorcompras.services import db
+from gestorcompras.services.credentials import resolve_telcos_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -16,15 +17,6 @@ def _normalize_template(template: str | None) -> str:
         template = db.get_config("SERVICIOS_REASIGNACION_MSG", _DEFAULT_TEMPLATE)
     return template or _DEFAULT_TEMPLATE
 
-
-def _ensure_credentials(email_session: Dict[str, str] | None) -> tuple[str, str]:
-    if not email_session:
-        raise ValueError("No hay sesión de Telcos disponible.")
-    address = email_session.get("address", "")
-    password = email_session.get("password", "")
-    if not address or not password:
-        raise ValueError("Credenciales incompletas para iniciar sesión en Telcos.")
-    return address, password
 
 
 def _build_payload(
@@ -103,9 +95,9 @@ def _run_selenium_batch(
     driver = None
     resultados: List[Dict[str, Any]] = []
     try:
-        address, password = _ensure_credentials(email_session)
+        username, password = resolve_telcos_credentials(email_session)
         driver = _create_driver(headless)
-        login_telcos(driver, address.split("@")[0], password)
+        login_telcos(driver, username, password)
 
         from gestorcompras.services.selenium_utils import retry_task
 
