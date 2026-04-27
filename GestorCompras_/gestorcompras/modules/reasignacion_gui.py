@@ -416,6 +416,13 @@ class ServiciosReasignacion(tk.Toplevel):
         from gestorcompras.services.email_task_scanner import normalize_for_search
         return normalize_for_search(value)
 
+    @staticmethod
+    def _normalize_email(address: str | None) -> str:
+        value = (address or "").strip()
+        if value and "@" not in value:
+            return f"{value}@telconet.ec"
+        return value
+
     def _buscar(self) -> None:
         cfg = core_config.get_servicios_config()
         correo_usuario = self._correo_usuario or self.email_session.get("address", "")
@@ -647,9 +654,13 @@ class ServiciosReasignacion(tk.Toplevel):
         try:
             from gestorcompras.services.reassign_reporter import enviar_reporte_servicios
 
+            destinatario_reporte = self.email_session.get("address", "") or self._correo_usuario
+            destinatario_reporte = self._normalize_email(destinatario_reporte)
+            logger.info("Destinatario final de reporte de reasignación: %s", destinatario_reporte or "(vacío)")
+
             enviar_reporte_servicios(
                 self.email_session,
-                self._correo_usuario,
+                destinatario_reporte,
                 exitosos,
                 fallidos,
             )
