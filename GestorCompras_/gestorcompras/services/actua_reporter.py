@@ -102,7 +102,14 @@ def send_actua_report(
     headless: bool = True,
 ) -> bool:
     """Envía un correo informe al propio usuario. Devuelve True si se envió."""
-    address = email_session.get("address", "")
+    address = (
+        email_session.get("address")
+        or email_session.get("email")
+        or email_session.get("username")
+        or email_session.get("user")
+        or ""
+    )
+    address = _ensure_email(address.strip())
     password = email_session.get("password", "")
     if not address or not password:
         logger.warning("No se puede enviar reporte: credenciales incompletas.")

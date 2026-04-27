@@ -426,7 +426,9 @@ def descargar_oc(
         actualizar_proveedores_desde_pdfs(ordenes, download_dir)
 
     numeros = [oc.get("numero") for oc in ordenes]
-    subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(cfg, ordenes)
+    subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(
+        cfg, ordenes, incluir_ubicaciones=True
+    )
     for numero, ruta in ubicaciones_descarga.items():
         for orden in ordenes:
             if str(orden.get("numero")) == str(numero):
@@ -440,4 +442,3 @@ def descargar_oc(
 
 if __name__ == "__main__":  # pragma: no cover
     descargar_oc([])
-
