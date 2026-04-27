@@ -599,21 +599,33 @@ class ActuaTareasScreen(ttk.Frame):
                 return
 
         self.status_var.set("Ejecutando...")
+        pending_snapshot = [dict(p) for p in pending]
+        manual_snapshot = [dict(m) for m in manual_pending]
 
         def _worker():
             driver = None
             try:
-                if not pending:
-                    pending = manual_pending
-                if not pending:
+                pendientes = list(pending_snapshot)
+                if not pendientes:
+                    pendientes = list(manual_snapshot)
+                if not pendientes:
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
                 username, password = resolve_telcos_credentials(self.email_session)
-                login_telcos(driver, username, password)
+                ultimo_error = None
+                for _intento in range(1, 3):
+                    try:
+                        login_telcos(driver, username, password)
+                        ultimo_error = None
+                        break
+                    except Exception as exc:
+                        ultimo_error = exc
+                if ultimo_error is not None:
+                    raise ultimo_error
 
                 consumidas_ok: list[int] = []
-                for row in pending:
+                for row in pendientes:
                     ctx = {
                         "task_number": row.get("task_number"),
                         "numero_tarea": row.get("task_number"),
