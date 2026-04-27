@@ -36,11 +36,11 @@ def nombre_archivo_orden(numero: str | None, proveedor: str | None = None, exten
     - Proveedor normalizado en MAYÚSCULAS con '_'.
     - Retro-compatible con llamadas (numero), (numero, proveedor), (numero, proveedor, extension) y (numero, ".pdf").
     """
-    # Compatibilidad: si 'proveedor' parece extensión, reubicar
     # Back-compat: si 'proveedor' parece extensión, reubicar
     if proveedor and isinstance(proveedor, str) and proveedor.startswith(".") and (extension is None or extension == ".pdf"):
         extension = proveedor
         proveedor = None
+    legacy_formato = bool(extension) and not str(extension).startswith(".")
 
     numero = (numero or "").strip()
     if numero:
@@ -55,13 +55,14 @@ def nombre_archivo_orden(numero: str | None, proveedor: str | None = None, exten
         prov_clean = _re.sub(r"[^\w\- ]", "_", proveedor or "")
         prov_clean = _re.sub(r"\s+", "_", prov_clean)
         prov_clean = _re.sub(r"_+", "_", prov_clean)
-        prov_clean = prov_clean.lstrip("_").upper()
+        prov_clean = prov_clean.lstrip("_")
+        prov_clean = prov_clean.lower() if legacy_formato else prov_clean.upper()
         base = f"{base} - {prov_clean}" if base else prov_clean
 
     base = (base or "archivo").strip()
 
-    # Prefijo ORDEN si hay número
-    if numero:
+    # Prefijo ORDEN en formato actual (no legacy)
+    if numero and not legacy_formato:
         base = f"ORDEN {base}"
 
     # Limitar longitud razonable
@@ -73,8 +74,13 @@ def nombre_archivo_orden(numero: str | None, proveedor: str | None = None, exten
         extension = ".pdf"
     if not extension.startswith('.'):
         extension = f".{extension}"
+    extension = extension.lower()
 
-    return f"{base}{extension}".upper()
+    if base.lower() == "archivo":
+        return f"archivo{extension}"
+    if legacy_formato:
+        return f"{base}{extension}"
+    return f"{base.upper()}{extension}"
 
 
 def proveedor_desde_pdf(ruta_pdf: str | Path | None) -> str:

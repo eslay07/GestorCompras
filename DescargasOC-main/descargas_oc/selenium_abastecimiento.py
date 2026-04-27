@@ -72,9 +72,20 @@ PATRONES_NUMERO = (
 def _renombrar_pdf_descargado(pdf: Path, numero: str, proveedor: str) -> Path:
     """Renombra el PDF descargado usando número y proveedor."""
 
-    base_actual = re.sub(r"\s+", " ", pdf.stem).strip()
-    preferido = base_actual or (numero or "").strip()
-    nombre_deseado = nombre_archivo_orden(preferido, proveedor, pdf.suffix or ".pdf")
+    numero_limpio = (numero or "").strip() or _numero_desde_texto(pdf.stem)
+    if numero_limpio:
+        prefijo = f"ORDEN #{numero_limpio}"
+    else:
+        base_actual = re.sub(r"\s+", " ", pdf.stem).strip()
+        prefijo = base_actual or "orden"
+
+    prov_limpio = re.sub(r"[^\w\- ]", "_", proveedor or "")
+    prov_limpio = re.sub(r"\s+", "_", prov_limpio)
+    prov_limpio = re.sub(r"_+", "_", prov_limpio).strip("_").lower()
+    if prov_limpio:
+        prov_limpio = f"{prov_limpio}_"
+
+    nombre_deseado = f"{prefijo} - {prov_limpio}{(pdf.suffix or '.pdf').lower()}"
     destino = pdf.with_name(nombre_deseado)
     if destino == pdf:
         return pdf
@@ -1032,7 +1043,9 @@ def descargar_abastecimiento(
         driver.quit()
 
     if getattr(cfg, 'abastecimiento_mover_archivos', True):
-        subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(cfg, ordenes)
+        subidos, faltantes, errores_mov, ubicaciones_descarga = mover_oc(
+            cfg, ordenes, incluir_ubicaciones=True
+        )
     else:
         subidos = [o.get('numero') for o in ordenes if o.get('numero')]
         faltantes, errores_mov, ubicaciones_descarga = [], [], {}
