@@ -519,10 +519,7 @@ class ActuaTareasScreen(ttk.Frame):
     def _go_back(self):
         from gestorcompras.ui import router
 
-        if self.origin == "servicios":
-            router.open_servicios_menu()
-        else:
-            router.open_bienes_menu()
+        router.open_home()
 
     def _refresh_inbox(self):
         for item in self.inbox_tree.get_children():
