@@ -6,6 +6,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+from typing import Callable
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
@@ -134,11 +135,18 @@ class ActionTooltip:
 
 
 class ActuaTareasScreen(ttk.Frame):
-    def __init__(self, master: tk.Misc, email_session: dict[str, str], origin: str):
+    def __init__(
+        self,
+        master: tk.Misc,
+        email_session: dict[str, str],
+        origin: str,
+        on_close: Callable[[], None] | None = None,
+    ):
         super().__init__(master, style="MyFrame.TFrame")
         self.master = master
         self.email_session = email_session
         self.origin = origin
+        self.on_close = on_close
         self.pasos: list[dict] = []
         self.flujos: list[dict] = []
         self.aliases: dict[str, str] = {}
@@ -517,8 +525,10 @@ class ActuaTareasScreen(ttk.Frame):
         self.aliases = {row[0].split("::", 1)[1]: row[1] for row in rows}
 
     def _go_back(self):
+        if callable(self.on_close):
+            self.on_close()
+            return
         from gestorcompras.ui import router
-
         router.open_home()
 
     def _refresh_inbox(self):
@@ -1230,6 +1240,39 @@ def abrir_panel_tareas(
     panel = ActuaExecutionPanel(master, email_session, origen, tareas or [], mode=mode)
     _OPEN_ACTUA_PANEL = panel
     return panel
+
+
+def open_actua_tareas_window(
+    master: tk.Misc,
+    email_session: dict[str, str],
+    origin: str = "bienes",
+) -> tk.Toplevel:
+    """Abre Actualizar Tareas como ventana independiente (consistente con otros módulos)."""
+    from gestorcompras.ui import router
+
+    win = tk.Toplevel(master)
+    win.title("Actualizar Tareas")
+    win.geometry("1120x760")
+    win.minsize(980, 620)
+    win.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
+
+    def _cerrar() -> None:
+        try:
+            win.grab_release()
+        except Exception:
+            pass
+        win.destroy()
+        try:
+            router.open_home()
+        except Exception:
+            logger.exception("No se pudo volver al menú al cerrar Actualizar Tareas.")
+
+    win.protocol("WM_DELETE_WINDOW", _cerrar)
+    screen = ActuaTareasScreen(win, email_session, origin=origin, on_close=_cerrar)
+    screen.pack(fill="both", expand=True)
+    win.grab_set()
+    win.focus_force()
+    return win
 
 
 def ejecutar_flujo_desde_modulo(

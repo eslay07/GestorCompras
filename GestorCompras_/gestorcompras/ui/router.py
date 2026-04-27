@@ -132,6 +132,7 @@ def open_home() -> None:
 def open_actua_tareas(origin: str = "bienes") -> None:
     if _email_session is None:
         raise RuntimeError("Sesion de correo no inicializada")
-    _clear_container()
-    from gestorcompras.ui.actua_tareas_gui import ActuaTareasScreen
-    ActuaTareasScreen(_container, _email_session, origin=origin).pack(fill="both", expand=True)
+    open_home()
+    from gestorcompras.ui.actua_tareas_gui import open_actua_tareas_window
+
+    open_actua_tareas_window(_root(), _email_session, origin=origin)
