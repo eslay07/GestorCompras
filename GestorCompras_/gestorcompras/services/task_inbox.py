@@ -24,12 +24,19 @@ def _ensure_table() -> None:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_actua_bandeja_pending_unique
+            ON actua_bandeja (origen, task_number)
+            WHERE consumed=0
+            """
+        )
         conn.commit()
     finally:
         conn.close()
 
 
-def push(origen: str, tasks: list[dict[str, Any]]) -> int:
+def push(origen: str, tasks: list[dict[str, Any]]) -> dict[str, int]:
     _ensure_table()
     origen = (origen or "").strip().lower()
     if origen not in VALID_ORIGINS:
@@ -37,19 +44,38 @@ def push(origen: str, tasks: list[dict[str, Any]]) -> int:
 
     conn = db.get_connection()
     inserted = 0
+    skipped_duplicates = 0
     try:
         cur = conn.cursor()
         for task in tasks:
             task_number = str(task.get("task_number", "")).strip()
             if not task_number:
                 continue
+
+            cur.execute(
+                """
+                SELECT 1
+                FROM actua_bandeja
+                WHERE origen=? AND task_number=? AND consumed=0
+                LIMIT 1
+                """,
+                (origen, task_number),
+            )
+            already_pending = cur.fetchone() is not None
+            if already_pending:
+                skipped_duplicates += 1
+                continue
+
             cur.execute(
                 "INSERT INTO actua_bandeja (origen, task_number, payload_json, consumed) VALUES (?, ?, ?, 0)",
                 (origen, task_number, json.dumps(task, ensure_ascii=False)),
             )
             inserted += 1
         conn.commit()
-        return inserted
+        return {
+            "inserted": inserted,
+            "skipped_duplicates": skipped_duplicates,
+        }
     finally:
         conn.close()
 
