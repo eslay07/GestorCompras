@@ -6,6 +6,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+from typing import Callable
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
@@ -134,11 +135,18 @@ class ActionTooltip:
 
 
 class ActuaTareasScreen(ttk.Frame):
-    def __init__(self, master: tk.Misc, email_session: dict[str, str], origin: str):
+    def __init__(
+        self,
+        master: tk.Misc,
+        email_session: dict[str, str],
+        origin: str,
+        on_close: Callable[[], None] | None = None,
+    ):
         super().__init__(master, style="MyFrame.TFrame")
         self.master = master
         self.email_session = email_session
         self.origin = origin
+        self.on_close = on_close
         self.pasos: list[dict] = []
         self.flujos: list[dict] = []
         self.aliases: dict[str, str] = {}
@@ -170,6 +178,14 @@ class ActuaTareasScreen(ttk.Frame):
                   font=("Segoe UI", 16, "bold"), foreground="#111827").grid(row=0, column=0, sticky="w")
         ttk.Label(head, text="Cree y ejecute flujos de automatizacion sobre tareas en Telcos.",
                   font=("Segoe UI", 10), foreground="#6B7280").grid(row=0, column=1, sticky="w", padx=(16, 0))
+        btn_back_top = ttk.Button(
+            head,
+            text="Regresar al menú",
+            style="MyButton.TButton",
+            command=self._go_back,
+        )
+        btn_back_top.grid(row=0, column=2, sticky="e", padx=(8, 0))
+        add_hover_effect(btn_back_top)
 
         ttk.Separator(self, orient="horizontal").grid(row=1, column=0, columnspan=2, sticky="ew", padx=10)
 
@@ -509,12 +525,11 @@ class ActuaTareasScreen(ttk.Frame):
         self.aliases = {row[0].split("::", 1)[1]: row[1] for row in rows}
 
     def _go_back(self):
+        if callable(self.on_close):
+            self.on_close()
+            return
         from gestorcompras.ui import router
-
-        if self.origin == "servicios":
-            router.open_servicios_menu()
-        else:
-            router.open_bienes_menu()
+        router.open_home()
 
     def _refresh_inbox(self):
         for item in self.inbox_tree.get_children():
@@ -584,21 +599,33 @@ class ActuaTareasScreen(ttk.Frame):
                 return
 
         self.status_var.set("Ejecutando...")
+        pending_snapshot = [dict(p) for p in pending]
+        manual_snapshot = [dict(m) for m in manual_pending]
 
         def _worker():
             driver = None
             try:
-                if not pending:
-                    pending = manual_pending
-                if not pending:
+                pendientes = list(pending_snapshot)
+                if not pendientes:
+                    pendientes = list(manual_snapshot)
+                if not pendientes:
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
                 driver = _create_driver(headless=not self.mostrar_nav_var.get())
                 username, password = resolve_telcos_credentials(self.email_session)
-                login_telcos(driver, username, password)
+                ultimo_error = None
+                for _intento in range(1, 3):
+                    try:
+                        login_telcos(driver, username, password)
+                        ultimo_error = None
+                        break
+                    except Exception as exc:
+                        ultimo_error = exc
+                if ultimo_error is not None:
+                    raise ultimo_error
 
                 consumidas_ok: list[int] = []
-                for row in pending:
+                for row in pendientes:
                     ctx = {
                         "task_number": row.get("task_number"),
                         "numero_tarea": row.get("task_number"),
@@ -1225,6 +1252,39 @@ def abrir_panel_tareas(
     panel = ActuaExecutionPanel(master, email_session, origen, tareas or [], mode=mode)
     _OPEN_ACTUA_PANEL = panel
     return panel
+
+
+def open_actua_tareas_window(
+    master: tk.Misc,
+    email_session: dict[str, str],
+    origin: str = "bienes",
+) -> tk.Toplevel:
+    """Abre Actualizar Tareas como ventana independiente (consistente con otros módulos)."""
+    from gestorcompras.ui import router
+
+    win = tk.Toplevel(master)
+    win.title("Actualizar Tareas")
+    win.geometry("1120x760")
+    win.minsize(980, 620)
+    win.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
+
+    def _cerrar() -> None:
+        try:
+            win.grab_release()
+        except Exception:
+            pass
+        win.destroy()
+        try:
+            router.open_home()
+        except Exception:
+            logger.exception("No se pudo volver al menú al cerrar Actualizar Tareas.")
+
+    win.protocol("WM_DELETE_WINDOW", _cerrar)
+    screen = ActuaTareasScreen(win, email_session, origin=origin, on_close=_cerrar)
+    screen.pack(fill="both", expand=True)
+    win.grab_set()
+    win.focus_force()
+    return win
 
 
 def ejecutar_flujo_desde_modulo(

@@ -47,21 +47,25 @@ def open_module(module_id: str) -> None:
 
 
 def _open_bienes_reasignacion() -> None:
+    open_home()
     from gestorcompras.modules import reasignacion_gui
     reasignacion_gui.open(_root(), _email_session, mode="bienes")
 
 
 def _open_bienes_correos() -> None:
+    open_home()
     from gestorcompras.modules import correos_masivos_gui
     correos_masivos_gui.open(_root(), _email_session)
 
 
 def _open_bienes_seguimientos() -> None:
+    open_home()
     from gestorcompras.gui import seguimientos_gui
     seguimientos_gui.open_seguimientos(_root(), _email_session)
 
 
 def _open_bienes_descargas() -> None:
+    open_home()
     from gestorcompras.modules import descargas_oc_gui
     descargas_oc_gui.open(_root(), _email_session)
 
@@ -71,16 +75,19 @@ def _open_bienes_actua() -> None:
 
 
 def _open_servicios_reasignacion() -> None:
+    open_home()
     from gestorcompras.modules import reasignacion_gui
     reasignacion_gui.open(_root(), _email_session, mode="servicios")
 
 
 def _open_servicios_correos() -> None:
+    open_home()
     from gestorcompras.modules import correos_masivos_gui
     correos_masivos_gui.open(_root(), _email_session)
 
 
 def _open_servicios_descargas() -> None:
+    open_home()
     from gestorcompras.modules import descargas_oc_gui
     descargas_oc_gui.open(_root(), _email_session)
 
@@ -90,6 +97,7 @@ def _open_servicios_actua() -> None:
 
 
 def _open_config() -> None:
+    open_home()
     from gestorcompras.gui import config_gui
     config_gui.open_config_gui(_root(), _email_session)
 
@@ -124,6 +132,7 @@ def open_home() -> None:
 def open_actua_tareas(origin: str = "bienes") -> None:
     if _email_session is None:
         raise RuntimeError("Sesion de correo no inicializada")
-    _clear_container()
-    from gestorcompras.ui.actua_tareas_gui import ActuaTareasScreen
-    ActuaTareasScreen(_container, _email_session, origin=origin).pack(fill="both", expand=True)
+    open_home()
+    from gestorcompras.ui.actua_tareas_gui import open_actua_tareas_window
+
+    open_actua_tareas_window(_root(), _email_session, origin=origin)
