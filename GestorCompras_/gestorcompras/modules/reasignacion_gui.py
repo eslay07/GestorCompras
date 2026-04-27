@@ -237,6 +237,19 @@ class ServiciosReasignacion(tk.Toplevel):
         reasignar_btn.pack(side="right", padx=5)
         add_hover_effect(reasignar_btn)
 
+        volver_btn = ttk.Button(
+            acciones,
+            text="Regresar al menú principal",
+            style="MyButton.TButton",
+            command=self._go_back_to_main_menu,
+        )
+        volver_btn.pack(side="right", padx=5)
+        add_hover_effect(volver_btn)
+
+        cerrar_btn = ttk.Button(acciones, text="Cerrar", style="MyButton.TButton", command=self._on_close)
+        cerrar_btn.pack(side="right", padx=5)
+        add_hover_effect(cerrar_btn)
+
         # -- Preview (column 1, spanning table + actions rows) --
         preview_frame = ttk.LabelFrame(main, text="Vista previa del correo", style="MyLabelFrame.TLabelframe", padding=10)
         preview_frame.grid(row=3, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
@@ -255,6 +268,8 @@ class ServiciosReasignacion(tk.Toplevel):
             font=("Segoe UI", 9),
             foreground="#6B7280",
         ).grid(row=5, column=0, columnspan=2, sticky="w", pady=(5, 0))
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     @staticmethod
     def _checkbox_symbol(checked: bool) -> str:
@@ -689,6 +704,24 @@ class ServiciosReasignacion(tk.Toplevel):
                 )
         except Exception:
             logger.exception("Hook Actualizar Tareas (reasignación) falló sin afectar el flujo principal.")
+
+
+    def _go_back_to_main_menu(self) -> None:
+        from gestorcompras.ui import router
+
+        self._on_close()
+        open_servicios_menu = getattr(router, "open_servicios_menu", None)
+        if callable(open_servicios_menu):
+            open_servicios_menu()
+            return
+        router.open_home()
+
+    def _on_close(self) -> None:
+        try:
+            self.grab_release()
+        except Exception:
+            pass
+        self.destroy()
 
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:
