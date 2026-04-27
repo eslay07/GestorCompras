@@ -107,6 +107,22 @@ def _task_value(task: dict, key: str) -> str:
     return str(value)
 
 
+def _normalize_task_number(task_number: str | None) -> str:
+    return re.sub(r"\s+", "", str(task_number or "")).upper()
+
+
+def _has_duplicate_task_numbers(tasks: list[dict]) -> bool:
+    seen: set[str] = set()
+    for task in tasks:
+        normalized = _normalize_task_number(task.get("task_number"))
+        if not normalized:
+            continue
+        if normalized in seen:
+            return True
+        seen.add(normalized)
+    return False
+
+
 class ActionTooltip:
     def __init__(self, widget: tk.Widget, text: str):
         self.widget = widget
@@ -578,18 +594,28 @@ class ActuaTareasScreen(ttk.Frame):
         if not self.pasos:
             messagebox.showwarning("Actualizar Tareas", "Debe agregar al menos un paso.", parent=self)
             return
+
+        origen_valor = _ORIGEN_MAP.get(self.origen_var.get())
+        pending = task_inbox.list_pending(origen_valor) if origen_valor else []
+        if pending and self.selected_inbox_ids:
+            pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
+        manual_tasks = self._manual_tasks()
+        manual_pending = [{"id": None, "task_number": num, "payload": {}} for num in manual_tasks]
+        if _has_duplicate_task_numbers(pending + manual_pending):
+            if not messagebox.askyesno(
+                "Actualizar Tareas",
+                "Existen tareas duplicadas, ¿desea continuar de todas formas?",
+                parent=self,
+            ):
+                return
+
         self.status_var.set("Ejecutando...")
 
         def _worker():
             driver = None
             try:
-                origen_valor = _ORIGEN_MAP.get(self.origen_var.get())
-                pending = task_inbox.list_pending(origen_valor) if origen_valor else []
-                if pending and self.selected_inbox_ids:
-                    pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
                 if not pending:
-                    manual_tasks = self._manual_tasks()
-                    pending = [{"id": None, "task_number": num, "payload": {}} for num in manual_tasks]
+                    pending = manual_pending
                 if not pending:
                     raise ValueError("Debe ingresar al menos una tarea manual o seleccionar tareas de bandeja.")
 
@@ -1038,6 +1064,13 @@ class ActuaExecutionPanel(tk.Toplevel):
             if not messagebox.askyesno(
                 "Validacion",
                 f"Hay {n_missing} tarea(s) con campos faltantes. ¿Continuar?",
+                parent=self,
+            ):
+                return
+        if _has_duplicate_task_numbers(self.tareas):
+            if not messagebox.askyesno(
+                "Actualizar Tareas",
+                "Existen tareas duplicadas, ¿desea continuar de todas formas?",
                 parent=self,
             ):
                 return
