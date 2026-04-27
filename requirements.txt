@@ -1,6 +1,6 @@
 jinja2~=3.1
 pdfplumber~=0.11
-pandas~=3.0
+pandas~=2.3
 openpyxl~=3.1
 selenium~=4.43
 webdriver-manager~=4.0

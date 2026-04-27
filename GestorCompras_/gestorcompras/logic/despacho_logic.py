@@ -3,10 +3,16 @@ import re
 import pdfplumber
 from gestorcompras.services.db import (
     get_config,
+    get_suppliers as db_get_suppliers,
     get_supplier_by_ruc,
     get_email_template_by_name,
 )
 from gestorcompras.services.email_sender import send_email_custom
+
+
+def get_suppliers():
+    """Compatibilidad retroactiva para pruebas y código legado."""
+    return db_get_suppliers()
 
 def buscar_archivo_mas_reciente(orden):
     """
@@ -68,6 +74,12 @@ def obtener_resumen_orden(orden):
     if not ruc:
         return None, f"No se pudo extraer el RUC del PDF (OC: {orden})."
     supplier = get_supplier_by_ruc(ruc)
+    if not supplier:
+        # Compatibilidad con estructuras antiguas donde se consultaba toda la tabla
+        for fila in get_suppliers():
+            if len(fila) >= 5 and str(fila[2]) == str(ruc):
+                supplier = (fila[3], fila[4])
+                break
     if not supplier:
         return None, f"No se encontró correo para el RUC {ruc} (OC: {orden})."
     email, email_alt = supplier
