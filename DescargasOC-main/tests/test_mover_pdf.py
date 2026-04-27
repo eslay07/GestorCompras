@@ -177,7 +177,9 @@ def test_mover_oc_bienes_resuelve_conflictos(tmp_path, monkeypatch):
     assert subidos == ["123456"]
     assert faltantes == []
     assert errores == []
-    archivos = sorted(carpeta_tarea.glob("*.pdf"))
+    archivos = sorted(
+        p for p in carpeta_tarea.iterdir() if p.suffix.lower() == ".pdf"
+    )
     assert len(archivos) == 2
     nombres = [p.name for p in archivos]
     assert any(name.endswith("(1).pdf") for name in nombres)
@@ -218,7 +220,7 @@ def test_mover_oc_no_bienes_renombra_en_origen_si_no_hay_destino(tmp_path):
     assert errores == []
     archivos = list(origen.glob("*.pdf"))
     assert len(archivos) == 1
-    assert archivos[0].name == "ORDEN 654321 - PROVEEDOR_Y.PDF"
+    assert archivos[0].name == "ORDEN 654321 - PROVEEDOR_Y.pdf"
 
 
 def test_mover_oc_no_bienes_registra_error_si_no_puede_mover(tmp_path, monkeypatch):

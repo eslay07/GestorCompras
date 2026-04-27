@@ -54,7 +54,8 @@ def _nombre_contiene_numero(nombre: str, numero: str | None) -> bool:
 def _resolver_conflicto(destino_dir: Path, nombre: str) -> Path:
     destino_dir.mkdir(parents=True, exist_ok=True)
     destino = destino_dir / nombre
-    if not destino.exists():
+    nombres_existentes = {p.name.lower() for p in destino_dir.iterdir() if p.is_file()}
+    if not destino.exists() and destino.name.lower() not in nombres_existentes:
         return destino
     base, ext = os.path.splitext(nombre)
     i = 1
@@ -197,11 +198,12 @@ def _destino_no_bienes(
     return None
 
 
-def mover_oc(config: Config, ordenes=None):
+def mover_oc(config: Config, ordenes=None, incluir_ubicaciones: bool = False):
     """Renombra y mueve los PDF de las órdenes descargadas.
 
-    Devuelve (subidos, faltantes, errores, ubicaciones), donde ubicaciones es un
-    diccionario numero->ruta final del PDF.
+    Devuelve (subidos, faltantes, errores) por compatibilidad legacy.
+    Si ``incluir_ubicaciones`` es True devuelve
+    (subidos, faltantes, errores, ubicaciones).
     """
 
     ordenes = ordenes or []
@@ -214,7 +216,9 @@ def mover_oc(config: Config, ordenes=None):
     if not carpetas_origen:
         logger.error("Carpetas de descarga no configuradas")
         errores.append("Carpetas de descarga no configuradas")
-        return [], numeros_oc, errores, {}
+        if incluir_ubicaciones:
+            return [], numeros_oc, errores, {}
+        return [], numeros_oc, errores
 
     archivos: list[Path] = []
     for carpeta in carpetas_origen:
@@ -353,4 +357,6 @@ def mover_oc(config: Config, ordenes=None):
         subidos.append(numero)
         ubicaciones[numero] = str(ruta_path)
 
-    return subidos, faltantes, errores, ubicaciones
+    if incluir_ubicaciones:
+        return subidos, faltantes, errores, ubicaciones
+    return subidos, faltantes, errores
