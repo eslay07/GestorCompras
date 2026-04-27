@@ -208,6 +208,7 @@ class ServiciosReasignacion(tk.Toplevel):
         self.tree.grid(row=0, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Button-1>", self._on_tree_click, add=True)
+        self.tree.tag_configure("duplicado", background="#FFF4CC")
 
         scrollbar = ttk.Scrollbar(tabla_lf, orient="vertical", command=self.tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
@@ -541,9 +542,31 @@ class ServiciosReasignacion(tk.Toplevel):
         self.estado_label.configure(text=f"Estado seleccionado: {record.get('estado', 'N/D')}")
 
     def _reasignar(self) -> None:
-        objetivos = [r for r in self.records.values() if r.get("checked")]
-        if not objetivos:
+        seleccionados = [r for r in self.records.values() if r.get("checked")]
+        if not seleccionados:
             messagebox.showwarning("Reasignación", "Marque al menos un correo para procesar.", parent=self)
+            return
+        objetivos: list[dict[str, object]] = []
+        objetivo_por_tarea: dict[str, dict[str, object]] = {}
+        duplicados_ids: set[str] = set()
+        for record in seleccionados:
+            task = str(record.get("task_number") or "").strip()
+            if not task or task == "N/D":
+                objetivos.append(record)
+                continue
+            if task in objetivo_por_tarea:
+                duplicados_ids.add(str(record.get("message_id", "")))
+                duplicados_ids.add(str(objetivo_por_tarea[task].get("message_id", "")))
+                continue
+            objetivo_por_tarea[task] = record
+            objetivos.append(record)
+
+        self._resaltar_duplicados(duplicados_ids)
+        if duplicados_ids and not messagebox.askyesno(
+            "Reasignación",
+            "Existen tareas duplicadas, ¿desea continuar de todas formas?",
+            parent=self,
+        ):
             return
         department = self.departamento_var.get().strip()
         employee = self.usuario_var.get().strip()
@@ -689,6 +712,16 @@ class ServiciosReasignacion(tk.Toplevel):
                 )
         except Exception:
             logger.exception("Hook Actualizar Tareas (reasignación) falló sin afectar el flujo principal.")
+
+    def _resaltar_duplicados(self, duplicados_ids: set[str]) -> None:
+        for iid in self.tree.get_children():
+            tags = list(self.tree.item(iid, "tags"))
+            if iid in duplicados_ids:
+                if "duplicado" not in tags:
+                    tags.append("duplicado")
+            else:
+                tags = [tag for tag in tags if tag != "duplicado"]
+            self.tree.item(iid, tags=tuple(tags))
 
 
 def open(master: tk.Misc, email_session: dict[str, str], mode: str = "bienes") -> None:
