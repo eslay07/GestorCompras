@@ -10,6 +10,7 @@ from typing import Callable
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
+from gestorcompras.services.actua_task_enrichment import enrich_task_from_base
 from gestorcompras.services.credentials import resolve_telcos_credentials
 from gestorcompras.services.reassign_bridge import _create_driver
 from gestorcompras.services.telcos_automation import login_telcos
@@ -596,7 +597,11 @@ class ActuaTareasScreen(ttk.Frame):
         if pending and self.selected_inbox_ids:
             pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
         manual_tasks = self._manual_tasks()
-        manual_pending = [{"id": None, "task_number": num, "payload": {}} for num in manual_tasks]
+        manual_pending = []
+        base_folder = self.carpeta_base_var.get().strip()
+        for num in manual_tasks:
+            payload = enrich_task_from_base(num, base_folder) if base_folder else {}
+            manual_pending.append({"id": None, "task_number": num, "payload": payload})
         if _has_duplicate_task_numbers(pending + manual_pending):
             if not messagebox.askyesno(
                 "Actualizar Tareas",
