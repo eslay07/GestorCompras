@@ -10,6 +10,7 @@ from typing import Callable
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
+from gestorcompras.services.actua_payload import normalize_payload
 from gestorcompras.services.actua_task_enrichment import enrich_task_from_base
 from gestorcompras.services.credentials import resolve_telcos_credentials
 from gestorcompras.services.reassign_bridge import _create_driver
@@ -601,6 +602,7 @@ class ActuaTareasScreen(ttk.Frame):
         base_folder = self.carpeta_base_var.get().strip()
         for num in manual_tasks:
             payload = enrich_task_from_base(num, base_folder) if base_folder else {}
+            payload = normalize_payload(num, payload)
             manual_pending.append({"id": None, "task_number": num, "payload": payload})
         if _has_duplicate_task_numbers(pending + manual_pending):
             if not messagebox.askyesno(
@@ -641,12 +643,10 @@ class ActuaTareasScreen(ttk.Frame):
                 for row in pendientes:
                     task_number = row.get("task_number")
                     ctx = {
-                        "task_number": task_number,
-                        "numero_tarea": task_number,
                         "carpeta_base": self.carpeta_base_var.get().strip(),
                         "file_aliases": self.aliases,
                     }
-                    ctx.update(row.get("payload") or {})
+                    ctx.update(normalize_payload(str(task_number or ""), row.get("payload") or {}))
 
                     def on_step(n, action_id, params, _task=task_number):
                         self.after(0, lambda: self._log(f"[{_task}] Paso {n}: {action_id} {params}"))
@@ -1396,8 +1396,7 @@ def run_flow_from_inbox(
             for i, row in enumerate(pend, start=1):
                 task_number = row.get("task_number")
                 log(f"[{i}/{len(pend)}] Tarea {task_number}")
-                ctx = {"task_number": task_number, "numero_tarea": task_number}
-                ctx.update(row.get("payload") or {})
+                ctx = normalize_payload(str(task_number or ""), row.get("payload") or {})
                 try:
                     auto.ejecutar_flujo(driver, pasos, ctx)
                     if row.get("id") is not None:
