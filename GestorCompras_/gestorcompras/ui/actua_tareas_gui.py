@@ -291,11 +291,11 @@ class ActuaTareasScreen(ttk.Frame):
             row=1, column=0, sticky="w", pady=(6, 0))
         self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
                                           borderwidth=1, font=("Segoe UI", 10))
-        self.manual_tasks_text.grid(row=1, column=1, columnspan=3, sticky="ew", pady=(6, 0))
+        self.manual_tasks_text.grid(row=1, column=1, columnspan=4, sticky="ew", pady=(6, 0))
         self.manual_tasks_text.bind("<Control-Return>", lambda _e: self._run_flow())
 
         source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
-        source_frame.grid(row=1, column=3, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
+        source_frame.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         ttk.Combobox(source_frame, textvariable=self.origen_var,
                      values=list(_ORIGEN_MAP.keys()), state="readonly", width=24).grid(
             row=0, column=0, sticky="w")
@@ -320,7 +320,7 @@ class ActuaTareasScreen(ttk.Frame):
         self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
 
         checks = ttk.Frame(bottom, style="MyFrame.TFrame")
-        checks.grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        checks.grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
         ttk.Checkbutton(
             checks,
             text="Mostrar navegador al ejecutar",
@@ -335,13 +335,13 @@ class ActuaTareasScreen(ttk.Frame):
         ).pack(side="left", padx=(10, 0))
         ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel",
                   font=("Segoe UI", 9), foreground="#6B7280").grid(
-            row=2, column=3, columnspan=2, sticky="w", pady=(8, 0))
+            row=3, column=3, columnspan=2, sticky="w", pady=(8, 0))
 
         self.log = ScrolledText(bottom, height=5, state="disabled", font=("Segoe UI", 9))
-        self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(6, 4))
+        self.log.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(6, 4))
 
         btn_row = ttk.Frame(bottom, style="MyFrame.TFrame")
-        btn_row.grid(row=4, column=0, columnspan=5, sticky="ew")
+        btn_row.grid(row=5, column=0, columnspan=5, sticky="ew")
         btn_row.columnconfigure(0, weight=1)
 
         alias_frame = ttk.LabelFrame(btn_row, text="Alias de archivos",
