@@ -399,7 +399,35 @@ def _resolver_archivo(raw: str, ctx: dict[str, Any]) -> str:
     if path.is_absolute():
         return str(path)
     if carpeta_base:
-        return str((Path(carpeta_base) / value).resolve())
+        base_path = Path(carpeta_base)
+        direct_path = (base_path / value).resolve()
+        if direct_path.exists():
+            return str(direct_path)
+
+        # Soporte para comodines relativos dentro de la carpeta base.
+        if any(ch in value for ch in ["*", "?", "["]):
+            matches = sorted(base_path.rglob(value))
+            if matches:
+                return str(matches[0].resolve())
+
+        # Búsqueda por coincidencia parcial en nombre cuando hay subcarpetas.
+        # Útil para casos como "OC 12345" dentro de un árbol de carpetas.
+        token = str(value).strip().lower()
+        if token:
+            for candidate in base_path.rglob("*"):
+                if candidate.is_file() and token in candidate.name.lower():
+                    return str(candidate.resolve())
+
+            # Alias funcional: "@orden_compra" / "@oc" busca por número de OC en el nombre.
+            if token in {"@orden_compra", "@oc"}:
+                oc_keys = ("orden_compra", "orden", "oc", "numero_orden", "orden_de_compra")
+                oc_value = next((str(ctx.get(k, "")).strip() for k in oc_keys if str(ctx.get(k, "")).strip()), "")
+                if oc_value:
+                    for candidate in base_path.rglob("*"):
+                        if candidate.is_file() and oc_value in candidate.name:
+                            return str(candidate.resolve())
+
+        return str(direct_path)
     return value
 
 
