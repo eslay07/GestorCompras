@@ -53,6 +53,12 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
+_COMMON_PAYLOAD_COLUMNS: list[tuple[str, str]] = [
+    ("orden_compra", "Orden compra"),
+    ("proveedor", "Proveedor"),
+    ("ruc", "RUC"),
+]
+
 _OPEN_ACTUA_PANEL = None
 
 
@@ -867,7 +873,18 @@ class ActuaExecutionPanel(tk.Toplevel):
         base = [("sel", "✓", 30), ("task_number", "N° Tarea", 100)]
         extra_from_flow = [(k, k.replace("_", " ").title(), 110) for k in sorted(self._required) if k != "task_number"]
         origin_cols = _ORIGEN_COLUMNS.get(self.origen) or []
+        common_cols = []
+        present_keys = set()
+        for t in self.tareas:
+            present_keys.update(t.keys())
+        for key, label in _COMMON_PAYLOAD_COLUMNS:
+            if key in present_keys:
+                common_cols.append((key, label, 130))
         seen = {"sel", "task_number"} | {k for k, _, _ in extra_from_flow}
+        for key, label, width in common_cols:
+            if key not in seen:
+                extra_from_flow.append((key, label, width))
+                seen.add(key)
         for key, label in origin_cols:
             if key not in seen:
                 extra_from_flow.append((key, label, 110))
