@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from gestorcompras.services import db
+from gestorcompras.services.actua_payload import missing_required_fields, normalize_payload
 
 VALID_ORIGINS = {"reasignacion", "descargas_oc", "correos_masivos"}
 
@@ -45,12 +46,17 @@ def push(origen: str, tasks: list[dict[str, Any]]) -> dict[str, int]:
     conn = db.get_connection()
     inserted = 0
     skipped_duplicates = 0
+    schema_warnings = 0
     try:
         cur = conn.cursor()
         for task in tasks:
             task_number = str(task.get("task_number", "")).strip()
             if not task_number:
                 continue
+            normalized = normalize_payload(task_number, task)
+            task_number = normalized["task_number"]
+            if missing_required_fields(origen, normalized):
+                schema_warnings += 1
 
             cur.execute(
                 """
@@ -68,13 +74,14 @@ def push(origen: str, tasks: list[dict[str, Any]]) -> dict[str, int]:
 
             cur.execute(
                 "INSERT INTO actua_bandeja (origen, task_number, payload_json, consumed) VALUES (?, ?, ?, 0)",
-                (origen, task_number, json.dumps(task, ensure_ascii=False)),
+                (origen, task_number, json.dumps(normalized, ensure_ascii=False)),
             )
             inserted += 1
         conn.commit()
         return {
             "inserted": inserted,
             "skipped_duplicates": skipped_duplicates,
+            "schema_warnings": schema_warnings,
         }
     finally:
         conn.close()

@@ -10,6 +10,8 @@ from typing import Callable
 
 from gestorcompras.services import actua_tareas_automation as auto
 from gestorcompras.services import actua_tareas_repo, db, task_inbox
+from gestorcompras.services.actua_payload import normalize_payload
+from gestorcompras.services.actua_task_enrichment import enrich_task_from_base
 from gestorcompras.services.credentials import resolve_telcos_credentials
 from gestorcompras.services.reassign_bridge import _create_driver
 from gestorcompras.services.telcos_automation import login_telcos
@@ -50,6 +52,12 @@ _ORIGEN_COLUMNS: dict[str, list[tuple[str, str]]] = {
         ("fecha_orden", "Fecha"),
     ],
 }
+
+_COMMON_PAYLOAD_COLUMNS: list[tuple[str, str]] = [
+    ("orden_compra", "Orden compra"),
+    ("proveedor", "Proveedor"),
+    ("ruc", "RUC"),
+]
 
 _OPEN_ACTUA_PANEL = None
 
@@ -154,9 +162,9 @@ class ActuaTareasScreen(ttk.Frame):
 
         self.nombre_flujo = tk.StringVar()
         self.flujo_var = tk.StringVar()
-        self.task_default_var = tk.StringVar()
         self.carpeta_base_var = tk.StringVar(value=actua_tareas_repo.get_carpeta_base(""))
         self.mostrar_nav_var = tk.BooleanVar(value=True)
+        self.report_var = tk.BooleanVar(value=db.get_config("ACTUA_REPORT_EMAIL", "1") != "0")
         self.origen_var = tk.StringVar(value="Manual")
         self.status_var = tk.StringVar(value="Listo")
         self.action_help_var = tk.StringVar(value="Seleccione una acción para ver su descripción.")
@@ -272,25 +280,22 @@ class ActuaTareasScreen(ttk.Frame):
         bottom.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         bottom.columnconfigure(3, weight=1)
 
-        ttk.Label(bottom, text="N° tarea manual:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Entry(bottom, textvariable=self.task_default_var, style="MyEntry.TEntry",
-                  width=20).grid(row=0, column=1, padx=4)
         ttk.Label(bottom, text="Carpeta base:", style="MyLabel.TLabel").grid(
-            row=0, column=2, padx=(10, 0), sticky="w")
+            row=0, column=0, padx=(0, 4), sticky="w")
         ttk.Entry(bottom, textvariable=self.carpeta_base_var, style="MyEntry.TEntry",
-                  width=40).grid(row=0, column=3, padx=4, sticky="ew")
+                  width=52).grid(row=0, column=1, columnspan=3, padx=4, sticky="ew")
         ttk.Button(bottom, text="Examinar...", style="MyButton.TButton",
-                   command=self._pick_folder).grid(row=0, column=4)
+                   command=self._pick_folder).grid(row=0, column=4, padx=(4, 0))
 
         ttk.Label(bottom, text="Tareas manuales (1 por linea):", style="MyLabel.TLabel").grid(
             row=1, column=0, sticky="w", pady=(6, 0))
         self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
                                           borderwidth=1, font=("Segoe UI", 10))
-        self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+        self.manual_tasks_text.grid(row=1, column=1, columnspan=4, sticky="ew", pady=(6, 0))
         self.manual_tasks_text.bind("<Control-Return>", lambda _e: self._run_flow())
 
         source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
-        source_frame.grid(row=1, column=3, columnspan=2, sticky="ew", padx=(8, 0), pady=(6, 0))
+        source_frame.grid(row=2, column=0, columnspan=5, sticky="ew", pady=(8, 0))
         ttk.Combobox(source_frame, textvariable=self.origen_var,
                      values=list(_ORIGEN_MAP.keys()), state="readonly", width=24).grid(
             row=0, column=0, sticky="w")
@@ -307,26 +312,36 @@ class ActuaTareasScreen(ttk.Frame):
         add_hover_effect(btn_manual_run)
 
         self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"),
-                                       show="headings", style="MyTreeview.Treeview", height=3)
+                                       show="headings", style="MyTreeview.Treeview", height=2)
         for col, txt, w in (("sel", "✓", 30), ("origen", "Origen", 110), ("task", "Tarea", 110)):
             self.inbox_tree.heading(col, text=txt)
             self.inbox_tree.column(col, width=w, anchor="center")
         self.inbox_tree.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(6, 0))
         self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
 
-        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar",
-                        style="MyCheckbutton.TCheckbutton",
-                        variable=self.mostrar_nav_var).grid(
-            row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        checks = ttk.Frame(bottom, style="MyFrame.TFrame")
+        checks.grid(row=3, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(
+            checks,
+            text="Mostrar navegador al ejecutar",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.mostrar_nav_var,
+        ).pack(side="left")
+        ttk.Checkbutton(
+            checks,
+            text="Enviarme reporte",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.report_var,
+        ).pack(side="left", padx=(10, 0))
         ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel",
                   font=("Segoe UI", 9), foreground="#6B7280").grid(
-            row=2, column=2, columnspan=3, sticky="w", pady=(8, 0))
+            row=3, column=3, columnspan=2, sticky="w", pady=(8, 0))
 
         self.log = ScrolledText(bottom, height=5, state="disabled", font=("Segoe UI", 9))
-        self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(6, 4))
+        self.log.grid(row=4, column=0, columnspan=5, sticky="ew", pady=(6, 4))
 
         btn_row = ttk.Frame(bottom, style="MyFrame.TFrame")
-        btn_row.grid(row=4, column=0, columnspan=5, sticky="ew")
+        btn_row.grid(row=5, column=0, columnspan=5, sticky="ew")
         btn_row.columnconfigure(0, weight=1)
 
         alias_frame = ttk.LabelFrame(btn_row, text="Alias de archivos",
@@ -589,7 +604,12 @@ class ActuaTareasScreen(ttk.Frame):
         if pending and self.selected_inbox_ids:
             pending = [p for p in pending if p["id"] in self.selected_inbox_ids]
         manual_tasks = self._manual_tasks()
-        manual_pending = [{"id": None, "task_number": num, "payload": {}} for num in manual_tasks]
+        manual_pending = []
+        base_folder = self.carpeta_base_var.get().strip()
+        for num in manual_tasks:
+            payload = enrich_task_from_base(num, base_folder) if base_folder else {}
+            payload = normalize_payload(num, payload)
+            manual_pending.append({"id": None, "task_number": num, "payload": payload})
         if _has_duplicate_task_numbers(pending + manual_pending):
             if not messagebox.askyesno(
                 "Actualizar Tareas",
@@ -625,16 +645,16 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ultimo_error
 
                 consumidas_ok: list[int] = []
+                report_rows: list[dict] = []
                 for row in pendientes:
+                    task_number = row.get("task_number")
                     ctx = {
-                        "task_number": row.get("task_number"),
-                        "numero_tarea": row.get("task_number"),
                         "carpeta_base": self.carpeta_base_var.get().strip(),
                         "file_aliases": self.aliases,
                     }
-                    ctx.update(row.get("payload") or {})
+                    ctx.update(normalize_payload(str(task_number or ""), row.get("payload") or {}))
 
-                    def on_step(n, action_id, params, _task=row.get("task_number")):
+                    def on_step(n, action_id, params, _task=task_number):
                         self.after(0, lambda: self._log(f"[{_task}] Paso {n}: {action_id} {params}"))
 
                     ctx["on_step"] = on_step
@@ -642,10 +662,25 @@ class ActuaTareasScreen(ttk.Frame):
                         auto.ejecutar_flujo(driver, self.pasos, ctx)
                         if row.get("id"):
                             consumidas_ok.append(int(row["id"]))
-                        self.after(0, lambda t=row.get("task_number"): self._log(f"✓ Tarea {t} completada"))
+                        report_rows.append({"numero_tarea": task_number, "estado": "OK", "detalle": "Completada"})
+                        self.after(0, lambda t=task_number: self._log(f"✓ Tarea {t} completada"))
                     except Exception as exc:
-                        self.after(0, lambda t=row.get("task_number"), e=exc: self._log(f"✗ Tarea {t}: {e}"))
+                        report_rows.append({"numero_tarea": task_number, "estado": "ERROR", "detalle": str(exc)})
+                        self.after(0, lambda t=task_number, e=exc: self._log(f"✗ Tarea {t}: {e}"))
                 task_inbox.mark_consumed(consumidas_ok)
+                db.set_config("ACTUA_REPORT_EMAIL", "1" if self.report_var.get() else "0")
+                if self.report_var.get() and self.email_session:
+                    try:
+                        from gestorcompras.services.actua_reporter import send_actua_report
+                        send_actua_report(
+                            email_session=self.email_session,
+                            origen=origen_valor or "manual",
+                            flujo_nombre=self.flujo_var.get().strip() or "Flujo manual",
+                            resumen=report_rows,
+                        )
+                        self.after(0, lambda: self._log("Reporte enviado por correo."))
+                    except Exception as exc:
+                        self.after(0, lambda e=exc: self._log(f"No se pudo enviar reporte: {e}"))
                 self.after(0, lambda: self.status_var.set("Ejecución completada"))
             except Exception as exc:
                 self.after(0, lambda e=exc: messagebox.showerror("Actualizar Tareas", str(e), parent=self))
@@ -662,8 +697,6 @@ class ActuaTareasScreen(ttk.Frame):
     def _manual_tasks(self) -> list[str]:
         raw = self.manual_tasks_text.get("1.0", tk.END)
         values = [line.strip() for line in raw.splitlines() if line.strip()]
-        if not values and self.task_default_var.get().strip():
-            values = [self.task_default_var.get().strip()]
         return values
 
     def _ask_text(self, title: str) -> str:
@@ -693,6 +726,7 @@ class ActuaExecutionPanel(tk.Toplevel):
         super().__init__(master)
         self.title("Actualizar Tareas - Ejecutar flujo")
         self.geometry("1060x680")
+        self.minsize(940, 620)
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()
         self.email_session = email_session or {}
@@ -784,7 +818,8 @@ class ActuaExecutionPanel(tk.Toplevel):
         self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_flujo_changed())
 
         opts = ttk.Frame(flow_frame, style="MyFrame.TFrame")
-        opts.grid(row=0, column=2, padx=(10, 0))
+        # Mantener checks críticos visibles aunque el ancho de ventana sea reducido.
+        opts.grid(row=1, column=1, columnspan=2, sticky="w", padx=(8, 0), pady=(6, 0))
         ttk.Checkbutton(opts, text="Mostrar navegador",
                         style="MyCheckbutton.TCheckbutton",
                         variable=self.headless_var, onvalue=False, offvalue=True).pack(side="left")
@@ -794,7 +829,7 @@ class ActuaExecutionPanel(tk.Toplevel):
 
         ttk.Label(flow_frame, textvariable=self.validation_var, style="MyLabel.TLabel",
                   wraplength=900, justify="left", foreground="#6B7280").grid(
-            row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
+            row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
         self.progress = ttk.Progressbar(wrapper, mode="determinate")
         self.progress.grid(row=5, column=0, sticky="ew")
@@ -838,7 +873,18 @@ class ActuaExecutionPanel(tk.Toplevel):
         base = [("sel", "✓", 30), ("task_number", "N° Tarea", 100)]
         extra_from_flow = [(k, k.replace("_", " ").title(), 110) for k in sorted(self._required) if k != "task_number"]
         origin_cols = _ORIGEN_COLUMNS.get(self.origen) or []
+        common_cols = []
+        present_keys = set()
+        for t in self.tareas:
+            present_keys.update(t.keys())
+        for key, label in _COMMON_PAYLOAD_COLUMNS:
+            if key in present_keys:
+                common_cols.append((key, label, 130))
         seen = {"sel", "task_number"} | {k for k, _, _ in extra_from_flow}
+        for key, label, width in common_cols:
+            if key not in seen:
+                extra_from_flow.append((key, label, width))
+                seen.add(key)
         for key, label in origin_cols:
             if key not in seen:
                 extra_from_flow.append((key, label, 110))
@@ -1264,8 +1310,14 @@ def open_actua_tareas_window(
 
     win = tk.Toplevel(master)
     win.title("Actualizar Tareas")
-    win.geometry("1120x760")
-    win.minsize(980, 620)
+    screen_w = win.winfo_screenwidth()
+    screen_h = win.winfo_screenheight()
+    width = min(1120, max(980, screen_w - 80))
+    height = min(760, max(620, screen_h - 120))
+    pos_x = max(0, (screen_w - width) // 2)
+    pos_y = max(0, (screen_h - height) // 2)
+    win.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+    win.minsize(940, 620)
     win.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
 
     def _cerrar() -> None:
@@ -1361,8 +1413,7 @@ def run_flow_from_inbox(
             for i, row in enumerate(pend, start=1):
                 task_number = row.get("task_number")
                 log(f"[{i}/{len(pend)}] Tarea {task_number}")
-                ctx = {"task_number": task_number, "numero_tarea": task_number}
-                ctx.update(row.get("payload") or {})
+                ctx = normalize_payload(str(task_number or ""), row.get("payload") or {})
                 try:
                     auto.ejecutar_flujo(driver, pasos, ctx)
                     if row.get("id") is not None:
