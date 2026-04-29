@@ -157,6 +157,7 @@ class ActuaTareasScreen(ttk.Frame):
         self.task_default_var = tk.StringVar()
         self.carpeta_base_var = tk.StringVar(value=actua_tareas_repo.get_carpeta_base(""))
         self.mostrar_nav_var = tk.BooleanVar(value=True)
+        self.report_var = tk.BooleanVar(value=db.get_config("ACTUA_REPORT_EMAIL", "1") != "0")
         self.origen_var = tk.StringVar(value="Manual")
         self.status_var = tk.StringVar(value="Listo")
         self.action_help_var = tk.StringVar(value="Seleccione una acción para ver su descripción.")
@@ -307,20 +308,30 @@ class ActuaTareasScreen(ttk.Frame):
         add_hover_effect(btn_manual_run)
 
         self.inbox_tree = ttk.Treeview(source_frame, columns=("sel", "origen", "task"),
-                                       show="headings", style="MyTreeview.Treeview", height=3)
+                                       show="headings", style="MyTreeview.Treeview", height=2)
         for col, txt, w in (("sel", "✓", 30), ("origen", "Origen", 110), ("task", "Tarea", 110)):
             self.inbox_tree.heading(col, text=txt)
             self.inbox_tree.column(col, width=w, anchor="center")
         self.inbox_tree.grid(row=1, column=0, columnspan=5, sticky="ew", pady=(6, 0))
         self.inbox_tree.bind("<Button-1>", self._toggle_inbox_row)
 
-        ttk.Checkbutton(bottom, text="Mostrar navegador al ejecutar",
-                        style="MyCheckbutton.TCheckbutton",
-                        variable=self.mostrar_nav_var).grid(
-            row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        checks = ttk.Frame(bottom, style="MyFrame.TFrame")
+        checks.grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
+        ttk.Checkbutton(
+            checks,
+            text="Mostrar navegador al ejecutar",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.mostrar_nav_var,
+        ).pack(side="left")
+        ttk.Checkbutton(
+            checks,
+            text="Enviarme reporte",
+            style="MyCheckbutton.TCheckbutton",
+            variable=self.report_var,
+        ).pack(side="left", padx=(10, 0))
         ttk.Label(bottom, textvariable=self.status_var, style="MyLabel.TLabel",
                   font=("Segoe UI", 9), foreground="#6B7280").grid(
-            row=2, column=2, columnspan=3, sticky="w", pady=(8, 0))
+            row=2, column=3, columnspan=2, sticky="w", pady=(8, 0))
 
         self.log = ScrolledText(bottom, height=5, state="disabled", font=("Segoe UI", 9))
         self.log.grid(row=3, column=0, columnspan=5, sticky="ew", pady=(6, 4))
@@ -625,16 +636,18 @@ class ActuaTareasScreen(ttk.Frame):
                     raise ultimo_error
 
                 consumidas_ok: list[int] = []
+                report_rows: list[dict] = []
                 for row in pendientes:
+                    task_number = row.get("task_number")
                     ctx = {
-                        "task_number": row.get("task_number"),
-                        "numero_tarea": row.get("task_number"),
+                        "task_number": task_number,
+                        "numero_tarea": task_number,
                         "carpeta_base": self.carpeta_base_var.get().strip(),
                         "file_aliases": self.aliases,
                     }
                     ctx.update(row.get("payload") or {})
 
-                    def on_step(n, action_id, params, _task=row.get("task_number")):
+                    def on_step(n, action_id, params, _task=task_number):
                         self.after(0, lambda: self._log(f"[{_task}] Paso {n}: {action_id} {params}"))
 
                     ctx["on_step"] = on_step
@@ -642,10 +655,25 @@ class ActuaTareasScreen(ttk.Frame):
                         auto.ejecutar_flujo(driver, self.pasos, ctx)
                         if row.get("id"):
                             consumidas_ok.append(int(row["id"]))
-                        self.after(0, lambda t=row.get("task_number"): self._log(f"✓ Tarea {t} completada"))
+                        report_rows.append({"numero_tarea": task_number, "estado": "OK", "detalle": "Completada"})
+                        self.after(0, lambda t=task_number: self._log(f"✓ Tarea {t} completada"))
                     except Exception as exc:
-                        self.after(0, lambda t=row.get("task_number"), e=exc: self._log(f"✗ Tarea {t}: {e}"))
+                        report_rows.append({"numero_tarea": task_number, "estado": "ERROR", "detalle": str(exc)})
+                        self.after(0, lambda t=task_number, e=exc: self._log(f"✗ Tarea {t}: {e}"))
                 task_inbox.mark_consumed(consumidas_ok)
+                db.set_config("ACTUA_REPORT_EMAIL", "1" if self.report_var.get() else "0")
+                if self.report_var.get() and self.email_session:
+                    try:
+                        from gestorcompras.services.actua_reporter import send_actua_report
+                        send_actua_report(
+                            email_session=self.email_session,
+                            origen=origen_valor or "manual",
+                            flujo_nombre=self.flujo_var.get().strip() or "Flujo manual",
+                            resumen=report_rows,
+                        )
+                        self.after(0, lambda: self._log("Reporte enviado por correo."))
+                    except Exception as exc:
+                        self.after(0, lambda e=exc: self._log(f"No se pudo enviar reporte: {e}"))
                 self.after(0, lambda: self.status_var.set("Ejecución completada"))
             except Exception as exc:
                 self.after(0, lambda e=exc: messagebox.showerror("Actualizar Tareas", str(e), parent=self))
