@@ -693,6 +693,7 @@ class ActuaExecutionPanel(tk.Toplevel):
         super().__init__(master)
         self.title("Actualizar Tareas - Ejecutar flujo")
         self.geometry("1060x680")
+        self.minsize(940, 620)
         self.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
         self.grab_set()
         self.email_session = email_session or {}
@@ -784,7 +785,8 @@ class ActuaExecutionPanel(tk.Toplevel):
         self.flujo_combo.bind("<<ComboboxSelected>>", lambda _e: self._on_flujo_changed())
 
         opts = ttk.Frame(flow_frame, style="MyFrame.TFrame")
-        opts.grid(row=0, column=2, padx=(10, 0))
+        # Mantener checks críticos visibles aunque el ancho de ventana sea reducido.
+        opts.grid(row=1, column=1, columnspan=2, sticky="w", padx=(8, 0), pady=(6, 0))
         ttk.Checkbutton(opts, text="Mostrar navegador",
                         style="MyCheckbutton.TCheckbutton",
                         variable=self.headless_var, onvalue=False, offvalue=True).pack(side="left")
@@ -794,7 +796,7 @@ class ActuaExecutionPanel(tk.Toplevel):
 
         ttk.Label(flow_frame, textvariable=self.validation_var, style="MyLabel.TLabel",
                   wraplength=900, justify="left", foreground="#6B7280").grid(
-            row=1, column=0, columnspan=3, sticky="w", pady=(6, 0))
+            row=2, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
         self.progress = ttk.Progressbar(wrapper, mode="determinate")
         self.progress.grid(row=5, column=0, sticky="ew")
@@ -1264,8 +1266,14 @@ def open_actua_tareas_window(
 
     win = tk.Toplevel(master)
     win.title("Actualizar Tareas")
-    win.geometry("1120x760")
-    win.minsize(980, 620)
+    screen_w = win.winfo_screenwidth()
+    screen_h = win.winfo_screenheight()
+    width = min(1120, max(980, screen_w - 80))
+    height = min(760, max(620, screen_h - 120))
+    pos_x = max(0, (screen_w - width) // 2)
+    pos_y = max(0, (screen_h - height) // 2)
+    win.geometry(f"{width}x{height}+{pos_x}+{pos_y}")
+    win.minsize(940, 620)
     win.transient(master.winfo_toplevel() if hasattr(master, "winfo_toplevel") else master)
 
     def _cerrar() -> None:
