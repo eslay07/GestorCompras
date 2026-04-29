@@ -154,7 +154,6 @@ class ActuaTareasScreen(ttk.Frame):
 
         self.nombre_flujo = tk.StringVar()
         self.flujo_var = tk.StringVar()
-        self.task_default_var = tk.StringVar()
         self.carpeta_base_var = tk.StringVar(value=actua_tareas_repo.get_carpeta_base(""))
         self.mostrar_nav_var = tk.BooleanVar(value=True)
         self.report_var = tk.BooleanVar(value=db.get_config("ACTUA_REPORT_EMAIL", "1") != "0")
@@ -273,21 +272,18 @@ class ActuaTareasScreen(ttk.Frame):
         bottom.grid(row=4, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
         bottom.columnconfigure(3, weight=1)
 
-        ttk.Label(bottom, text="N° tarea manual:", style="MyLabel.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Entry(bottom, textvariable=self.task_default_var, style="MyEntry.TEntry",
-                  width=20).grid(row=0, column=1, padx=4)
         ttk.Label(bottom, text="Carpeta base:", style="MyLabel.TLabel").grid(
-            row=0, column=2, padx=(10, 0), sticky="w")
+            row=0, column=0, padx=(0, 4), sticky="w")
         ttk.Entry(bottom, textvariable=self.carpeta_base_var, style="MyEntry.TEntry",
-                  width=40).grid(row=0, column=3, padx=4, sticky="ew")
+                  width=52).grid(row=0, column=1, columnspan=3, padx=4, sticky="ew")
         ttk.Button(bottom, text="Examinar...", style="MyButton.TButton",
-                   command=self._pick_folder).grid(row=0, column=4)
+                   command=self._pick_folder).grid(row=0, column=4, padx=(4, 0))
 
         ttk.Label(bottom, text="Tareas manuales (1 por linea):", style="MyLabel.TLabel").grid(
             row=1, column=0, sticky="w", pady=(6, 0))
         self.manual_tasks_text = tk.Text(bottom, height=3, width=36, relief="solid",
                                           borderwidth=1, font=("Segoe UI", 10))
-        self.manual_tasks_text.grid(row=1, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+        self.manual_tasks_text.grid(row=1, column=1, columnspan=3, sticky="ew", pady=(6, 0))
         self.manual_tasks_text.bind("<Control-Return>", lambda _e: self._run_flow())
 
         source_frame = ttk.LabelFrame(bottom, text="Origen de tareas", style="MyLabelFrame.TLabelframe", padding=6)
@@ -690,8 +686,6 @@ class ActuaTareasScreen(ttk.Frame):
     def _manual_tasks(self) -> list[str]:
         raw = self.manual_tasks_text.get("1.0", tk.END)
         values = [line.strip() for line in raw.splitlines() if line.strip()]
-        if not values and self.task_default_var.get().strip():
-            values = [self.task_default_var.get().strip()]
         return values
 
     def _ask_text(self, title: str) -> str:
