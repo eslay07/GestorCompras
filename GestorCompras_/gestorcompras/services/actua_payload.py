@@ -4,6 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
+ORIGIN_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "reasignacion": ("task_number",),
+    "correos_masivos": ("task_number", "orden_compra", "proveedor"),
+    "descargas_oc": ("task_number",),
+}
+
 
 def normalize_payload(task_number: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = dict(payload or {})
@@ -27,3 +33,11 @@ def normalize_payload(task_number: str, payload: dict[str, Any] | None = None) -
         out["numero_orden"] = oc
     return out
 
+
+def missing_required_fields(origen: str, payload: dict[str, Any]) -> list[str]:
+    required = ORIGIN_REQUIRED_FIELDS.get((origen or "").strip().lower(), ("task_number",))
+    missing: list[str] = []
+    for field in required:
+        if not str(payload.get(field, "") or "").strip():
+            missing.append(field)
+    return missing
