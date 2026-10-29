@@ -10,6 +10,26 @@ Nació de un problema cotidiano: una compra no termina al registrar una orden. H
 
 > **Estado actual:** el flujo operativo descrito corresponde a **Compras Bienes**. **Servicios está en desarrollo:** su interfaz replica la de Bienes y todavía no es funcional como flujo completo.
 
+## Impacto mensual estimado · De 17–21 horas a unas 6 horas y 15 minutos
+
+**Con este escenario de trabajo, el ahorro operativo estimado es de aproximadamente 11–15 horas al mes.** Además de reducir la duración acumulada de los procesos, la ejecución por lotes y en segundo plano permite dedicar menos atención a los pasos repetitivos.
+
+La referencia parte de **45 tareas gestionadas durante el mes**. Para estimar el conjunto de actividades se consideran **80 correos de despacho, 90 documentos y 80 órdenes de compra**, con una reasignación y un flujo de seguimiento y archivos por tarea.
+
+| Actividad mensual estimada | Trabajo manual | Con el proyecto |
+| --- | ---: | ---: |
+| Enviar 80 correos de despacho | 2 h 40 min | ≈42 min² |
+| Organizar 90 documentos | 3–3 h 30 min | ≈1 h |
+| Cargar 80 OC de unos 5 ítems | 5 h 20 min–6 h 40 min | ≈2 h 40 min |
+| Reasignar 45 tareas | 1 h 30 min–2 h 15 min | ≈27 min |
+| Descargar y organizar 80 OC | 1 h 33 min–1 h 47 min | ≈40 min |
+| Ejecutar seguimiento y archivos en 45 tareas | 3–4 h 30 min | ≈45 min |
+| **Total** | **17–21 horas** | **≈6 h 15 min** |
+
+² Para correos se reservan 40 minutos de preparación y revisión de ocho lotes, además de aproximadamente 1 minuto y 20 segundos de envío automático. Se utiliza una previsión redondeada de 42 minutos.
+
+**Cómo interpretar la estimación.** Las 45 tareas y el rango de 1–30 ítems por tarea son datos aportados por el autor. El cálculo de carga de OC utiliza órdenes de unos 5 ítems como referencia; los 90 documentos son un supuesto de dos por tarea. Para no duplicar acciones, el tiempo del Orquestador incluye seguimiento y archivos, sin volver a contar la reasignación. Los totales están redondeados y comparan duraciones acumuladas de procesos: no son un cronometraje mensual ni equivalen automáticamente a horas netas de atención humana liberada, porque las ejecuciones pueden solaparse. **Servicios no se incluye en el ahorro.**
+
 ## El ahorro, módulo por módulo
 
 | Módulo y volumen de referencia | Antes, de forma manual | Con GestorCompras | Tiempo recuperado |
