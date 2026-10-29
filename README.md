@@ -1,264 +1,87 @@
 # GestorCompras · COMPRAS TN
 
-### Automatización aplicada a problemas reales de compras
+### De un problema operativo de compras a una aplicación de automatización
 
-**Desarrollé GestorCompras para reducir el trabajo repetitivo de una operación de compras:** preparar correos, organizar cotizaciones, cargar órdenes y actualizar tareas. Convertí ese recorrido en una aplicación de escritorio que integra correo, documentos, Google Sheets y portales corporativos, con ejecución por lotes y en segundo plano.
+**Diseñé y desarrollé una herramienta que conecta correos, documentos, Google Sheets y portales para ejecutar trabajo de compras por lotes y en segundo plano.** Automatiza la preparación de solicitudes de despacho, la organización de cotizaciones, la carga de órdenes y el seguimiento de tareas, con validaciones y revisión de resultados.
 
-Con una carga de referencia de **45 tareas mensuales**, el escenario documentado estima un **ahorro operativo de 11–15 horas al mes**. Los tiempos por módulo se conservan más abajo junto con los supuestos del cálculo. La revisión de datos, las confirmaciones y la atención a excepciones siguen en manos del usuario.
+**Jimmy Toapanta · [eslay07](https://github.com/eslay07)**
 
-**Desarrollado por [Jimmy Toapanta · eslay07](https://github.com/eslay07)** · Python · PySide6 · Google Sheets · Automatización de portales
+Python · PySide6 · Selenium · Google Sheets · SQLite · SQLAlchemy
 
-## Lo que demuestra este proyecto
+[Resultados y supuestos](docs/IMPACTO_OPERATIVO.md) · [Módulos y 25 capturas](docs/MODULOS.md) · [Instalador](https://github.com/eslay07/GestorCompras/releases/tag/v2.0.0) · [Guía técnica](docs/GUIA_TECNICA.md)
 
-El objetivo es **reducir el esfuerzo por operación y aprovechar mejor los recursos disponibles**. El proyecto permite evaluar mi capacidad para analizar una necesidad del trabajo diario, diseñar una solución y llevarla hasta una aplicación instalable.
+## El proyecto en una mirada
 
-| Capacidad | Evidencia en el proyecto |
+| Problema | Solución que construí | Impacto de referencia |
+| --- | --- | --- |
+| Repetir búsquedas, transcripción y recorridos por cada compra | Una aplicación que prepara lotes y coordina documentos, correo y portales | **11–15 h mensuales de ahorro operativo estimado** en el escenario documentado |
+| Acompañar manualmente cada acción de una tarea | Flujos reutilizables y ejecución en segundo plano | **5 tareas reasignadas en ≈3 min**, frente a 10–15 min manuales |
+| Copiar cada artículo de una orden entre sistemas | Lectura de Google Sheets, validación y carga automática | **1 OC de 5 ítems en ≈2 min**, frente a 4–5 min manuales |
+
+Los tiempos por módulo son aproximaciones reportadas durante el uso del proyecto. La cifra mensual es una estimación con supuestos explícitos, no un cronometraje de horas netas de personal. [Consultar el cálculo completo](docs/IMPACTO_OPERATIVO.md).
+
+**Estado:** Compras Bienes es el flujo operativo actual. Servicios conserva una interfaz preliminar y todavía no es funcional como flujo completo.
+
+![Vista principal de GestorCompras](docs/capturas/01-inicio.png)
+
+*Interfaz real con datos de demostración; las identidades y la información corporativa están ocultas. La galería no representa operaciones ejecutadas al generar las capturas.*
+
+## Mi aporte al proyecto
+
+Partí del recorrido de trabajo de compras: recibir información, localizar documentos, registrar órdenes y actualizar su seguimiento. Identifiqué las acciones repetidas y las convertí en módulos que comparten datos y controles.
+
+| Capacidad | Implementación y evidencia |
 | --- | --- |
-| **Analizar y mejorar procesos** | Identificación de búsquedas, transcripciones y recorridos repetidos; comparación de tiempos antes y después por módulo. |
-| **Integrar herramientas y datos** | Asociación de correos, proveedores, documentos, hojas de cálculo y tareas dentro de un mismo recorrido. |
-| **Automatizar con controles** | Validación previa, confirmaciones, control de duplicados, estados persistentes y recuperación de pendientes. |
-| **Entregar una solución mantenible** | Separación de interfaz, casos de uso, dominio e infraestructura; pruebas automáticas, instalador y documentación de uso. |
+| **Análisis y mejora de procesos** | Comparación por módulo del recorrido manual y automatizado, con volúmenes y tiempos de referencia. [Impacto operativo](docs/IMPACTO_OPERATIVO.md). |
+| **Integración de sistemas** | Adaptadores para correo, documentos, Google Sheets y portales. [Infraestructura](COMPRAS%20TN%202.0/src/compras_tn/infrastructure/). |
+| **Desarrollo de herramientas de escritorio** | Interfaz PySide6, selección de lotes, trabajos en segundo plano y resultados por elemento. [Presentación](COMPRAS%20TN%202.0/src/compras_tn/presentation/). |
+| **Automatización con controles** | Validaciones previas, confirmaciones, control de duplicados y recuperación de pendientes. [Casos de uso](COMPRAS%20TN%202.0/src/compras_tn/application/). |
+| **Entrega y mantenimiento** | Separación de responsabilidades, pruebas automáticas, evolución del esquema e instalador de Windows. [Pruebas](COMPRAS%20TN%202.0/tests/) · [Instalador](COMPRAS%20TN%202.0/tools/installer/). |
 
-**El aporte profesional está en conectar el conocimiento operativo con la implementación técnica:** entender dónde se repite el esfuerzo y construir herramientas que permitan dedicar más atención a revisar resultados y resolver excepciones.
+## Qué automatiza
 
-> **Estado actual:** el flujo operativo descrito corresponde a **Compras Bienes**. **Servicios está en desarrollo:** su interfaz replica la de Bienes y todavía no es funcional como flujo completo.
-
-## Impacto mensual estimado · De 17–21 horas a unas 6 horas y 15 minutos
-
-**Con este escenario de trabajo, el ahorro operativo estimado es de aproximadamente 11–15 horas al mes.** Además de reducir la duración acumulada de los procesos, la ejecución por lotes y en segundo plano permite dedicar menos atención a los pasos repetitivos.
-
-La referencia parte de **45 tareas gestionadas durante el mes**. Para estimar el conjunto de actividades se consideran **80 correos de despacho, 90 documentos y 80 órdenes de compra**, con una reasignación y un flujo de seguimiento y archivos por tarea.
-
-| Actividad mensual estimada | Trabajo manual | Con el proyecto |
-| --- | ---: | ---: |
-| Enviar 80 correos de despacho | 2 h 40 min | ≈42 min² |
-| Organizar 90 documentos | 3–3 h 30 min | ≈1 h |
-| Cargar 80 OC de unos 5 ítems | 5 h 20 min–6 h 40 min | ≈2 h 40 min |
-| Reasignar 45 tareas | 1 h 30 min–2 h 15 min | ≈27 min |
-| Descargar y organizar 80 OC | 1 h 33 min–1 h 47 min | ≈40 min |
-| Ejecutar seguimiento y archivos en 45 tareas | 3–4 h 30 min | ≈45 min |
-| **Total** | **17–21 horas** | **≈6 h 15 min** |
-
-² Para correos se reservan 40 minutos de preparación y revisión de ocho lotes, además de aproximadamente 1 minuto y 20 segundos de envío automático. Se utiliza una previsión redondeada de 42 minutos.
-
-**Cómo interpretar la estimación.** Las 45 tareas y el rango de 1–30 ítems por tarea son datos aportados por el autor. El cálculo de carga de OC utiliza órdenes de unos 5 ítems como referencia; los 90 documentos son un supuesto de dos por tarea. Para no duplicar acciones, el tiempo del Orquestador incluye seguimiento y archivos, sin volver a contar la reasignación. Los totales están redondeados y comparan duraciones acumuladas de procesos: no son un cronometraje mensual ni equivalen automáticamente a horas netas de atención humana liberada, porque las ejecuciones pueden solaparse. **Servicios no se incluye en el ahorro.**
-
-## Más volumen con menor necesidad de trabajo manual
-
-**La oportunidad empresarial es aumentar el trabajo procesado sin aumentar en la misma proporción la dotación dedicada a tareas repetitivas.** Si esa capacidad se confirma en la operación del equipo, puede permitir absorber crecimiento, evitar contrataciones adicionales para esos pasos o redimensionar la dedicación que requieren.
-
-### Escenario de crecimiento · El doble de operaciones
-
-La siguiente proyección aplica proporcionalmente los tiempos de la tabla mensual, manteniendo la misma mezcla de actividades y complejidad. Las tareas y OC identifican el escenario; también aumentan proporcionalmente los correos, documentos, reasignaciones y seguimientos.
-
-| Escenario mensual | Tareas | OC | Duración acumulada manual | Duración acumulada con el proyecto |
-| --- | ---: | ---: | ---: | ---: |
-| Referencia actual | 45 | 80 | 17–21 h | ≈6 h 15 min |
-| 20 % más volumen | 54 | 96 | 20 h 24 min–25 h 12 min | ≈7 h 30 min |
-| Doble de volumen | 90 | 160 | 34–42 h | ≈12 h 30 min |
-
-**En el escenario proporcional, duplicar el volumen requeriría unas 12 h 30 min de ejecución acumulada, frente a las 17–21 horas del recorrido manual del volumen original.** Esto ilustra el potencial de gestionar más operaciones dentro de un presupuesto menor de tiempo de proceso.
-
-*Es una proyección de capacidad, no una prueba de rendimiento a ese volumen. Deben comprobarse los límites del correo y de los portales, la preparación de datos, las excepciones y la supervisión. La ejecución en segundo plano puede solaparse con otras actividades; estas duraciones no representan por sí solas horas de personal disponibles.*
-
-### Cómo se traduce en recursos humanos
-
-| Decisión de organización | Qué tendría que demostrar la automatización |
+| Módulo | Trabajo que resuelve |
 | --- | --- |
-| **Evitar una contratación adicional** | Que el equipo actual puede absorber el volumen creciente y cumplir los plazos, incluyendo revisión, incidencias y mantenimiento. |
-| **Reasignar capacidad del equipo** | Que se liberan horas efectivas de intervención para revisar compras, atender excepciones o realizar otras funciones. |
-| **Reducir la dotación necesaria para una función** | Que disminuye de forma sostenida la carga humana total de esa función y que el equipo restante puede cubrirla junto con sus demás responsabilidades, sin deteriorar servicio ni controles. |
+| **Correos masivos** | Prepara solicitudes de despacho con plantilla, asunto y OC adjunta; envía a cada proveedor el mensaje correspondiente. |
+| **Organizador de archivos** | Identifica cotizaciones por asunto, tarea, remitente o RUC y guarda los documentos en la carpeta correspondiente. |
+| **Carga automática de OC** | Toma artículos, cantidades, precios y solicitantes de Google Sheets; registra la OC y los datos de autorización para seguimiento. |
+| **Reasignación** | Detecta avisos de compras completas y prepara factura, ingreso, observaciones y destino para reasignar las tareas. |
+| **Descargas OC** | Detecta órdenes aprobadas o acepta números manuales; descarga, identifica y organiza los archivos por tarea y proveedor. |
+| **Orquestador** | Permite crear y reutilizar secuencias para observaciones, seguimientos y archivos en el portal de tareas. |
 
-Para evaluar una reducción de dotación hay que medir **horas humanas netas**: dedicación manual anterior menos preparación, revisión, intervención ante errores y soporte después de automatizar. En una función ya atendida por un equipo, esas horas liberadas se comparan con la capacidad y las responsabilidades que deben seguir cubriéndose.
+[Ver el funcionamiento, los tiempos y las capturas de cada módulo →](docs/MODULOS.md)
 
-Como unidad de referencia, **176 horas netas mensuales verificadas equivaldrían aritméticamente a una jornada de 22 días de 8 horas**. Esa equivalencia permite estudiar el dimensionamiento; no demuestra que pueda eliminarse un puesto. El ahorro operativo estimado de **11–15 horas mensuales de este proyecto todavía no acredita esa reducción**.
+La reasignación se complementa con [Notificacion-automatica-tareas](https://github.com/eslay07/Notificacion-automatica-tareas), un proyecto del mismo autor en Google Apps Script que detecta entregas completas en Sheets y emite la notificación por correo.
 
-**Mi propuesta profesional:** analizar el trabajo repetitivo, automatizar sus recorridos y medir su efecto sobre el esfuerzo por operación. El objetivo es que una empresa pueda procesar más trabajo con sus recursos disponibles y, cuando los resultados del conjunto de la función lo justifiquen, reducir la dotación operativa necesaria.
-
-## El ahorro, módulo por módulo
-
-| Módulo y volumen de referencia | Antes, de forma manual | Con GestorCompras | Tiempo recuperado |
-| --- | ---: | ---: | ---: |
-| Correos masivos · 10–20 destinatarios | 20–40 min para 10–20 correos | ≈10 s de envío por lote preparado | Se sustituye el armado y envío individual¹ |
-| Organizador · 3–4 archivos | 6–7 min por lote | ≈2 min por lote | **4–5 min por lote** |
-| Carga automática · 1 OC de 5 ítems | 4–5 min por orden | ≈2 min por orden | **2–3 min por orden** |
-| Reasignación · 5 tareas | 10–15 min por lote | ≈3 min por lote | **7–12 min por lote** |
-| Descargas OC · 6 órdenes | 7–8 min o más por lote | ≈3 min por lote | **4–5 min o más por lote** |
-| Orquestador · 1 tarea | 4–6 min por tarea | ≈1 min por tarea | **3–5 min por tarea** |
-
-¹ En Correos masivos, el tiempo automático corresponde al envío del lote ya preparado; la selección y revisión previas se contabilizan aparte.
-
-*Tiempos aproximados reportados por el autor durante el uso del proyecto. Son referencias por módulo y volumen indicado; pueden variar según documentos, pasos del flujo, red y respuesta de los portales. No se suman como si correspondieran a una misma jornada.*
-
-**El valor también está en la autonomía:** preparar un lote permite dejar al programa ejecutando el recorrido repetitivo y dedicar la atención a otra actividad. El tiempo de ejecución de una automatización no equivale necesariamente a tiempo de intervención humana. La revisión inicial, las confirmaciones y la atención a excepciones siguen formando parte del trabajo.
-
-![Panel de navegación de GestorCompras](docs/capturas/01-inicio.png)
-
-> Las capturas son de la interfaz real con datos de demostración. Se ocultaron o sustituyeron correos, proveedores, RUC, responsables y rutas privadas. Las filas ilustrativas no representan transacciones realizadas al generar las imágenes.
-
-## 1. Correos masivos · Solicitudes de despacho listas por lote
-
-**Antes:** cada solicitud exigía redactar o adaptar un correo, colocar el asunto correcto, buscar la orden de compra y adjuntarla. La referencia manual es de **2 minutos por correo**.
-
-**Ahora:** se utiliza una plantilla, se revisan las órdenes y sus documentos y se envía un lote de **10–20 correos**, cada uno dirigido al proveedor correspondiente. La preparación del mensaje, el asunto y el adjunto deja de repetirse manualmente para cada destinatario.
-
-> **10–20 correos enviados en aproximadamente 10 segundos por lote**, con un proveedor distinto como destinatario de cada mensaje. El recorrido manual de ese volumen ocupaba **20–40 minutos**, a razón de 2 minutos por correo.
-
-¹ Los 10 segundos corresponden al envío automático de un lote preparado. La selección de órdenes y la revisión inicial se realizan antes y deben contabilizarse al medir el ahorro total de una jornada.
-
-![Correos masivos](docs/capturas/02-correos-bienes.png)
-
-## 2. Organizador de archivos · Del correo a la carpeta correcta
-
-El módulo reconoce mensajes de solicitud de cotización cuyo asunto contiene la tarea. Compara el remitente con la base local para identificar al proveedor, extrae el PDF o la ficha y busca, dentro de las subcarpetas de la carpeta central configurada, la que corresponde al número de tarea.
-
-El archivo se guarda en su destino con una etiqueta que identifica la **cotización y el proveedor**. Así se reduce el trabajo de abrir mensajes, identificar a quién pertenece un documento, renombrarlo y recorrer carpetas hasta encontrar su ubicación.
-
-También permite seleccionar **varios archivos locales**. En esa modalidad se extrae el RUC para asociar el documento con el proveedor registrado y se revisan los datos antes de guardar.
-
-> **Lote de 3–4 archivos:** de **6–7 minutos** de organización manual a **aproximadamente 2 minutos**. Un ahorro de **4–5 minutos por lote**.
-
-![Organizador de cotizaciones y archivos](docs/capturas/03-organizador-archivos.png)
-
-## 3. Carga automática de OC · De Google Sheets al portal
-
-Toma de una hoja de Google Sheets los datos necesarios para preparar la orden: **artículos, cantidades, precios, proveedor y solicitante**. Valida la información y realiza la carga en el portal de órdenes de compra.
-
-El número de OC y los datos de quienes deben autorizarla se registran en la hoja para facilitar los seguimientos. La información se mantiene vinculada a la tarea y a los artículos de origen.
-
-> **Una OC con 5 ítems:** de **4–5 minutos** de captura manual a **aproximadamente 2 minutos** de ejecución automática. Entre **2 y 3 minutos menos por orden**.
-
-Su mayor aporte es poder dejar **varias órdenes preparadas en un lote** y continuar con otra función mientras el programa las procesa. Se reducen tanto la transcripción entre sistemas como la necesidad de acompañar cada campo y cada clic.
-
-![Carga automática de órdenes de compra](docs/capturas/04-carga-oc-automatica.png)
-
-## 4. Reasignación · Compras completas que avanzan sin repetir el recorrido
-
-Detecta correos que informan que una tarea de compras está completa. A partir de ellos prepara la reasignación en el portal corporativo de gestión de tareas: completa **número de factura, número de ingreso y observaciones**, y utiliza el departamento y usuario configurados como destino.
-
-El usuario revisa el lote y la automatización ejecuta el recorrido que antes debía repetirse para cada tarea.
-
-> **Cinco tareas:** de **10–15 minutos** de reasignación manual a **aproximadamente 3 minutos por lote**. Entre **7 y 12 minutos recuperados**.
-
-![Reasignación por lotes](docs/capturas/06-reasignacion-bienes.png)
-
-### Una automatización que se complementa con otra
-
-Los correos de tareas completas se complementan con [Notificacion-automatica-tareas](https://github.com/eslay07/Notificacion-automatica-tareas), un proyecto del mismo autor en Google Apps Script. Ese sistema revisa las entregas registradas en Google Sheets, detecta tareas completas y envía su notificación. GestorCompras utiliza ese aviso como entrada para el proceso de reasignación.
+## Decisiones técnicas
 
 ```mermaid
 flowchart LR
-    A[Entregas registradas en Google Sheets] --> B[Notificación de tarea completa]
-    B --> C[Escaneo y revisión en GestorCompras]
-    C --> D[Reasignación por lote en el portal]
+    UI[Interfaz PySide6] --> APP[Casos de uso y validaciones]
+    APP --> DOMAIN[Modelos y reglas de dominio]
+    APP --> INFRA[Adaptadores de infraestructura]
+    INFRA --> DATA[SQLite y documentos]
+    INFRA --> EXT[Correo, Google Sheets y portales]
 ```
 
-## 5. Descargas OC · Descargar, identificar y organizar en un mismo flujo
+- **Separación de responsabilidades:** interfaz, casos de uso, dominio e infraestructura se mantienen en capas distintas.
+- **Trabajo por lotes y en segundo plano:** la interfaz conserva la revisión y muestra los resultados de cada elemento.
+- **Persistencia y recuperación:** se registran estados y pendientes para evitar reconstruir manualmente el trabajo o repetir acciones inciertas.
+- **Entorno de ejecución aislado:** el instalador incorpora las dependencias compatibles, comprueba el arranque y respalda los datos antes de actualizar.
 
-El escaneo de correo detecta las confirmaciones de órdenes aprobadas y extrae los datos necesarios para descargarlas. El programa abre el portal de órdenes de compra, descarga los documentos uno a uno dentro del lote y los organiza en la carpeta o subcarpeta configurada, utilizando la **tarea y el proveedor** para identificar el archivo y su destino.
+## Resultados, alcance y calidad
 
-También puede ejecutarse **sin escaneo de correo**: basta ingresar un lote de números de OC y revisar la selección.
+El escenario mensual documentado parte de **45 tareas** y estima **17–21 horas de recorrido manual frente a ≈6 h 15 min con el proyecto**. La finalidad es reducir esfuerzo por operación y permitir que el equipo atienda más trabajo con sus recursos disponibles.
 
-> **Seis órdenes:** de **7–8 minutos o más** —incluyendo descarga, cambio de nombre y ubicación— a **aproximadamente 3 minutos por lote**. Al menos **4–5 minutos menos** en el rango de referencia.
+La proyección de crecimiento y los criterios para evaluar necesidades de personal están en [Impacto operativo](docs/IMPACTO_OPERATIVO.md#más-volumen-con-menor-necesidad-de-trabajo-manual). Una reducción de dotación requiere medir la intervención humana neta y la carga completa de la función; el proyecto no la presenta como un resultado ya demostrado.
 
-![Descargas de órdenes](docs/capturas/07-descargas-bienes.png)
+El repositorio incluye pruebas de servicios, validaciones, automatización mediante dobles de prueba, interfaz e instalador. Las integraciones reales requieren acceso autorizado y se mantienen fuera de la ejecución predeterminada. La instalación y el lanzamiento se comprobaron con Python 3.12; las dependencias para Python 3.13 se verificaron por resolución sin conexión.
 
-### El volumen mensual le da valor a cada lote
+No se publican bases operativas, credenciales ni perfiles reales de proveedores. [Privacidad](PRIVACY.md) · [Seguridad](SECURITY.md).
 
-El autor sitúa la carga de trabajo en unas **80 órdenes mensuales de Bienes** y unas **300 de Servicios**. Son volúmenes de referencia de la actividad, no una afirmación de que ambos flujos estén automatizados en esta versión.
+## Ejecutar o revisar el proyecto
 
-Aplicando proporcionalmente los tiempos anteriores a **80 órdenes de Bienes**, la descarga y organización pasan de **aproximadamente 93–107 minutos a 40 minutos al mes**: **unos 53–67 minutos recuperados solo en este módulo**. Este cálculo no suma los ahorros de correos, cotizaciones, carga de OC ni tareas. El volumen de Servicios representa una oportunidad futura mientras ese módulo continúa en desarrollo.
-
-<details>
-<summary>Abastecimiento y cola de subidas</summary>
-
-La modalidad Abastecimiento incorpora filtros para preparar la descarga. La cola de subidas permite revisar estados y recuperar transferencias pendientes.
-
-![Abastecimiento](docs/capturas/07-descargas-bienes-abastecimiento.png)
-
-![Cola de subidas](docs/capturas/07-descargas-bienes-telcodrive-subidas.png)
-
-</details>
-
-## 6. Orquestador · Un constructor de flujos para el portal de tareas
-
-Su idea se parece a la de un constructor de automatizaciones como **n8n**, enfocada al portal corporativo de tareas: combinar pasos para registrar seguimientos, escribir observaciones, subir archivos y mantener el historial de una compra.
-
-El editor visual permite preparar y guardar una secuencia para reutilizarla. Después se aplica a un lote de tareas, en segundo plano, con revisión de resultados por elemento.
-
-> **Una tarea:** de **4–6 minutos** de acciones manuales a **aproximadamente 1 minuto** de ejecución del flujo. Entre **3 y 5 minutos menos por tarea**, con ejecución por lotes y en segundo plano.
-
-El beneficio crece cuando el mismo procedimiento debe repetirse muchas veces: se configura el recorrido y se reutiliza, en lugar de reproducir manualmente cada acción en cada tarea.
-
-![Ejecución de flujos por lote](docs/capturas/08-orquestador-bienes.png)
-
-![Constructor visual de flujos](docs/capturas/08-orquestador-bienes-editor-visual.png)
-
-![Alias para localizar archivos](docs/capturas/08-orquestador-bienes-alias-de-archivos.png)
-
-## Herramientas que completan el recorrido
-
-### Seguimientos
-
-Prepara la comunicación de seguimiento de las órdenes mediante selección y plantillas. Complementa la información registrada durante la carga y el control de las compras.
-
-![Seguimientos](docs/capturas/05-seguimientos.png)
-
-### Configuración centralizada
-
-Reúne el catálogo de proveedores, sus datos de identificación, las asignaciones, las plantillas y las opciones de integración. Esta base permite asociar correctamente los correos y documentos con cada proveedor, sin publicar el catálogo real en el repositorio.
-
-![Configuración con datos ocultos](docs/capturas/13-configuracion.png)
-
-<details>
-<summary>Ver asignaciones, plantillas y opciones por módulo</summary>
-
-![Asignaciones](docs/capturas/13-configuracion-asignaciones.png)
-
-![Plantillas](docs/capturas/13-configuracion-plantillas.png)
-
-![Opciones e integraciones](docs/capturas/13-configuracion-opciones-por-modulo.png)
-
-</details>
-
-### Acceso y trabajo en segundo plano
-
-Tras preparar la selección y confirmar la operación, los procesos pueden trabajar en segundo plano para reducir la atención paso a paso. El usuario conserva la revisión de los resultados y puede atender otras actividades mientras se ejecuta el lote.
-
-![Acceso](docs/capturas/00-acceso.png)
-
-## Estado de Servicios · Interfaz en desarrollo
-
-**Servicios todavía no es funcional como un flujo completo.** Sus pantallas son una copia de la estructura de Bienes y se conservan como base para la implementación. Los tiempos y resultados operativos descritos arriba no deben interpretarse como una validación de Servicios.
-
-<details>
-<summary>Ver las pantallas preliminares de Servicios</summary>
-
-Estas capturas muestran la estructura de la interfaz, no módulos terminados.
-
-![Correos de Servicios — preliminar](docs/capturas/09-correos-servicios.png)
-
-![Reasignación de Servicios — preliminar](docs/capturas/10-reasignacion-servicios.png)
-
-![Descargas de Servicios — preliminar](docs/capturas/11-descargas-servicios.png)
-
-![Abastecimiento de Servicios — preliminar](docs/capturas/11-descargas-servicios-abastecimiento.png)
-
-![Subidas de Servicios — preliminar](docs/capturas/11-descargas-servicios-telcodrive-subidas.png)
-
-![Orquestador de Servicios — preliminar](docs/capturas/12-orquestador-servicios.png)
-
-![Editor de Servicios — preliminar](docs/capturas/12-orquestador-servicios-editor-visual.png)
-
-![Alias de Servicios — preliminar](docs/capturas/12-orquestador-servicios-alias-de-archivos.png)
-
-</details>
-
-## Instalación desde el código
-
-Se requiere **Windows de 64 bits y Python 3.12 o 3.13**. Use un entorno en una ruta corta para evitar el límite de longitud de rutas de Windows al instalar PySide6.
-
-Desde la raíz del repositorio, en PowerShell:
+**Windows de 64 bits · Python 3.12 o 3.13.** El [instalador completo](https://github.com/eslay07/GestorCompras/releases/tag/v2.0.0) está disponible en Releases. Para ejecutar desde el código, use una ruta corta para el entorno virtual:
 
 ```powershell
 py -3.12 -m venv "$env:USERPROFILE\.venvs\compras-tn"
@@ -267,66 +90,20 @@ py -3.12 -m venv "$env:USERPROFILE\.venvs\compras-tn"
 & "$env:USERPROFILE\.venvs\compras-tn\Scripts\python.exe" run.py
 ```
 
-Para Python 3.13, cambie `py -3.12` por `py -3.13`. También puede usar `COMPRAS TN 2.0/COMPRAS 3.0.pyw`, que conserva su nombre por compatibilidad con el acceso por doble clic. La versión declarada del paquete es 2.0.0.
+Para las operaciones reales, cada organización configura sus propios servicios y credenciales. Para revisar el proyecto sin ellas, consulte la [galería de demostración](docs/MODULOS.md) y las [instrucciones de pruebas](docs/GUIA_TECNICA.md#desarrollo-y-pruebas).
 
-## Instalador sin conexión
+## Documentación
 
-El instalador selecciona las ruedas compatibles con Python 3.12 o 3.13 ya instalado, crea una carpeta de librerías aislada y verifica las dependencias directas y transitivas. Antes de activar una actualización comprueba el arranque completo de la interfaz y el navegador, respalda la base existente y conserva las configuraciones.
+- [Impacto operativo: tabla mensual, supuestos y proyección de capacidad](docs/IMPACTO_OPERATIVO.md).
+- [Módulos: explicación, tiempos y 25 capturas](docs/MODULOS.md).
+- [Guía técnica: instalación, configuración, pruebas y estructura](docs/GUIA_TECNICA.md).
+- [Manual del proyecto](COMPRAS%20TN%202.0/README.md) y [organización de documentos](COMPRAS%20TN%202.0/COTIZACIONES_Y_ADJUNTOS.md).
 
-Use únicamente un paquete completo de [Releases](https://github.com/eslay07/GestorCompras/releases), extraiga todo su contenido y ejecute `instalar.py`. Las compilaciones públicas incluyen un perfil vacío: no distribuyen catálogos de proveedores ni datos corporativos. Consulte [las instrucciones del instalador](INSTALAR_PYTHON313.md).
+## Sobre el autor
 
-## Configuración inicial
+**Jimmy Toapanta** · [Perfil de GitHub](https://github.com/eslay07)
 
-1. Abra **Configuración** y registre proveedores, asignaciones y plantillas.
-2. Configure el correo y las rutas de documentos de su instalación.
-3. Para Google Sheets, registre su propio ID de documento y archivo de credenciales; no los agregue al repositorio.
-4. Configure el portal y el almacenamiento remoto autorizados por su organización.
-5. Revise los datos y use las confirmaciones de cada módulo antes de ejecutar una operación real.
-
-Los identificadores privados de documentos y repositorios de almacenamiento no forman parte de los valores predeterminados de esta edición pública.
-
-## Datos y privacidad
-
-- La base de trabajo se guarda fuera del código, en la carpeta local de COMPRAS TN; puede seleccionarse mediante `COMPRAS_TN_DATA_DIR`.
-- El repositorio no incluye bases de producción, credenciales JSON, contraseñas, adjuntos, buzones ni perfiles privados del instalador.
-- Las capturas de esta documentación se generaron con datos sintéticos. Las imágenes históricas y la base antigua se retiraron del historial publicable.
-- La aplicación no descarga ni sustituye el Python aprobado de la organización y no modifica las políticas del equipo.
-- Los errores de lanzamiento quedan registrados para facilitar la reparación del entorno.
-
-## Desarrollo y pruebas
-
-```powershell
-cd "COMPRAS TN 2.0"
-& "$env:USERPROFILE\.venvs\compras-tn\Scripts\python.exe" -m pytest -m "not live"
-```
-
-Las pruebas reales contra servicios corporativos se mantienen fuera de la ejecución predeterminada. Las pruebas automáticas no sustituyen la validación de accesos y permisos en cada organización.
-
-## Estructura
-
-```text
-COMPRAS TN 2.0/
-  src/compras_tn/
-    application/       Casos de uso, validaciones y flujos
-    domain/            Modelos y reglas
-    infrastructure/    Persistencia, correo, documentos y automatización
-    presentation/      Interfaz PySide6
-  alembic/             Evolución del esquema
-  tests/               Pruebas automáticas
-  tools/installer/     Instalación, actualización y diagnóstico
-  requirements.lock    Versiones de dependencias
-  pyproject.toml       Configuración del paquete
-  launch.py            Selección del entorno de ejecución
-docs/capturas/         Capturas públicas de demostración
-run.py                 Inicio desde la raíz
-instalar.py            Entrada del instalador completo
-```
-
-Documentación técnica: [manual del proyecto](COMPRAS%20TN%202.0/README.md), [operación y portales](COMPRAS%20TN%202.0/OPERACION_Y_PORTALES.md) y [organización de documentos](COMPRAS%20TN%202.0/COTIZACIONES_Y_ADJUNTOS.md).
-
-## Actualización publicada por tramos
-
-Los commits de esta actualización separan la retirada de la versión original, la aplicación actual con sus nuevos módulos, la reparación del entorno e instalador y la documentación visual. La autoría de los commits nuevos corresponde a Jimmy Toapanta.
+Este proyecto reúne mi experiencia en el proceso operativo de compras y mi capacidad para convertirlo en una solución de software: analizar el recorrido, integrar herramientas, automatizar pasos y preparar una entrega instalable con controles y documentación.
 
 ## Licencia
 
