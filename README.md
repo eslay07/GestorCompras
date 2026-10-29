@@ -1,8 +1,64 @@
 # COMPRAS TN
 
-Aplicación de escritorio para gestionar Compras Bienes y Compras Servicios desde una sola ventana. Integra correo, documentos, órdenes de compra, tareas y automatización de portales mediante una interfaz en Python y PySide6.
+## Menos trabajo repetitivo en compras. Más tiempo para revisar y decidir.
+
+**COMPRAS TN automatiza el trabajo operativo que normalmente exige abrir correos, buscar documentos, copiar datos entre sistemas y actualizar tareas una por una.** Reúne esos pasos en una aplicación de escritorio para Compras Bienes y Compras Servicios: permite preparar lotes, validar la información, ejecutar las acciones y revisar sus resultados.
+
+El beneficio está en reducir la atención que una persona debe dedicar a cada operación. En lugar de repetir el mismo recorrido por cada orden, el usuario revisa una selección y atiende las excepciones que requieren su criterio.
 
 **Autor y mantenimiento:** Jimmy Toapanta · [eslay07](https://github.com/eslay07)
+
+## ¿Qué problema resuelve?
+
+Un proceso manual de compras puede obligar a consultar un correo, localizar el PDF correcto, identificar la tarea y el proveedor, ingresar al portal, copiar datos, descargar o subir documentos y registrar el resultado. Ese recorrido se repite con cada orden. Cuando aumenta el volumen, también aumenta el tiempo dedicado a buscar, transcribir y comprobar información.
+
+COMPRAS TN conecta ese recorrido: organiza documentos por tarea, prepara comunicaciones, consolida órdenes y ejecuta secuencias de acciones desde una sola interfaz. Mantiene la revisión y las confirmaciones del usuario en los puntos que lo necesitan.
+
+| Trabajo que antes se repite por registro | Cómo lo aborda el proyecto | Dónde se reduce el esfuerzo manual |
+| --- | --- | --- |
+| Buscar correos y descargar adjuntos uno por uno | Escaneo por fechas o tareas y revisión conjunta de archivos | Menos búsqueda y clasificación repetida |
+| Localizar, nombrar y guardar cada documento | Identificación de tipos y guardado en la carpeta de la tarea | Menos navegación entre carpetas |
+| Preparar un correo para cada OC | Plantillas, agrupación y revisión de destinatarios y PDF | Menos redacción y selección de adjuntos |
+| Transcribir artículos desde una hoja al portal | Consolidación, validación y carga de las órdenes seleccionadas | Menos captura duplicada entre sistemas |
+| Buscar cada tarea y repetir los mismos clics | Orquestador con flujos guardados y ejecución por lotes | Menos intervención paso a paso |
+| Volver a revisar qué quedó pendiente | Estados, resultados por elemento y recuperación de pendientes | Menos reconstrucción manual del trabajo |
+
+## ¿Cuánto tiempo puede ahorrar?
+
+**Ejemplo ilustrativo: un lote de 30 operaciones al día podría liberar 1 hora y 45 minutos de trabajo manual diario, equivalente a 38 horas y 30 minutos al mes.** El cálculo siguiente muestra las suposiciones; **no es una medición obtenida de la operación real**.
+
+| Supuesto del ejemplo | Proceso manual | Trabajo asistido con COMPRAS TN |
+| --- | ---: | ---: |
+| Operaciones diarias del mismo tipo | 30 | 30 |
+| Dedicación humana por operación | 5 min | 1 min de revisión e intervención |
+| Preparación y revisión general del lote | Incluidas en los 5 min por operación | 15 min diarios adicionales |
+| **Dedicación humana diaria** | **150 min** | **45 min** |
+| **Ahorro estimado** | | **105 min diarios · 70 %** |
+| **Ahorro en un mes de 22 días laborables** | | **38 h 30 min** |
+
+La estimación compara **tiempo de dedicación humana**, no promete que el portal complete cada operación en un minuto. La duración total depende de la red, los sistemas externos, el tipo de flujo y las incidencias. Preparar datos, confirmar operaciones y resolver excepciones sigue requiriendo trabajo.
+
+Para calcular el ahorro real del equipo:
+
+```text
+Ahorro diario = (operaciones × minutos manuales por operación)
+              − (preparación del lote + revisión e intervención total)
+
+Ahorro mensual en horas = ahorro diario × días laborables ÷ 60
+```
+
+Para sustituir este ejemplo por un resultado medido, registre un lote comparable antes y después, incluyendo preparación, correcciones y revisión final.
+
+## El impacto va más allá de los minutos
+
+- **Trabajo más uniforme:** plantillas y flujos guardados permiten aplicar el mismo procedimiento a un lote.
+- **Menos transcripción:** se reutilizan los datos disponibles en correos, documentos y hojas, con validaciones antes de ejecutar.
+- **Menor riesgo de duplicación:** controles por tarea y OC, estados persistentes y recuperación de guardados inciertos ayudan a evitar repetir acciones.
+- **Resultados más fáciles de revisar:** cada lote muestra sus correctos, errores y pendientes para concentrar la atención en lo que requiere intervención.
+
+### Un recorrido de trabajo desde una sola ventana
+
+Buscar y revisar documentos → preparar órdenes y comunicaciones → ejecutar el lote seleccionado → revisar resultados y recuperar pendientes.
 
 ![Panel principal de COMPRAS TN](docs/capturas/01-inicio.png)
 
