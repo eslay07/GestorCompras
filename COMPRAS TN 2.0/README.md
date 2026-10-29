@@ -1,7 +1,14 @@
 # COMPRAS TN 2.0
 
-Aplicación de escritorio para automatizar los procesos de Compras Bienes y
-Compras Servicios. Guarda su información en `%LOCALAPPDATA%\ComprasTN\2.0`.
+Aplicación de escritorio para automatizar los procesos de Compras Bienes. El área de Servicios conserva una copia de la interfaz de Bienes y todavía no es funcional como flujo completo. Guarda su información en `%LOCALAPPDATA%\ComprasTN\2.0`.
+
+## Estado y valor del proyecto
+
+El flujo operativo actual es **Bienes**. Se ejecutan lotes en segundo plano para reducir búsquedas, transcripción y recorridos repetidos por correo, documentos y portales.
+
+Referencias aproximadas reportadas por el autor: 3–4 cotizaciones organizadas en 2 minutos frente a 6–7 manuales; una OC de 5 ítems en 2 minutos frente a 4–5; cinco tareas reasignadas en 3 minutos frente a 10–15; seis OC descargadas y organizadas en 3 minutos frente a 7–8 o más; un flujo del Orquestador en 1 minuto frente a 4–6. El envío de un lote ya preparado de 10–20 correos se sitúa en unos 10 segundos; la revisión previa se mide por separado.
+
+Consulte la [presentación por módulos y las capturas](../README.md) para conocer el recorrido, los tiempos y el proyecto complementario de notificaciones. **Servicios continúa en desarrollo** y sus pantallas no acreditan un flujo operativo terminado.
 
 ## Inicio rápido
 

@@ -1,183 +1,149 @@
-# COMPRAS TN
+# GestorCompras · COMPRAS TN
 
-## Menos trabajo repetitivo en compras. Más tiempo para revisar y decidir.
+### Automatización de compras para recuperar tiempo de trabajo manual
 
-**COMPRAS TN automatiza el trabajo operativo que normalmente exige abrir correos, buscar documentos, copiar datos entre sistemas y actualizar tareas una por una.** Reúne esos pasos en una aplicación de escritorio para Compras Bienes y Compras Servicios: permite preparar lotes, validar la información, ejecutar las acciones y revisar sus resultados.
+**Preparar correos, ordenar cotizaciones, cargar órdenes y actualizar tareas deja de ser una secuencia de acciones repetidas una por una.** GestorCompras reúne ese trabajo en una aplicación de escritorio que prepara y ejecuta lotes en segundo plano, mientras el usuario continúa con otras actividades.
 
-El beneficio está en reducir la atención que una persona debe dedicar a cada operación. En lugar de repetir el mismo recorrido por cada orden, el usuario revisa una selección y atiende las excepciones que requieren su criterio.
+Nació de un problema cotidiano: una compra no termina al registrar una orden. Hay que encontrar sus documentos, solicitar el despacho, controlar entregas, descargar archivos y dejar constancia en el sistema de tareas. El proyecto automatiza ese recorrido y mantiene la revisión de los datos y resultados en manos del usuario.
 
-**Autor y mantenimiento:** Jimmy Toapanta · [eslay07](https://github.com/eslay07)
+**Desarrollado por [Jimmy Toapanta · eslay07](https://github.com/eslay07)** · Python · PySide6 · Google Sheets · Automatización de portales
 
-## ¿Qué problema resuelve?
+> **Estado actual:** el flujo operativo descrito corresponde a **Compras Bienes**. **Servicios está en desarrollo:** su interfaz replica la de Bienes y todavía no es funcional como flujo completo.
 
-Un proceso manual de compras puede obligar a consultar un correo, localizar el PDF correcto, identificar la tarea y el proveedor, ingresar al portal, copiar datos, descargar o subir documentos y registrar el resultado. Ese recorrido se repite con cada orden. Cuando aumenta el volumen, también aumenta el tiempo dedicado a buscar, transcribir y comprobar información.
+## El ahorro, módulo por módulo
 
-COMPRAS TN conecta ese recorrido: organiza documentos por tarea, prepara comunicaciones, consolida órdenes y ejecuta secuencias de acciones desde una sola interfaz. Mantiene la revisión y las confirmaciones del usuario en los puntos que lo necesitan.
+| Módulo y volumen de referencia | Antes, de forma manual | Con GestorCompras | Tiempo recuperado |
+| --- | ---: | ---: | ---: |
+| Correos masivos · 10–20 destinatarios | 20–40 min para 10–20 correos | ≈10 s de envío por lote preparado | Se sustituye el armado y envío individual¹ |
+| Organizador · 3–4 archivos | 6–7 min por lote | ≈2 min por lote | **4–5 min por lote** |
+| Carga automática · 1 OC de 5 ítems | 4–5 min por orden | ≈2 min por orden | **2–3 min por orden** |
+| Reasignación · 5 tareas | 10–15 min por lote | ≈3 min por lote | **7–12 min por lote** |
+| Descargas OC · 6 órdenes | 7–8 min o más por lote | ≈3 min por lote | **4–5 min o más por lote** |
+| Orquestador · 1 tarea | 4–6 min por tarea | ≈1 min por tarea | **3–5 min por tarea** |
 
-| Trabajo que antes se repite por registro | Cómo lo aborda el proyecto | Dónde se reduce el esfuerzo manual |
-| --- | --- | --- |
-| Buscar correos y descargar adjuntos uno por uno | Escaneo por fechas o tareas y revisión conjunta de archivos | Menos búsqueda y clasificación repetida |
-| Localizar, nombrar y guardar cada documento | Identificación de tipos y guardado en la carpeta de la tarea | Menos navegación entre carpetas |
-| Preparar un correo para cada OC | Plantillas, agrupación y revisión de destinatarios y PDF | Menos redacción y selección de adjuntos |
-| Transcribir artículos desde una hoja al portal | Consolidación, validación y carga de las órdenes seleccionadas | Menos captura duplicada entre sistemas |
-| Buscar cada tarea y repetir los mismos clics | Orquestador con flujos guardados y ejecución por lotes | Menos intervención paso a paso |
-| Volver a revisar qué quedó pendiente | Estados, resultados por elemento y recuperación de pendientes | Menos reconstrucción manual del trabajo |
+¹ En Correos masivos, el tiempo automático corresponde al envío del lote ya preparado; la selección y revisión previas se contabilizan aparte.
 
-## ¿Cuánto tiempo puede ahorrar?
+*Tiempos aproximados reportados por el autor durante el uso del proyecto. Son referencias por módulo y volumen indicado; pueden variar según documentos, pasos del flujo, red y respuesta de los portales. No se suman como si correspondieran a una misma jornada.*
 
-**Ejemplo ilustrativo: un lote de 30 operaciones al día podría liberar 1 hora y 45 minutos de trabajo manual diario, equivalente a 38 horas y 30 minutos al mes.** El cálculo siguiente muestra las suposiciones; **no es una medición obtenida de la operación real**.
+**El valor también está en la autonomía:** preparar un lote permite dejar al programa ejecutando el recorrido repetitivo y dedicar la atención a otra actividad. El tiempo de ejecución de una automatización no equivale necesariamente a tiempo de intervención humana. La revisión inicial, las confirmaciones y la atención a excepciones siguen formando parte del trabajo.
 
-| Supuesto del ejemplo | Proceso manual | Trabajo asistido con COMPRAS TN |
-| --- | ---: | ---: |
-| Operaciones diarias del mismo tipo | 30 | 30 |
-| Dedicación humana por operación | 5 min | 1 min de revisión e intervención |
-| Preparación y revisión general del lote | Incluidas en los 5 min por operación | 15 min diarios adicionales |
-| **Dedicación humana diaria** | **150 min** | **45 min** |
-| **Ahorro estimado** | | **105 min diarios · 70 %** |
-| **Ahorro en un mes de 22 días laborables** | | **38 h 30 min** |
+![Panel de navegación de GestorCompras](docs/capturas/01-inicio.png)
 
-La estimación compara **tiempo de dedicación humana**, no promete que el portal complete cada operación en un minuto. La duración total depende de la red, los sistemas externos, el tipo de flujo y las incidencias. Preparar datos, confirmar operaciones y resolver excepciones sigue requiriendo trabajo.
+> Las capturas son de la interfaz real con datos de demostración. Se ocultaron o sustituyeron correos, proveedores, RUC, responsables y rutas privadas. Las filas ilustrativas no representan transacciones realizadas al generar las imágenes.
 
-Para calcular el ahorro real del equipo:
+## 1. Correos masivos · Solicitudes de despacho listas por lote
 
-```text
-Ahorro diario = (operaciones × minutos manuales por operación)
-              − (preparación del lote + revisión e intervención total)
+**Antes:** cada solicitud exigía redactar o adaptar un correo, colocar el asunto correcto, buscar la orden de compra y adjuntarla. La referencia manual es de **2 minutos por correo**.
 
-Ahorro mensual en horas = ahorro diario × días laborables ÷ 60
+**Ahora:** se utiliza una plantilla, se revisan las órdenes y sus documentos y se envía un lote de **10–20 correos**, cada uno dirigido al proveedor correspondiente. La preparación del mensaje, el asunto y el adjunto deja de repetirse manualmente para cada destinatario.
+
+> **10–20 correos enviados en aproximadamente 10 segundos por lote**, con un proveedor distinto como destinatario de cada mensaje. El recorrido manual de ese volumen ocupaba **20–40 minutos**, a razón de 2 minutos por correo.
+
+¹ Los 10 segundos corresponden al envío automático de un lote preparado. La selección de órdenes y la revisión inicial se realizan antes y deben contabilizarse al medir el ahorro total de una jornada.
+
+![Correos masivos](docs/capturas/02-correos-bienes.png)
+
+## 2. Organizador de archivos · Del correo a la carpeta correcta
+
+El módulo reconoce mensajes de solicitud de cotización cuyo asunto contiene la tarea. Compara el remitente con la base local para identificar al proveedor, extrae el PDF o la ficha y busca, dentro de las subcarpetas de la carpeta central configurada, la que corresponde al número de tarea.
+
+El archivo se guarda en su destino con una etiqueta que identifica la **cotización y el proveedor**. Así se reduce el trabajo de abrir mensajes, identificar a quién pertenece un documento, renombrarlo y recorrer carpetas hasta encontrar su ubicación.
+
+También permite seleccionar **varios archivos locales**. En esa modalidad se extrae el RUC para asociar el documento con el proveedor registrado y se revisan los datos antes de guardar.
+
+> **Lote de 3–4 archivos:** de **6–7 minutos** de organización manual a **aproximadamente 2 minutos**. Un ahorro de **4–5 minutos por lote**.
+
+![Organizador de cotizaciones y archivos](docs/capturas/03-organizador-archivos.png)
+
+## 3. Carga automática de OC · De Google Sheets al portal
+
+Toma de una hoja de Google Sheets los datos necesarios para preparar la orden: **artículos, cantidades, precios, proveedor y solicitante**. Valida la información y realiza la carga en el portal de órdenes de compra.
+
+El número de OC y los datos de quienes deben autorizarla se registran en la hoja para facilitar los seguimientos. La información se mantiene vinculada a la tarea y a los artículos de origen.
+
+> **Una OC con 5 ítems:** de **4–5 minutos** de captura manual a **aproximadamente 2 minutos** de ejecución automática. Entre **2 y 3 minutos menos por orden**.
+
+Su mayor aporte es poder dejar **varias órdenes preparadas en un lote** y continuar con otra función mientras el programa las procesa. Se reducen tanto la transcripción entre sistemas como la necesidad de acompañar cada campo y cada clic.
+
+![Carga automática de órdenes de compra](docs/capturas/04-carga-oc-automatica.png)
+
+## 4. Reasignación · Compras completas que avanzan sin repetir el recorrido
+
+Detecta correos que informan que una tarea de compras está completa. A partir de ellos prepara la reasignación en el portal corporativo de gestión de tareas: completa **número de factura, número de ingreso y observaciones**, y utiliza el departamento y usuario configurados como destino.
+
+El usuario revisa el lote y la automatización ejecuta el recorrido que antes debía repetirse para cada tarea.
+
+> **Cinco tareas:** de **10–15 minutos** de reasignación manual a **aproximadamente 3 minutos por lote**. Entre **7 y 12 minutos recuperados**.
+
+![Reasignación por lotes](docs/capturas/06-reasignacion-bienes.png)
+
+### Una automatización que se complementa con otra
+
+Los correos de tareas completas se complementan con [Notificacion-automatica-tareas](https://github.com/eslay07/Notificacion-automatica-tareas), un proyecto del mismo autor en Google Apps Script. Ese sistema revisa las entregas registradas en Google Sheets, detecta tareas completas y envía su notificación. GestorCompras utiliza ese aviso como entrada para el proceso de reasignación.
+
+```mermaid
+flowchart LR
+    A[Entregas registradas en Google Sheets] --> B[Notificación de tarea completa]
+    B --> C[Escaneo y revisión en GestorCompras]
+    C --> D[Reasignación por lote en el portal]
 ```
 
-Para sustituir este ejemplo por un resultado medido, registre un lote comparable antes y después, incluyendo preparación, correcciones y revisión final.
+## 5. Descargas OC · Descargar, identificar y organizar en un mismo flujo
 
-## El impacto va más allá de los minutos
+El escaneo de correo detecta las confirmaciones de órdenes aprobadas y extrae los datos necesarios para descargarlas. El programa abre el portal de órdenes de compra, descarga los documentos uno a uno dentro del lote y los organiza en la carpeta o subcarpeta configurada, utilizando la **tarea y el proveedor** para identificar el archivo y su destino.
 
-- **Trabajo más uniforme:** plantillas y flujos guardados permiten aplicar el mismo procedimiento a un lote.
-- **Menos transcripción:** se reutilizan los datos disponibles en correos, documentos y hojas, con validaciones antes de ejecutar.
-- **Menor riesgo de duplicación:** controles por tarea y OC, estados persistentes y recuperación de guardados inciertos ayudan a evitar repetir acciones.
-- **Resultados más fáciles de revisar:** cada lote muestra sus correctos, errores y pendientes para concentrar la atención en lo que requiere intervención.
+También puede ejecutarse **sin escaneo de correo**: basta ingresar un lote de números de OC y revisar la selección.
 
-### Un recorrido de trabajo desde una sola ventana
+> **Seis órdenes:** de **7–8 minutos o más** —incluyendo descarga, cambio de nombre y ubicación— a **aproximadamente 3 minutos por lote**. Al menos **4–5 minutos menos** en el rango de referencia.
 
-Buscar y revisar documentos → preparar órdenes y comunicaciones → ejecutar el lote seleccionado → revisar resultados y recuperar pendientes.
+![Descargas de órdenes](docs/capturas/07-descargas-bienes.png)
 
-![Panel principal de COMPRAS TN](docs/capturas/01-inicio.png)
+### El volumen mensual le da valor a cada lote
 
-> Las capturas muestran la interfaz real con una base temporal y datos de demostración. Los proveedores, RUC, correos, responsables y rutas privadas están ocultos o sustituidos. No se conectó a buzones ni portales corporativos para generarlas. Las filas ilustrativas no representan transacciones ejecutadas.
+El autor sitúa la carga de trabajo en unas **80 órdenes mensuales de Bienes** y unas **300 de Servicios**. Son volúmenes de referencia de la actividad, no una afirmación de que ambos flujos estén automatizados en esta versión.
 
-## Módulos disponibles
-
-| Área | Módulo | Función |
-| --- | --- | --- |
-| General | Acceso e inicio | Sesión corporativa, navegación y ubicación de datos |
-| Bienes y Servicios | Correos masivos | Revisión de OC, PDF, destinatarios y plantillas antes del envío |
-| Bienes | Organizador de archivos | Escaneo de adjuntos o selección local, identificación y guardado por tarea |
-| Bienes | Carga de OC automática | Lectura de Google Sheets, agrupación, validación y carga controlada en NAF |
-| Bienes | Seguimientos | Selección de OC y envío de seguimiento con plantilla |
-| Bienes y Servicios | Reasignación | Búsqueda de tareas, validación de destino y reasignación en Telcos |
-| Bienes y Servicios | Descargas OC | Descarga manual, escaneo de correo y modalidad Abastecimiento |
-| Bienes y Servicios | Cola de subidas | Transferencias persistentes, estados y recuperación de pendientes |
-| Bienes y Servicios | Orquestador Telcos | Bandeja de tareas, ejecución por lotes, editor visual y alias de archivos |
-| Sistema | Configuración | Proveedores, asignaciones, plantillas e integraciones por módulo |
-
-## Capturas y funcionamiento
-
-### Acceso
-
-El acceso inicia una sesión de trabajo. La contraseña permanece en memoria y se descarta al cerrar sesión.
-
-![Acceso](docs/capturas/00-acceso.png)
-
-### Correos masivos
-
-Permite ingresar órdenes, revisar los documentos y confirmar los destinatarios antes del envío. Bienes y Servicios disponen de su propio acceso desde la barra lateral.
-
-![Correos masivos de Bienes](docs/capturas/02-correos-bienes.png)
+Aplicando proporcionalmente los tiempos anteriores a **80 órdenes de Bienes**, la descarga y organización pasan de **aproximadamente 93–107 minutos a 40 minutos al mes**: **unos 53–67 minutos recuperados solo en este módulo**. Este cálculo no suma los ahorros de correos, cotizaciones, carga de OC ni tareas. El volumen de Servicios representa una oportunidad futura mientras ese módulo continúa en desarrollo.
 
 <details>
-<summary>Ver Correos masivos de Servicios</summary>
+<summary>Abastecimiento y cola de subidas</summary>
 
-![Correos masivos de Servicios](docs/capturas/09-correos-servicios.png)
-
-</details>
-
-### Organizador de archivos
-
-Busca adjuntos por fechas o tareas y admite archivos locales. La revisión permite identificar el tipo de documento y su destino antes de guardar los seleccionados.
-
-![Organizador de archivos](docs/capturas/03-organizador-archivos.png)
-
-### Carga automática de OC
-
-Lee la hoja configurada, consolida artículos y agrupa las órdenes por proveedor, departamento y solicitante. Las validaciones y la selección previa permiten revisar qué se enviará al portal. Incluye recuperación de operaciones pendientes para evitar repetir una creación incierta.
-
-![Carga automática de OC](docs/capturas/04-carga-oc-automatica.png)
-
-### Seguimientos
-
-Organiza las órdenes que requieren seguimiento y permite preparar su comunicación mediante una plantilla.
-
-![Seguimientos](docs/capturas/05-seguimientos.png)
-
-### Reasignación de tareas
-
-Presenta las tareas encontradas y los campos de destino antes de ejecutar la reasignación. Los flujos de Bienes y Servicios comparten controles de validación y reporte.
-
-![Reasignación de Bienes](docs/capturas/06-reasignacion-bienes.png)
-
-<details>
-<summary>Ver Reasignación de Servicios</summary>
-
-![Reasignación de Servicios](docs/capturas/10-reasignacion-servicios.png)
-
-</details>
-
-### Descargas OC y Abastecimiento
-
-La modalidad normal acepta órdenes manuales o detectadas desde correo. Abastecimiento incorpora filtros por fechas y responsables. La cola de transferencias mantiene los pendientes de subida y sus estados.
-
-![Descargas OC de Bienes](docs/capturas/07-descargas-bienes.png)
+La modalidad Abastecimiento incorpora filtros para preparar la descarga. La cola de subidas permite revisar estados y recuperar transferencias pendientes.
 
 ![Abastecimiento](docs/capturas/07-descargas-bienes-abastecimiento.png)
 
 ![Cola de subidas](docs/capturas/07-descargas-bienes-telcodrive-subidas.png)
 
-<details>
-<summary>Ver Descargas, Abastecimiento y Subidas de Servicios</summary>
-
-![Descargas OC de Servicios](docs/capturas/11-descargas-servicios.png)
-
-![Abastecimiento de Servicios](docs/capturas/11-descargas-servicios-abastecimiento.png)
-
-![Subidas de Servicios](docs/capturas/11-descargas-servicios-telcodrive-subidas.png)
-
 </details>
 
-### Orquestador Telcos
+## 6. Orquestador · Un constructor de flujos para el portal de tareas
 
-Reúne las tareas de distintos orígenes, elimina duplicados y permite ejecutar un flujo guardado. El editor visual muestra cada acción y sus parámetros; los alias relacionan tipos de documento y archivos. La política del flujo controla cómo continuar ante fallos.
+Su idea se parece a la de un constructor de automatizaciones como **n8n**, enfocada al portal corporativo de tareas: combinar pasos para registrar seguimientos, escribir observaciones, subir archivos y mantener el historial de una compra.
 
-![Ejecución del orquestador](docs/capturas/08-orquestador-bienes.png)
+El editor visual permite preparar y guardar una secuencia para reutilizarla. Después se aplica a un lote de tareas, en segundo plano, con revisión de resultados por elemento.
 
-![Editor visual](docs/capturas/08-orquestador-bienes-editor-visual.png)
+> **Una tarea:** de **4–6 minutos** de acciones manuales a **aproximadamente 1 minuto** de ejecución del flujo. Entre **3 y 5 minutos menos por tarea**, con ejecución por lotes y en segundo plano.
 
-![Alias de archivos](docs/capturas/08-orquestador-bienes-alias-de-archivos.png)
+El beneficio crece cuando el mismo procedimiento debe repetirse muchas veces: se configura el recorrido y se reutiliza, en lugar de reproducir manualmente cada acción en cada tarea.
 
-<details>
-<summary>Ver el Orquestador de Servicios</summary>
+![Ejecución de flujos por lote](docs/capturas/08-orquestador-bienes.png)
 
-![Ejecución de Servicios](docs/capturas/12-orquestador-servicios.png)
+![Constructor visual de flujos](docs/capturas/08-orquestador-bienes-editor-visual.png)
 
-![Editor de Servicios](docs/capturas/12-orquestador-servicios-editor-visual.png)
+![Alias para localizar archivos](docs/capturas/08-orquestador-bienes-alias-de-archivos.png)
 
-![Alias de Servicios](docs/capturas/12-orquestador-servicios-alias-de-archivos.png)
+## Herramientas que completan el recorrido
 
-</details>
+### Seguimientos
 
-### Configuración
+Prepara la comunicación de seguimiento de las órdenes mediante selección y plantillas. Complementa la información registrada durante la carga y el control de las compras.
 
-Centraliza los catálogos de proveedores, asignaciones, plantillas HTML y opciones de los módulos. Cada instalación debe registrar sus propias credenciales, rutas e identificadores privados.
+![Seguimientos](docs/capturas/05-seguimientos.png)
 
-![Configuración y proveedores ocultos](docs/capturas/13-configuracion.png)
+### Configuración centralizada
+
+Reúne el catálogo de proveedores, sus datos de identificación, las asignaciones, las plantillas y las opciones de integración. Esta base permite asociar correctamente los correos y documentos con cada proveedor, sin publicar el catálogo real en el repositorio.
+
+![Configuración con datos ocultos](docs/capturas/13-configuracion.png)
 
 <details>
 <summary>Ver asignaciones, plantillas y opciones por módulo</summary>
@@ -186,7 +152,40 @@ Centraliza los catálogos de proveedores, asignaciones, plantillas HTML y opcion
 
 ![Plantillas](docs/capturas/13-configuracion-plantillas.png)
 
-![Integraciones por módulo](docs/capturas/13-configuracion-opciones-por-modulo.png)
+![Opciones e integraciones](docs/capturas/13-configuracion-opciones-por-modulo.png)
+
+</details>
+
+### Acceso y trabajo en segundo plano
+
+Tras preparar la selección y confirmar la operación, los procesos pueden trabajar en segundo plano para reducir la atención paso a paso. El usuario conserva la revisión de los resultados y puede atender otras actividades mientras se ejecuta el lote.
+
+![Acceso](docs/capturas/00-acceso.png)
+
+## Estado de Servicios · Interfaz en desarrollo
+
+**Servicios todavía no es funcional como un flujo completo.** Sus pantallas son una copia de la estructura de Bienes y se conservan como base para la implementación. Los tiempos y resultados operativos descritos arriba no deben interpretarse como una validación de Servicios.
+
+<details>
+<summary>Ver las pantallas preliminares de Servicios</summary>
+
+Estas capturas muestran la estructura de la interfaz, no módulos terminados.
+
+![Correos de Servicios — preliminar](docs/capturas/09-correos-servicios.png)
+
+![Reasignación de Servicios — preliminar](docs/capturas/10-reasignacion-servicios.png)
+
+![Descargas de Servicios — preliminar](docs/capturas/11-descargas-servicios.png)
+
+![Abastecimiento de Servicios — preliminar](docs/capturas/11-descargas-servicios-abastecimiento.png)
+
+![Subidas de Servicios — preliminar](docs/capturas/11-descargas-servicios-telcodrive-subidas.png)
+
+![Orquestador de Servicios — preliminar](docs/capturas/12-orquestador-servicios.png)
+
+![Editor de Servicios — preliminar](docs/capturas/12-orquestador-servicios-editor-visual.png)
+
+![Alias de Servicios — preliminar](docs/capturas/12-orquestador-servicios-alias-de-archivos.png)
 
 </details>
 
