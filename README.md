@@ -94,6 +94,7 @@ Para las operaciones reales, cada organización configura sus propios servicios 
 
 ## Documentación
 
+- [Presentación profesional y guía visual actuales en PDF](docs/portafolio/README.md).
 - [Impacto operativo: tabla mensual, supuestos y proyección de capacidad](docs/IMPACTO_OPERATIVO.md).
 - [Módulos: explicación, tiempos y 25 capturas](docs/MODULOS.md).
 - [Guía técnica: instalación, configuración, pruebas y estructura](docs/GUIA_TECNICA.md).
