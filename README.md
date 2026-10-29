@@ -101,7 +101,7 @@ Para las operaciones reales, cada organización configura sus propios servicios 
 
 ## Sobre el autor
 
-**Jimmy Toapanta** · [Perfil de GitHub](https://github.com/eslay07)
+**Jimmy Toapanta** · [Portafolio de GitHub](https://github.com/eslay07) · [LinkedIn](https://www.linkedin.com/in/jimmy-toapanta-950a441b8/)
 
 Este proyecto reúne mi experiencia en el proceso operativo de compras y mi capacidad para convertirlo en una solución de software: analizar el recorrido, integrar herramientas, automatizar pasos y preparar una entrega instalable con controles y documentación.
 
