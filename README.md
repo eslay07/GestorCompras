@@ -1,12 +1,25 @@
 # GestorCompras · COMPRAS TN
 
-### Automatización de compras para recuperar tiempo de trabajo manual
+### Automatización aplicada a problemas reales de compras
 
-**Preparar correos, ordenar cotizaciones, cargar órdenes y actualizar tareas deja de ser una secuencia de acciones repetidas una por una.** GestorCompras reúne ese trabajo en una aplicación de escritorio que prepara y ejecuta lotes en segundo plano, mientras el usuario continúa con otras actividades.
+**Desarrollé GestorCompras para reducir el trabajo repetitivo de una operación de compras:** preparar correos, organizar cotizaciones, cargar órdenes y actualizar tareas. Convertí ese recorrido en una aplicación de escritorio que integra correo, documentos, Google Sheets y portales corporativos, con ejecución por lotes y en segundo plano.
 
-Nació de un problema cotidiano: una compra no termina al registrar una orden. Hay que encontrar sus documentos, solicitar el despacho, controlar entregas, descargar archivos y dejar constancia en el sistema de tareas. El proyecto automatiza ese recorrido y mantiene la revisión de los datos y resultados en manos del usuario.
+Con una carga de referencia de **45 tareas mensuales**, el escenario documentado estima un **ahorro operativo de 11–15 horas al mes**. Los tiempos por módulo se conservan más abajo junto con los supuestos del cálculo. La revisión de datos, las confirmaciones y la atención a excepciones siguen en manos del usuario.
 
 **Desarrollado por [Jimmy Toapanta · eslay07](https://github.com/eslay07)** · Python · PySide6 · Google Sheets · Automatización de portales
+
+## Lo que demuestra este proyecto
+
+El objetivo es **reducir el esfuerzo por operación y aprovechar mejor los recursos disponibles**. El proyecto permite evaluar mi capacidad para analizar una necesidad del trabajo diario, diseñar una solución y llevarla hasta una aplicación instalable.
+
+| Capacidad | Evidencia en el proyecto |
+| --- | --- |
+| **Analizar y mejorar procesos** | Identificación de búsquedas, transcripciones y recorridos repetidos; comparación de tiempos antes y después por módulo. |
+| **Integrar herramientas y datos** | Asociación de correos, proveedores, documentos, hojas de cálculo y tareas dentro de un mismo recorrido. |
+| **Automatizar con controles** | Validación previa, confirmaciones, control de duplicados, estados persistentes y recuperación de pendientes. |
+| **Entregar una solución mantenible** | Separación de interfaz, casos de uso, dominio e infraestructura; pruebas automáticas, instalador y documentación de uso. |
+
+**El aporte profesional está en conectar el conocimiento operativo con la implementación técnica:** entender dónde se repite el esfuerzo y construir herramientas que permitan dedicar más atención a revisar resultados y resolver excepciones.
 
 > **Estado actual:** el flujo operativo descrito corresponde a **Compras Bienes**. **Servicios está en desarrollo:** su interfaz replica la de Bienes y todavía no es funcional como flujo completo.
 
