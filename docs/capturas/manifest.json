@@ -1,0 +1,106 @@
+{
+  "synthetic": true,
+  "real_services_accessed": false,
+  "captures": [
+    {
+      "file": "00-acceso.png",
+      "caption": "Acceso y sesión"
+    },
+    {
+      "file": "01-inicio.png",
+      "caption": "Inicio"
+    },
+    {
+      "file": "02-correos-bienes.png",
+      "caption": "Correos masivos"
+    },
+    {
+      "file": "03-organizador-archivos.png",
+      "caption": "Organizador de archivos"
+    },
+    {
+      "file": "04-carga-oc-automatica.png",
+      "caption": "Carga de OC automática"
+    },
+    {
+      "file": "05-seguimientos.png",
+      "caption": "Seguimientos"
+    },
+    {
+      "file": "06-reasignacion-bienes.png",
+      "caption": "Reasignación"
+    },
+    {
+      "file": "07-descargas-bienes.png",
+      "caption": "Descargas OC"
+    },
+    {
+      "file": "07-descargas-bienes-abastecimiento.png",
+      "caption": "Descargas OC · Abastecimiento"
+    },
+    {
+      "file": "07-descargas-bienes-telcodrive-subidas.png",
+      "caption": "Descargas OC · Telcodrive · Subidas"
+    },
+    {
+      "file": "08-orquestador-bienes.png",
+      "caption": "Orquestador Telcos"
+    },
+    {
+      "file": "08-orquestador-bienes-editor-visual.png",
+      "caption": "Orquestador Telcos · Editor visual"
+    },
+    {
+      "file": "08-orquestador-bienes-alias-de-archivos.png",
+      "caption": "Orquestador Telcos · Alias de archivos"
+    },
+    {
+      "file": "09-correos-servicios.png",
+      "caption": "Correos masivos"
+    },
+    {
+      "file": "10-reasignacion-servicios.png",
+      "caption": "Reasignación"
+    },
+    {
+      "file": "11-descargas-servicios.png",
+      "caption": "Descargas OC"
+    },
+    {
+      "file": "11-descargas-servicios-abastecimiento.png",
+      "caption": "Descargas OC · Abastecimiento"
+    },
+    {
+      "file": "11-descargas-servicios-telcodrive-subidas.png",
+      "caption": "Descargas OC · Telcodrive · Subidas"
+    },
+    {
+      "file": "12-orquestador-servicios.png",
+      "caption": "Orquestador Telcos"
+    },
+    {
+      "file": "12-orquestador-servicios-editor-visual.png",
+      "caption": "Orquestador Telcos · Editor visual"
+    },
+    {
+      "file": "12-orquestador-servicios-alias-de-archivos.png",
+      "caption": "Orquestador Telcos · Alias de archivos"
+    },
+    {
+      "file": "13-configuracion.png",
+      "caption": "Configuración"
+    },
+    {
+      "file": "13-configuracion-asignaciones.png",
+      "caption": "Configuración · Asignaciones"
+    },
+    {
+      "file": "13-configuracion-plantillas.png",
+      "caption": "Configuración · Plantillas"
+    },
+    {
+      "file": "13-configuracion-opciones-por-modulo.png",
+      "caption": "Configuración · Opciones por módulo"
+    }
+  ]
+}

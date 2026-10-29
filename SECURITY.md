@@ -1,15 +1,13 @@
 # Seguridad
 
-## Reporte responsable
+Reporte una vulnerabilidad mediante un aviso privado en la pestaña Security del repositorio. No publique secretos, datos personales o información de producción en incidencias.
 
-Reporta una vulnerabilidad mediante un aviso privado de seguridad en la pestaña **Security** del repositorio. No incluyas secretos, datos personales ni información de producción en incidencias públicas.
+## Contribuciones
 
-## Reglas para contribuciones
+- No incluya credenciales, contraseñas, certificados, bases operativas, logs ni perfiles de proveedores.
+- Mantenga las capturas con datos sintéticos y las identidades ocultas.
+- Configure los identificadores privados en la instalación; no los añada como valores predeterminados públicos.
+- Ejecute las pruebas sin acceso a servicios reales antes de publicar.
+- Las pruebas corporativas requieren autorización y no forman parte de la ejecución predeterminada.
 
-- No subas archivos de entorno, credenciales, claves, certificados o tokens.
-- No añadas bases de datos, logs, descargas ni configuraciones locales.
-- Usa solamente fixtures sintéticos y correos `example.com`.
-- Mantén los adaptadores de demostración sin conexiones externas.
-- Ejecuta `scripts\privacy_check.py` y las pruebas antes de proponer cambios.
-
-Si un secreto llegara a incorporarse, revócalo en su sistema de origen antes de limpiar el historial. No publiques su valor en reportes o conversaciones.
+Si se publica un secreto, revóquelo en su sistema de origen y coordine la limpieza de las referencias afectadas.
