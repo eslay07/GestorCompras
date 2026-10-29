@@ -1,0 +1,12 @@
+{
+  "source": "https://telcos.telconet.ec/soporte/tareas/",
+  "captured_on": "2026-10-13",
+  "method": "Recortes de capturas reales del navegador Codex; sin iconos dibujados ni recreados.",
+  "states_observed": [
+    "Asignada",
+    "Aceptada",
+    "Pausada"
+  ],
+  "source_screenshots": ".test-results/telcos/",
+  "note": "Controles genéricos sin identidades. El campo Número tarea se recreó con un control nativo vacío para ocultar la referencia operativa."
+}

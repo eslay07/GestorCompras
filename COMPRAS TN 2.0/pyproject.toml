@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compras-tn"
+version = "2.0.0"
+description = "Automatización de Compras Telconet"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "alembic~=1.18",
+    "google-auth~=2.49",
+    "gspread~=6.2",
+    "jinja2~=3.1",
+    "openpyxl~=3.1",
+    "pandas~=2.3",
+    "pdfplumber~=0.11",
+    "pydantic~=2.12",
+    "PySide6~=6.11",
+    "requests~=2.33",
+    "selenium~=4.43",
+    "SQLAlchemy~=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy~=1.18",
+    "pytest~=9.0",
+    "pytest-cov~=7.0",
+    "pytest-qt~=4.5",
+    "ruff~=0.14",
+]
+
+[project.scripts]
+compras-tn = "compras_tn.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"compras_tn.presentation" = ["assets/telcos/*.jpg", "assets/telcos/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
+markers = ["live: requiere acceso real a servicios corporativos"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["compras_tn"]
+exclude = ["alembic"]
+
+[[tool.mypy.overrides]]
+module = [
+    "compras_tn.presentation.*",
+    "compras_tn.infrastructure.automation.*",
+    "compras_tn.infrastructure.google_sheets",
+    "compras_tn.infrastructure.mail",
+    "compras_tn.infrastructure.reports",
+    "compras_tn.infrastructure.seafile",
+]
+ignore_errors = true
